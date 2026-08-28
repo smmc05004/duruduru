@@ -22,3 +22,8 @@
 - 작업이 끝나면 PR에서 변경 범위, 검증 결과, 제품 문서 확인 여부를 점검한 뒤에만 `main`으로 병합한다. 병합된 작업 브랜치는 삭제한다.
 - `main`에는 force push하지 않는다. 작업 브랜치의 이력 정리가 필요할 때만, 원격 상태를 확인한 후 `--force-with-lease`를 사용한다.
 - 상세 절차와 병합 방식은 `docs/development/BRANCH_WORKFLOW.md`를 따른다.
+
+## 지속 에이전트 역할
+
+- 제품 범위와 의사결정은 `.agents/pm/AGENT.md`의 PM 에이전트가 관리한다.
+- 구현 작업의 계획·수행·검증은 `.agents/employee/AGENT.md`의 employee agent가 담당한다.
