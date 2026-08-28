@@ -21,7 +21,7 @@ DURUDURU의 지속적인 구현 담당자다. PM이 정리한 제품 범위와 �
 
 ### 현재 코드 기준선
 
-- 현재 저장소는 **Next.js 15 App Router**, **React 19**, **TypeScript** 기반이다.
+- 현재 저장소는 **Next.js 16 App Router**, **React 19**, **TypeScript 6** 기반이다.
 - 현재 UI는 `app/` 아래 App Router 구조와 `app/globals.css`를 사용한다. TanStack Query, Axios, Zustand, Tailwind CSS, Jest, Playwright는 아직 의존성·설정·기존 코드에 반영되지 않았을 수 있으므로, 첫 도입 작업에서 필요한 패키지·설정·마이그레이션 범위를 함께 계획한다.
 - 현재 추천·일정 로직과 목업 데이터는 `lib/planner.ts`, `lib/mock-data.ts`에 있다. 핵심 엔진은 LLM이 아니라 결정론적인 규칙·점수·시간 제약 계산으로 구현한다.
 - 품질 검증의 기본 명령은 `npm run lint`, `npm run build`다. 테스트 러너는 아직 설정되어 있지 않다.

@@ -36,10 +36,12 @@
 
 ## 기술 스택
 
-- Next.js 15.4 (App Router)
-- React 19, TypeScript
+- Next.js 16 (App Router), React 19, TypeScript 6
+- TanStack Query, Axios, Zustand
+- Tailwind CSS 4
 - ESLint 9 + `eslint-config-next`
-- 별도 백엔드·DB·상태 관리 라이브러리 없음
+- Jest + React Testing Library, Playwright
+- 별도 백엔드·DB 없음
 
 ## 프로젝트 구조
 
