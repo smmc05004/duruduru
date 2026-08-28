@@ -5,6 +5,7 @@
 @AGENTS.md
 @docs/agent/SOURCE_ORDER.md
 @docs/agent/WORKFLOW.md
+@docs/agent/WORK_CYCLE.md
 @docs/agent/TECH_STACK.md
 
 ## Claude Code 전용 규칙

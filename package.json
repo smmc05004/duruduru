@@ -7,6 +7,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "jest --passWithNoTests",
+    "test:e2e": "playwright test",
+    "setup:e2e": "playwright install chromium",
+    "verify": "npm run check:agent-harness && npm run lint && npm run typecheck && npm run test && npm run build",
+    "cycle": "node scripts/work-cycle.mjs",
     "check:agent-harness": "node scripts/check-agent-harness.mjs",
     "check:tour-api": "node --env-file-if-exists=.env.local scripts/probe-tourapi.mjs"
   },
