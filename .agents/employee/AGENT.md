@@ -22,9 +22,10 @@ DURUDURU의 지속적인 구현 담당자다. PM이 정리한 제품 범위와 �
 ### 현재 코드 기준선
 
 - 현재 저장소는 **Next.js 16 App Router**, **React 19**, **TypeScript 6** 기반이다.
-- 현재 UI는 `app/` 아래 App Router 구조와 `app/globals.css`를 사용한다. TanStack Query, Axios, Zustand, Tailwind CSS, Jest, Playwright는 아직 의존성·설정·기존 코드에 반영되지 않았을 수 있으므로, 첫 도입 작업에서 필요한 패키지·설정·마이그레이션 범위를 함께 계획한다.
+- 현재 UI는 `app/` 아래 App Router 구조와 `app/globals.css`를 사용한다. TanStack Query, Axios, Zustand, Tailwind CSS, Jest, Playwright 의존성과 기본 검증 설정이 반영되어 있다. 기능별 사용은 필요한 작업에서만 도입한다.
 - 현재 추천·일정 로직과 목업 데이터는 `lib/planner.ts`, `lib/mock-data.ts`에 있다. 핵심 엔진은 LLM이 아니라 결정론적인 규칙·점수·시간 제약 계산으로 구현한다.
-- 품질 검증의 기본 명령은 `npm run lint`, `npm run build`다. 테스트 러너는 아직 설정되어 있지 않다.
+- 품질 검증은 `npm run verify`로 실행한다. 이 명령은 하네스 검사, lint, 타입 검사, Jest, 프로덕션 빌드를 순서대로 수행한다. 브라우저 핵심 흐름은 `npm run test:e2e`로 별도 실행한다.
+- 작업 게이트는 `npm run cycle`로 추적한다. `docs/agent/WORK_CYCLE.md`의 그래프에서 선행 노드와 근거를 확인한다.
 - TourAPI 응답을 조사하는 수동 도구는 `scripts/probe-tourapi.mjs`와 `npm run check:tour-api`다. 이 도구는 현재 앱 런타임과 연결돼 있지 않다.
 - 패키지 관리자는 npm이며, 의존성 설치에는 lockfile 기준의 `npm ci`를 우선 사용한다.
 

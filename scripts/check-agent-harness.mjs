@@ -9,6 +9,7 @@ const requiredSources = [
   "CLAUDE.md",
   "docs/agent/SOURCE_ORDER.md",
   "docs/agent/WORKFLOW.md",
+  "docs/agent/WORK_CYCLE.md",
   "docs/agent/TECH_STACK.md",
   "docs/product/PRD.md",
   "docs/product/DECISIONS.md",
@@ -16,6 +17,7 @@ const requiredSources = [
   "docs/development/BRANCH_WORKFLOW.md",
   ".agents/pm/AGENT.md",
   ".agents/employee/AGENT.md",
+  ".agents/reviewer/AGENT.md",
 ];
 
 const claudeEntrypoint = "CLAUDE.md";
