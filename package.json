@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "check:agent-harness": "node scripts/check-agent-harness.mjs",
     "check:tour-api": "node --env-file-if-exists=.env.local scripts/probe-tourapi.mjs"
   },
   "dependencies": {

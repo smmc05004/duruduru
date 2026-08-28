@@ -1,5 +1,11 @@
 # DURUDURU 작업 규칙
 
+공통 에이전트 규칙의 우선순위와 작업 절차는 다음 문서를 함께 따른다.
+
+- `docs/agent/SOURCE_ORDER.md`
+- `docs/agent/WORKFLOW.md`
+- `docs/agent/TECH_STACK.md`
+
 이 프로젝트에서 제품 범위, 우선순위, 데이터 신뢰도 또는 사용자 흐름에 영향을 주는 작업을 시작하기 전에 다음 문서를 읽는다.
 
 1. `.agents/pm/AGENT.md` — 지속되는 PM 역할과 권한
