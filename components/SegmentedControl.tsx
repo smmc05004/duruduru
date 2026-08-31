@@ -20,11 +20,26 @@ type SegmentedControlProps = {
   value: string;
   onChange: (value: string) => void;
   invalid?: boolean;
+  /** 오류 메시지 또는 안내 문구 엘리먼트의 id. 라디오 그룹에 연결한다. */
+  describedBy?: string;
 };
 
-export function SegmentedControl({ label, options, value, onChange, invalid = false }: SegmentedControlProps) {
+export function SegmentedControl({
+  label,
+  options,
+  value,
+  onChange,
+  invalid = false,
+  describedBy,
+}: SegmentedControlProps) {
   return (
-    <div className="dd-segmented" role="radiogroup" aria-label={label} aria-invalid={invalid || undefined}>
+    <div
+      className="dd-segmented"
+      role="radiogroup"
+      aria-label={label}
+      aria-invalid={invalid || undefined}
+      aria-describedby={describedBy}
+    >
       {options.map((option) => {
         const selected = option.value === value;
         return (

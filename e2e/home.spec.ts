@@ -45,3 +45,19 @@ test("대중교통은 고를 수 없다", async ({ page }) => {
   await expect(page.getByRole("radio", { name: "대중교통" })).toBeDisabled();
   await expect(page.getByText("대중교통은 아직 준비 중이라 고를 수 없어요.")).toBeVisible();
 });
+
+test("출발과 복귀가 동시에 비어 있으면 두 오류가 모두 보이고 배너 개수와 일치한다", async ({ page }) => {
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
+
+  await expect(page.getByText("출발지를 골라 주세요.")).toBeVisible();
+  await expect(page.getByText("출발 일시를 골라 주세요.")).toBeVisible();
+  await expect(page.getByText("복귀 가능 일시를 골라 주세요.")).toBeVisible();
+  await expect(page.getByText("고쳐야 할 항목이 3개 있어요")).toBeVisible();
+  await expect(page.locator(".dd-field-error__text")).toHaveCount(3);
+
+  // 각 오류 메시지가 자기 입력에 연결된다.
+  await expect(page.getByLabel("출발 일시")).toHaveAttribute("aria-describedby", "start-at-error");
+  await expect(page.getByLabel("복귀 가능 일시")).toHaveAttribute("aria-describedby", "return-by-error");
+});

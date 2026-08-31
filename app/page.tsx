@@ -3,7 +3,7 @@
 import { FormEvent, useMemo, useState } from "react";
 import { Button } from "@/components/Button";
 import { Chip } from "@/components/Chip";
-import { FieldCard } from "@/components/FieldCard";
+import { FieldCard, fieldErrorId, fieldHintId, type FieldCardError } from "@/components/FieldCard";
 import { InputField } from "@/components/InputField";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { Select } from "@/components/Select";
@@ -12,6 +12,7 @@ import {
   errorsByField,
   validateTripConditions,
   type TripConditionsDraft,
+  type TripConditionsField,
   type ValidTripConditions,
 } from "@/lib/trip-conditions";
 
@@ -75,6 +76,23 @@ export default function TripConditionsPage() {
   const result = useMemo(() => validateTripConditions(draft, provisionalSupportSet), [draft]);
   const fieldErrors = result.ok || !attempted ? {} : errorsByField(result.errors);
   const errorCount = result.ok || !attempted ? 0 : result.errors.length;
+
+  /*
+   * 항목 하나가 입력 하나에 대응하지 않는다(출발·복귀는 한 카드를 쓴다). 그래서 오류를
+   * 카드 단위로 고르지 않고 입력 단위로 모아 넘긴다. 요약 배너가 세는 개수와 화면에
+   * 보이는 메시지 수가 어긋나면 사용자는 무엇을 더 고쳐야 하는지 알 수 없다.
+   */
+  function cardErrors(...fields: [TripConditionsField, string][]): FieldCardError[] {
+    return fields
+      .filter(([field]) => fieldErrors[field])
+      .map(([field, inputId]) => ({ inputId, message: fieldErrors[field] as string }));
+  }
+
+  /** 오류가 있으면 오류 텍스트를, 없으면 안내 문구를 가리킨다. */
+  function describedBy(field: TripConditionsField, inputId: string, hasHint = false) {
+    if (fieldErrors[field]) return fieldErrorId(inputId);
+    return hasHint ? fieldHintId(inputId) : undefined;
+  }
 
   const transportOptions = provisionalSupportSet.transports.map((transport) => ({
     value: transport.id,
@@ -171,7 +189,8 @@ export default function TripConditionsPage() {
             label="어디서 출발해요?"
             htmlFor="origin"
             hint="지금은 주요 도시 단위로만 고를 수 있어요."
-            error={fieldErrors.originId}
+            hintFor="origin"
+            errors={cardErrors(["originId", "origin"])}
           >
             <Select
               id="origin"
@@ -182,13 +201,14 @@ export default function TripConditionsPage() {
               placeholder="출발지를 골라 주세요"
               value={draft.originId}
               invalid={Boolean(fieldErrors.originId)}
+              aria-describedby={describedBy("originId", "origin", true)}
               onChange={(event) => update({ originId: event.target.value })}
             />
           </FieldCard>
 
           <FieldCard
             label="언제 나가서 언제까지 돌아와요?"
-            error={fieldErrors.startAt ?? fieldErrors.returnBy}
+            errors={cardErrors(["startAt", "start-at"], ["returnBy", "return-by"])}
           >
             <div className="dd-datetime-pair">
               <InputField
@@ -198,6 +218,7 @@ export default function TripConditionsPage() {
                 aria-label="출발 일시"
                 value={draft.startAt}
                 invalid={Boolean(fieldErrors.startAt)}
+                aria-describedby={describedBy("startAt", "start-at")}
                 onChange={(event) => update({ startAt: event.target.value })}
               />
               <InputField
@@ -207,6 +228,7 @@ export default function TripConditionsPage() {
                 aria-label="복귀 가능 일시"
                 value={draft.returnBy}
                 invalid={Boolean(fieldErrors.returnBy)}
+                aria-describedby={describedBy("returnBy", "return-by")}
                 onChange={(event) => update({ returnBy: event.target.value })}
               />
             </div>
@@ -230,12 +252,18 @@ export default function TripConditionsPage() {
             ) : null}
           </FieldCard>
 
-          <FieldCard label="무엇으로 이동해요?" hint={transportHint} error={fieldErrors.transport}>
+          <FieldCard
+            label="무엇으로 이동해요?"
+            hint={transportHint}
+            hintFor="transport"
+            errors={cardErrors(["transport", "transport"])}
+          >
             <SegmentedControl
               label="이동수단"
               options={transportOptions}
               value={draft.transport}
               invalid={Boolean(fieldErrors.transport)}
+              describedBy={describedBy("transport", "transport", Boolean(transportHint))}
               onChange={(value) => update({ transport: value })}
             />
           </FieldCard>

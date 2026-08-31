@@ -53,6 +53,69 @@ describe("조건 입력 화면", () => {
     expect(screen.getByText("서울 출발")).toBeInTheDocument();
   });
 
+  it("출발과 복귀가 동시에 잘못되면 두 오류 메시지가 모두 보인다", async () => {
+    const user = userEvent.setup();
+    render(<TripConditionsPage />);
+
+    await user.click(screen.getByRole("button", { name: "갈 수 있는 곳 찾기" }));
+
+    expect(screen.getByText("출발 일시를 골라 주세요.")).toBeInTheDocument();
+    expect(screen.getByText("복귀 가능 일시를 골라 주세요.")).toBeInTheDocument();
+  });
+
+  it("요약 배너가 세는 개수와 화면에 보이는 항목별 오류 메시지 수가 일치한다", async () => {
+    const user = userEvent.setup();
+    const { container } = render(<TripConditionsPage />);
+
+    await user.click(screen.getByRole("button", { name: "갈 수 있는 곳 찾기" }));
+
+    const banner = screen.getByText(/고쳐야 할 항목이 (\d+)개 있어요/);
+    const counted = Number(/(\d+)개/.exec(banner.textContent ?? "")?.[1]);
+    expect(counted).toBeGreaterThan(0);
+    expect(container.querySelectorAll(".dd-field-error__text")).toHaveLength(counted);
+  });
+
+  it("각 입력의 aria-describedby가 자기 오류 메시지를 가리킨다", async () => {
+    const user = userEvent.setup();
+    render(<TripConditionsPage />);
+
+    await user.click(screen.getByRole("button", { name: "갈 수 있는 곳 찾기" }));
+
+    const startAt = screen.getByLabelText("출발 일시");
+    const returnBy = screen.getByLabelText("복귀 가능 일시");
+    const origin = screen.getByLabelText("어디서 출발해요?");
+
+    for (const [input, message] of [
+      [startAt, "출발 일시를 골라 주세요."],
+      [returnBy, "복귀 가능 일시를 골라 주세요."],
+      [origin, "출발지를 골라 주세요."],
+    ] as const) {
+      const describedBy = input.getAttribute("aria-describedby");
+      expect(describedBy).toBeTruthy();
+      const described = (describedBy ?? "")
+        .split(/\s+/)
+        .map((id) => document.getElementById(id)?.textContent)
+        .join(" ");
+      expect(described).toContain(message);
+    }
+  });
+
+  it("오류가 없으면 입력에 오류 메시지가 연결되지 않는다", async () => {
+    render(<TripConditionsPage />);
+
+    await fillConditions("2026-09-12T08:00", "2026-09-13T20:00");
+
+    for (const label of ["출발 일시", "복귀 가능 일시"]) {
+      expect(screen.getByLabelText(label)).not.toHaveAttribute("aria-describedby");
+    }
+    // 출발지는 오류가 없을 때 안내 문구가 연결된다.
+    const describedBy = screen.getByLabelText("어디서 출발해요?").getAttribute("aria-describedby");
+    expect(describedBy).toBeTruthy();
+    expect(document.getElementById(describedBy ?? "")?.textContent).toContain(
+      "지금은 주요 도시 단위로만 고를 수 있어요.",
+    );
+  });
+
   it("대중교통은 고를 수 없다", () => {
     render(<TripConditionsPage />);
 
