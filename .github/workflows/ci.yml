@@ -23,7 +23,5 @@ jobs:
           cache: npm
       - name: 의존성 설치
         run: npm ci
-      - name: 정적 검사
-        run: npm run lint
-      - name: 프로덕션 빌드
-        run: npm run build
+      - name: 통합 검증
+        run: npm run verify
