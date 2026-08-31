@@ -7,6 +7,14 @@ export type ScheduleItem = { day: string; time: string; type: string; title: str
 const hour = (date: Date) => date.getHours() + date.getMinutes() / 60;
 const dateLabel = (date: Date) => `${date.getMonth() + 1}/${date.getDate()}`;
 const clock = (date: Date) => date.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false });
+// 소수 시간(17.5, 9)을 17:30, 09:00 형태로 표기한다. clock()은 Date만 받으므로 별개다.
+const clockFromHours = (value: number) => {
+  const totalMinutes = Math.round(value * 60);
+  return `${String(Math.floor(totalMinutes / 60)).padStart(2, "0")}:${String(totalMinutes % 60).padStart(2, "0")}`;
+};
+const dayKey = (date: Date) => `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+const openingTime = (date: Date, attraction: Attraction, dayOffset = 0) =>
+  new Date(date.getFullYear(), date.getMonth(), date.getDate() + dayOffset, Math.max(9, attraction.open), 0);
 const addHours = (date: Date, value: number) => new Date(date.getTime() + value * 3_600_000);
 
 export function recommendDestinations(input: TripInput, data: Destination[]): Recommendation[] {
@@ -32,13 +40,20 @@ export function buildItinerary(destination: Destination, input: TripInput): Sche
   let cursor = addHours(start, travel);
   const items: ScheduleItem[] = [{ day: dateLabel(start), time: clock(start), type: "이동", title: `${input.origin}에서 ${destination.name}으로 출발`, description: input.transport === "car" ? `평균 예상 이동 ${travel}시간 · 자차 기준` : `평균 예상 이동 ${travel}시간 · 대중교통 기준` }];
   const sorted = [...destination.attractions].sort((a, b) => Number(input.interests.includes(b.category)) - Number(input.interests.includes(a.category)));
+  // 하루를 새로 시작할 때만 커서를 개장 시각으로 리셋한다. 이미 리셋한 날에는
+  // 앞 항목의 체류시간 + 30분 간격을 유지해야 하므로 다시 리셋하지 않는다.
+  let openedDay = dayKey(cursor);
   for (const attraction of sorted) {
-    if (cursor.getDate() !== start.getDate()) cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate(), Math.max(9, attraction.open), 0);
+    if (dayKey(cursor) !== openedDay) {
+      cursor = openingTime(cursor, attraction);
+      openedDay = dayKey(cursor);
+    }
     if (!isOpen(attraction, cursor) || hour(cursor) + attraction.stayHours > attraction.close) {
-      cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 1, Math.max(9, attraction.open), 0);
+      cursor = openingTime(cursor, attraction, 1);
+      openedDay = dayKey(cursor);
     }
     if (cursor > end || !isOpen(attraction, cursor)) continue;
-    items.push({ day: dateLabel(cursor), time: clock(cursor), type: attraction.category, title: attraction.name, description: attraction.description, note: `추천 체류 ${attraction.stayHours}시간 · 운영 ${attraction.open}:00–${attraction.close}:00` });
+    items.push({ day: dateLabel(cursor), time: clock(cursor), type: attraction.category, title: attraction.name, description: attraction.description, note: `추천 체류 ${attraction.stayHours}시간 · 운영 ${clockFromHours(attraction.open)}–${clockFromHours(attraction.close)}` });
     cursor = addHours(cursor, attraction.stayHours + 0.5);
   }
   if (destination.festival && new Date(destination.festival.start) <= end && new Date(destination.festival.end) >= start) items.splice(1, 0, { day: dateLabel(addHours(start, travel)), time: "도착 후", type: "축제", title: destination.festival.name, description: "여행 기간 중 열리는 지역 축제를 함께 들러보세요.", note: `${destination.festival.start} ~ ${destination.festival.end}` });
