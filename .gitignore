@@ -7,3 +7,7 @@ tsconfig.tsbuildinfo
 .env.local
 .env*.local
 !.env.local.example
+
+# 디자인 캔버스 발행물 (에디터 페이로드 포함, 재생성 가능)
+design/*.html
+!design/*.dc.html
