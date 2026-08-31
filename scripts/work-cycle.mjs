@@ -3,7 +3,12 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+// 기본값은 이 스크립트가 속한 저장소다. WORK_CYCLE_ROOT 는 테스트가 임시 저장소를
+// 대상으로 명령을 실행하기 위한 것이다. 사이클 게이트는 현재 git 브랜치를 근거로
+// 판정하므로, 이 통로가 없으면 테스트 결과가 테스트를 돌리는 브랜치에 따라 달라진다.
+const repositoryRoot = process.env.WORK_CYCLE_ROOT
+  ? path.resolve(process.env.WORK_CYCLE_ROOT)
+  : path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const stateDirectory = path.join(repositoryRoot, ".work-cycles");
 
 const stages = [
