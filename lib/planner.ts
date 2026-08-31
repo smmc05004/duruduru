@@ -39,6 +39,8 @@ export function buildItinerary(destination: Destination, input: TripInput): Sche
   const travel = input.transport === "car" ? destination.driveHours : destination.publicHours;
   let cursor = addHours(start, travel);
   const items: ScheduleItem[] = [{ day: dateLabel(start), time: clock(start), type: "이동", title: `${input.origin}에서 ${destination.name}으로 출발`, description: input.transport === "car" ? `평균 예상 이동 ${travel}시간 · 자차 기준` : `평균 예상 이동 ${travel}시간 · 대중교통 기준` }];
+  // 식사 시간 블록을 만들지 않는다 — 이것도 알려진 구현 한계다. F-04는 P0에서 식사 시간
+  // 블록 확보를 요구하지만, 식사 시간대와 소요시간이 정책으로 정해지지 않았다.
   const sorted = [...destination.attractions].sort((a, b) => Number(input.interests.includes(b.category)) - Number(input.interests.includes(a.category)));
   // 하루를 새로 시작할 때만 커서를 개장 시각으로 리셋한다. 이미 리셋한 날에는
   // 앞 항목의 체류시간 + 30분 간격을 유지해야 하므로 다시 리셋하지 않는다.
@@ -52,6 +54,14 @@ export function buildItinerary(destination: Destination, input: TripInput): Sche
       cursor = openingTime(cursor, attraction, 1);
       openedDay = dayKey(cursor);
     }
+    // 복귀 초과는 검사하지 않는다 — 알려진 구현 한계다.
+    // 여기서 비교하는 것은 **항목의 시작 시각**뿐이다(`cursor > end`). 항목의 체류시간과
+    // 목적지→출발지 복귀 이동시간을 더한 실제 종료 시각이 복귀 가능 시각을 넘는지는
+    // 검사하지 않는다. 그래서 복귀 직전에 시작만 걸치는 항목이 일정에 남을 수 있다.
+    // FUNCTIONAL_SPEC.md의 F-04는 "마지막 항목 종료 + 목적지→출발지 이동 + 복귀 버퍼는
+    // 복귀 가능 일시 이하"를 요구하지만, 그 검사에 필요한 최소 현지 체류시간과 복귀 버퍼
+    // 기준이 docs/product/DECISIONS.md에서 미확정이다. 기준을 임의로 정하면 그 상수가
+    // 사실상 제품 결정이 되므로 지금 고치지 않는다. 정책이 확정되면 F-04 규칙대로 구현한다.
     if (cursor > end || !isOpen(attraction, cursor)) continue;
     items.push({ day: dateLabel(cursor), time: clock(cursor), type: attraction.category, title: attraction.name, description: attraction.description, note: `추천 체류 ${attraction.stayHours}시간 · 운영 ${clockFromHours(attraction.open)}–${clockFromHours(attraction.close)}` });
     cursor = addHours(cursor, attraction.stayHours + 0.5);
