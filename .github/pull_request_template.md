@@ -14,8 +14,8 @@
 
 ## 검증
 
-- [ ] `npm run lint`
-- [ ] `npm run build`
+- [ ] `npm run verify` (하네스 검사, lint, 타입 검사, Jest, 빌드)
+- [ ] 브라우저 흐름이 바뀌면 `npm run test:e2e`
 - [ ] 해당 기능의 테스트 또는 수동 검증을 수행했습니다.
 
 ## 독립 리뷰

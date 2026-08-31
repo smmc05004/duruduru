@@ -12,3 +12,13 @@
 도구별 훅과 CI는 이 절차를 강제하거나 보조할 수 있지만, 절차 자체를 대체하지 않는다. 코드 변경이 없는 문서 작업에는 위험에 비례한 검증만 수행한다.
 
 작업 단계와 근거는 `docs/agent/WORK_CYCLE.md`의 그래프와 `npm run cycle` 명령으로 추적한다.
+
+## 문서에서 경로를 쓸 때
+
+`npm run check:agent-harness`는 에이전트 문서가 백틱으로 감싼 경로가 실제로 존재하는지 검사한다. 코드에는 lint·타입 검사 게이트가 있지만 문서에는 없어서, 파일이 사라져도 문서만 남아 에이전트를 없는 경로로 유도하는 상태가 조용히 유지되기 때문이다.
+
+검사 대상은 `AGENTS.md`, `CLAUDE.md`, `docs/agent/`, `docs/product/`, `docs/development/BRANCH_WORKFLOW.md`, `.agents/`, `.github/pull_request_template.md`다. 디렉터리를 생략한 파일명(`PRD.md`)도 알려진 문서 위치에서 찾는다.
+
+따라서 백틱은 실존하는 경로에만 쓴다. 없는 파일이나 아직 만들지 않은 경로를 설명할 때는 백틱을 쓰지 않는다.
+
+경로처럼 보이지만 경로가 아닌 표기가 필요하면, 판정 규칙을 느슨하게 만들지 말고 `scripts/check-agent-harness.mjs`의 `ignoredTokens`에 이유와 함께 등록한다. 규칙을 넓히면 다른 미탐이 함께 생긴다.

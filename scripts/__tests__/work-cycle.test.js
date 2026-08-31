@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
-import { readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -7,11 +8,18 @@ const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(testDirectory, "../..");
 const cycleScript = path.join(repositoryRoot, "scripts/work-cycle.mjs");
 
+// 사이클 게이트는 현재 git 브랜치를 근거로 판정한다. 이 저장소에서 그대로 돌리면
+// 테스트 결과가 테스트를 돌리는 브랜치에 따라 달라진다. CI 는 detached HEAD 이거나
+// main 이라 start 가 거부되므로, 매번 작업 브랜치를 가진 임시 저장소를 만들어 그곳을
+// 대상으로 실행한다.
+let workspace;
+
 function runCycle(...arguments_) {
   return execFileSync(process.execPath, [cycleScript, ...arguments_], {
-    cwd: repositoryRoot,
+    cwd: workspace,
     encoding: "utf8",
     stdio: "pipe",
+    env: { ...process.env, WORK_CYCLE_ROOT: workspace },
   });
 }
 
@@ -28,13 +36,15 @@ function runCycleExpectFailure(...arguments_) {
 let taskId;
 let statePath;
 
-beforeEach(() => {
+beforeEach(async () => {
+  workspace = await mkdtemp(path.join(os.tmpdir(), "work-cycle-test-"));
+  execFileSync("git", ["init", "-b", "feat/테스트-작업"], { cwd: workspace, stdio: "pipe" });
   taskId = `cycle-test-${process.pid}-${Date.now()}`;
-  statePath = path.join(repositoryRoot, ".work-cycles", `${taskId}.json`);
+  statePath = path.join(workspace, ".work-cycles", `${taskId}.json`);
 });
 
 afterEach(async () => {
-  await rm(statePath, { force: true });
+  await rm(workspace, { recursive: true, force: true });
 });
 
 describe("작업 사이클 그래프", () => {
