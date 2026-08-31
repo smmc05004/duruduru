@@ -18,6 +18,9 @@ const requiredSources = [
   ".agents/pm/AGENT.md",
   ".agents/employee/AGENT.md",
   ".agents/reviewer/AGENT.md",
+  ".agents/designer/AGENT.md",
+  "docs/design/DESIGN_DIRECTION.md",
+  "docs/design/DESIGN_TOKENS.md",
   ".claude/settings.json",
 ];
 
@@ -35,7 +38,7 @@ const referenceDocuments = [
 ];
 
 // 백틱 경로를 검사할 문서를 찾을 디렉터리.
-const referenceDirectories = ["docs/agent", "docs/product"];
+const referenceDirectories = ["docs/agent", "docs/product", "docs/design"];
 
 // 디렉터리 없이 파일명만 쓴 참조(`PRD.md`)를 찾아볼 위치. 저장소 루트가 먼저다.
 const filenameSearchDirectories = [
@@ -55,6 +58,7 @@ const rootPrefixes = [
   ".claude/",
   ".github/",
   "app/",
+  "design/",
   "docs/",
   "e2e/",
   "lib/",

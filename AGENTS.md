@@ -35,6 +35,7 @@
 - 제품 범위와 의사결정은 `.agents/pm/AGENT.md`의 PM 에이전트가 관리한다.
 - 구현 작업의 계획·수행·검증은 `.agents/employee/AGENT.md`의 employee agent가 담당한다.
 - 구현 결과의 독립 검토는 `.agents/reviewer/AGENT.md`의 reviewer agent가 담당한다. reviewer agent는 구현을 맡은 세션·에이전트와 분리해 새 컨텍스트에서 실행한다.
+- 화면 설계와 디자인 토큰·공통 컴포넌트는 `.agents/designer/AGENT.md`의 designer agent가 담당한다. 확정된 디자인 방향은 `docs/design/DESIGN_DIRECTION.md`, 토큰은 `docs/design/DESIGN_TOKENS.md`에 있다.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
