@@ -28,10 +28,10 @@
 ```bash
 git switch main
 git pull --ff-only
-git switch -c feat/작업-목적
+git switch -c feat/work-purpose
 
 # 구현 및 한글 커밋
-git push -u origin feat/작업-목적
+git push -u origin feat/work-purpose
 ```
 
 1. 기능 명세서의 작업 단위 또는 명확한 버그·문서 목적을 하나 선택한다.
@@ -40,14 +40,35 @@ git push -u origin feat/작업-목적
 4. 기본적으로 `npm run verify`를 실행한다. 화면·브라우저 흐름을 바꾼 작업은 `npm run test:e2e`도 실행한다. 작업 게이트와 근거는 `npm run cycle`로 남긴다.
 5. 코드·설정·의존성을 변경한 작업은 구현과 무관한 새 컨텍스트의 reviewer agent에게 독립 검토를 요청한다.
 6. PR을 열고 템플릿의 범위·검증·제품 문서·독립 리뷰 항목을 채운다.
-7. reviewer agent의 확인된 지적을 반영하고, 재검토가 필요한 변경이면 같은 분리 원칙으로 다시 검토한다. 병합 방식은 아래 기준을 따른다.
-8. 병합된 원격 브랜치는 자동 삭제를 사용하고, 로컬 브랜치도 정리한다.
+7. reviewer agent의 확인된 지적을 반영하고, 재검토가 필요한 변경이면 같은 분리 원칙으로 다시 검토한다.
+8. PR의 **체크 결과와 병합 가능 상태를 함께 확인한다.** 아래 기준을 따른다.
+9. 병합 방식은 아래 기준을 따른다. 병합된 원격 브랜치는 자동 삭제를 사용하고, 로컬 브랜치도 정리한다.
 
 ```bash
 git switch main
 git pull --ff-only
-git branch -d feat/작업-목적
+git branch -d feat/work-purpose
 ```
+
+## PR 확인
+
+병합 전에 **체크 결과와 병합 가능 상태를 함께 본다.** 둘 중 하나만 보면 통과를 잘못 읽는다.
+
+```bash
+gh pr checks <번호>
+gh pr view <번호> --json mergeable,mergeStateStatus
+```
+
+체크가 하나도 없는 것은 통과가 아니다. 병합 충돌이 있으면 GitHub은 PR 워크플로를 실행하지 않으므로, 체크가 "실패"가 아니라 **"없음"으로 나타난다.** 실제로 이 저장소에서 충돌 상태의 PR이 체크 없이 조용히 머물러 있던 적이 있다.
+
+| 상태 | 의미 | 할 일 |
+| --- | --- | --- |
+| 체크 없음 + `DIRTY` | 충돌 때문에 CI가 돌지 않음 | 최신 `main`으로 rebase하고 충돌을 해결한 뒤 다시 push |
+| 체크 없음 + `CLEAN` | 워크플로가 트리거되지 않음 | 워크플로 조건과 실행 이력을 확인한다 |
+| `pending` | 아직 실행 중 | 끝날 때까지 기다린다 |
+| `pass` + `CLEAN` | 병합 가능 | 병합 규칙을 따른다 |
+
+작업 브랜치를 최신화할 때는 rebase를 쓴다. 원격에 이미 push한 브랜치라면 `git ls-remote`로 원격 상태를 확인한 뒤 `--force-with-lease`로 push한다. `main`에는 force push하지 않는다.
 
 ## 병합 규칙
 
