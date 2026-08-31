@@ -2,7 +2,8 @@ import { describe, expect, it } from "@jest/globals";
 import { destinations } from "@/lib/mock-data";
 import { buildItinerary, type ScheduleItem, type TripInput } from "@/lib/planner";
 
-// app/page.tsx의 기본 조건과 동일한 입력.
+// design/screens 시안이 쓴 것과 같은 입력(서울 출발, 9/12 08:00 → 9/13 20:00, 자차, 관심사 역사).
+// 현재 화면(app/page.tsx)은 조건 입력까지만 다루고 추천·일정 엔진을 아직 호출하지 않는다.
 const defaultInput: TripInput = {
   origin: "서울",
   start: "2026-09-12T08:00",

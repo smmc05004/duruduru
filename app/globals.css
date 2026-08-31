@@ -1,12 +1,483 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Mono&family=Nanum+Myeongjo:wght@400;700;800&family=Pretendard:wght@400;500;600;700&display=swap');
+/*
+ * 방향 H의 기본 스타일과 공통 컴포넌트 스타일.
+ * 값은 모두 app/tokens.css의 토큰에서 온다. 여기서 새 색·크기를 만들지 않는다.
+ * 컴포넌트별 상태 표현은 docs/design/DESIGN_TOKENS.md의 컴포넌트 표와 1:1로 대응한다.
+ */
 
-:root { --ink:#17241e; --green:#246b4d; --lime:#d9ea5d; --cream:#faf8f1; --sand:#eeeadc; --muted:#6f776f; --line:#ddd9cc; }
-* { box-sizing:border-box; } body { margin:0; color:var(--ink); background:var(--cream); font-family:Pretendard,Arial,sans-serif; } button,input,select { font:inherit; } button { cursor:pointer; }
-.hero { min-height:420px; padding:26px max(6vw,32px) 70px; color:#fff; background:linear-gradient(120deg,rgba(13,48,36,.9),rgba(28,96,68,.72)), url('https://images.unsplash.com/photo-1561998338-13ad7883b20f?auto=format&fit=crop&w=1800&q=85') center/cover; }
-nav { display:flex; align-items:center; justify-content:space-between; font-size:13px; letter-spacing:.02em; opacity:.9; } .logo { font-family:'DM Mono',monospace; font-size:20px; letter-spacing:.08em; font-weight:bold; }
-.hero-copy { margin:80px auto 0; max-width:1080px; } .eyebrow { margin:0 0 12px; color:#588f72; font:11px 'DM Mono',monospace; letter-spacing:.12em; font-weight:bold; } .hero .eyebrow { color:var(--lime); }.hero h1 { margin:0; font:800 clamp(42px,7vw,78px)/1.13 'Nanum Myeongjo',serif; letter-spacing:-.07em; }.hero-copy > p:last-child { margin:24px 0 0; font-size:17px; opacity:.9; }
-.planner { max-width:1080px; margin:-34px auto 0; padding:0 24px; position:relative; }.planner form { display:grid; grid-template-columns:1fr 1.3fr 1.3fr 1.05fr; gap:14px; padding:20px; border:1px solid var(--line); background:#fff; box-shadow:0 16px 38px #13231917; }.field { min-width:0; }.field label { display:block; margin-bottom:7px; font-size:12px; color:var(--muted); } input,select { width:100%; height:42px; border:1px solid var(--line); border-radius:2px; padding:0 10px; color:var(--ink); background:#fff; }.segmented { display:flex; height:42px; border:1px solid var(--line); }.segmented button { flex:1; border:0; background:#fff; color:var(--muted); font-size:13px; }.segmented .active { color:#fff; background:var(--green); }.interests { grid-column:span 3; }.chip { padding:9px 14px; margin:0 6px 0 0; border:1px solid var(--line); background:#fff; color:var(--muted); border-radius:99px; font-size:13px; }.chip.selected { border-color:var(--green); color:var(--green); background:#eff7ed; }.submit { border:0; color:#183726; background:var(--lime); font-weight:700; font-size:15px; }.submit span { font-size:20px; margin-left:5px; }
-.content { max-width:1080px; margin:76px auto; padding:0 24px; }.section-heading { display:flex; justify-content:space-between; gap:24px; align-items:flex-end; margin-bottom:23px; }.section-heading h2 { margin:0 0 8px; font:800 30px 'Nanum Myeongjo',serif; letter-spacing:-.06em; }.section-heading p:not(.eyebrow) { margin:0; color:var(--muted); font-size:14px; }.count,.tag { color:var(--green); font-size:13px; white-space:nowrap; }.tag { padding:8px 10px; border-radius:99px; background:#e8f0db; }.cards { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }.destination-card { min-height:260px; padding:21px; text-align:left; border:1px solid var(--line); background:#fff; color:var(--ink); transition:.15s; }.destination-card:hover,.destination-card.selected { border-color:var(--green); box-shadow:0 10px 25px #0a422011; transform:translateY(-2px); }.card-top,.meta { display:flex; justify-content:space-between; align-items:center; }.area,.score,.schedule-type { font-size:11px; }.area { color:var(--muted); }.score { color:var(--green); padding:4px 6px; background:#eef5e7; }.destination-card h3 { margin:24px 0 8px; font:800 29px 'Nanum Myeongjo',serif; letter-spacing:-.06em; }.destination-card p { height:42px; margin:0; color:var(--muted); font-size:14px; line-height:1.5; }.meta { margin-top:22px; color:var(--muted); font-size:12px; }.reason { margin-top:17px; padding-top:12px; border-top:1px solid var(--sand); color:var(--green); font-size:12px; line-height:1.45; }.festival { margin-top:12px; color:#8c6720; font-size:12px; }
-.itinerary { margin-top:88px; padding-top:70px; border-top:1px solid var(--line); }.timeline { max-width:760px; }.timeline-item { display:grid; grid-template-columns:82px 24px 1fr; position:relative; min-height:106px; }.time { padding-top:2px; color:var(--green); font:13px 'DM Mono',monospace; }.time span { display:block; margin-top:4px; color:var(--muted); font:11px 'DM Mono',monospace; }.dot { z-index:1; width:11px; height:11px; margin:5px 0 0 5px; border:2px solid var(--green); border-radius:50%; background:var(--cream); }.line { position:absolute; top:16px; bottom:-5px; left:10px; width:1px; background:#bbcdbd; }.schedule { padding:0 0 26px 14px; }.schedule-type { color:var(--green); }.schedule h3 { margin:4px 0 5px; font-size:17px; }.schedule p { margin:0 0 6px; color:var(--muted); font-size:14px; }.schedule small { color:#8b7652; font-size:12px; } footer { padding:30px; text-align:center; border-top:1px solid var(--line); color:var(--muted); font-size:12px; }
-@media(max-width:760px) { .hero { min-height:370px; }.hero-copy { margin-top:66px; } .planner form { grid-template-columns:1fr 1fr; }.interests { grid-column:span 2; }.submit { min-height:44px; }.cards { grid-template-columns:1fr; }.destination-card { min-height:auto; }.destination-card p { height:auto; }.section-heading { align-items:start; }.section-heading h2 { font-size:27px; } }
-@media(max-width:480px) { nav span:last-child { display:none; }.planner { padding:0 14px; }.planner form { grid-template-columns:1fr; }.interests { grid-column:auto; }.content { padding:0 20px; }.timeline-item { grid-template-columns:66px 21px 1fr; }.schedule { padding-left:8px; } }
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--ink);
+  background-color: var(--paper);
+  background-image: radial-gradient(var(--paper-dot) 1px, transparent 1px);
+  background-size: 16px 16px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.7;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+/* ── 버튼 ─────────────────────────────────────────────── */
+
+.dd-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  border-radius: var(--radius-card);
+}
+
+.dd-button--primary {
+  min-height: 56px;
+  padding: 0 18px;
+  color: var(--on-dark);
+  background: var(--olive);
+  border: var(--border-card) solid var(--line);
+  box-shadow: var(--shadow-card);
+  font-family: var(--font-title);
+  font-size: 19px;
+}
+
+.dd-button--secondary {
+  min-height: 52px;
+  padding: 0 18px;
+  color: var(--ink);
+  background: var(--card);
+  border: var(--border-card) solid var(--line);
+  box-shadow: var(--shadow-card);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* 비활성에서 섀도를 뺀다. 색만 흐리게 하면 하드 섀도 때문에 여전히 눌리는 것처럼 보인다. */
+.dd-button:disabled {
+  color: var(--ink-faint);
+  background: var(--card-muted);
+  border: var(--border-card) dashed var(--line-dashed);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.dd-button-note {
+  margin: 9px 0 0;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-faint);
+}
+
+/* ── 필드 카드 ────────────────────────────────────────── */
+
+.dd-field-card {
+  padding: 20px;
+  background: var(--card);
+  border: var(--border-card) solid var(--line);
+  box-shadow: var(--shadow-card);
+}
+
+.dd-field-card__label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-body);
+}
+
+.dd-field-card__label-aside {
+  font-weight: 600;
+  color: var(--ink-faint);
+}
+
+.dd-field-card__body {
+  margin-top: 9px;
+}
+
+.dd-field-card__hint {
+  margin: 8px 0 0;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.7;
+  color: var(--ink-faint);
+}
+
+/* ── 입력 필드 · 셀렉트 ───────────────────────────────── */
+
+.dd-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 14px;
+  background: var(--field);
+  border: var(--border-card) solid var(--line);
+  border-radius: var(--radius-card);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.dd-control__prefix {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.dd-control__input {
+  flex-grow: 1;
+  min-width: 0;
+  height: 44px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  text-align: right;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.dd-control__input:focus {
+  outline: none;
+}
+
+.dd-control__select {
+  flex-grow: 1;
+  min-width: 0;
+  height: 44px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  appearance: none;
+}
+
+.dd-control__select:focus {
+  outline: none;
+}
+
+.dd-control__select--placeholder {
+  color: var(--ink-faint);
+}
+
+.dd-control__chevron {
+  flex-shrink: 0;
+  stroke: var(--line);
+}
+
+/* 입력 중(포커스): 테두리 2.5px 올리브 + 바깥 3px 올리브 링 */
+.dd-control:focus-within {
+  border-width: 2.5px;
+  border-color: var(--olive);
+  box-shadow: 0 0 0 3px var(--olive-soft);
+}
+
+.dd-control:focus-within .dd-control__prefix {
+  color: var(--olive-ink);
+}
+
+.dd-control:focus-within .dd-control__chevron {
+  stroke: var(--olive);
+}
+
+/* 오류 */
+.dd-control--invalid {
+  border-color: var(--alert);
+  color: var(--alert-ink);
+}
+
+.dd-control--invalid .dd-control__prefix,
+.dd-control--invalid .dd-control__input,
+.dd-control--invalid .dd-control__select {
+  color: var(--alert-ink);
+}
+
+.dd-control--invalid .dd-control__chevron {
+  stroke: var(--alert);
+}
+
+/* 비활성 */
+.dd-control--disabled {
+  background: var(--card-muted);
+  border: var(--border-card) dashed var(--line-dashed);
+}
+
+.dd-control--disabled .dd-control__prefix {
+  color: var(--ink-faint);
+}
+
+.dd-control__skeleton {
+  width: 96px;
+  height: 12px;
+  background: var(--skeleton);
+}
+
+/* 항목별 오류 메시지 */
+.dd-field-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.dd-field-error__icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.dd-field-error__text {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.6;
+  color: var(--alert-ink);
+}
+
+/* ── 세그먼티드 컨트롤 ────────────────────────────────── */
+
+.dd-segmented {
+  display: flex;
+  background: var(--field);
+  border: var(--border-card) solid var(--line);
+}
+
+.dd-segmented__item {
+  flex-grow: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 46px;
+  padding: 0 10px;
+  background: var(--field);
+  border: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.dd-segmented__item + .dd-segmented__item {
+  border-left: var(--border-card) solid var(--line);
+}
+
+.dd-segmented__item--selected {
+  background: var(--olive);
+  color: var(--on-dark);
+  font-weight: 700;
+}
+
+.dd-segmented__item:disabled {
+  background: var(--card-muted);
+  color: var(--ink-faint);
+  cursor: not-allowed;
+}
+
+.dd-segmented__item:disabled + .dd-segmented__item,
+.dd-segmented__item + .dd-segmented__item:disabled {
+  border-left-color: var(--line-dashed);
+}
+
+.dd-segmented__icon {
+  flex-shrink: 0;
+}
+
+/* ── 칩 ───────────────────────────────────────────────── */
+
+.dd-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-min);
+  padding: 0 16px;
+  background: var(--field);
+  border: 1.5px solid var(--olive);
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--olive-ink);
+}
+
+.dd-chip--selected {
+  background: var(--mustard);
+  border-color: var(--mustard);
+  font-weight: 700;
+  /* 머스터드 위 대비를 위한 값. DESIGN_TOKENS.md 칩 표에 명시된 예외 색이다. */
+  color: #4a3708;
+}
+
+.dd-chip:disabled {
+  background: var(--card-muted);
+  border: 1.5px dashed var(--line-dashed);
+  color: var(--ink-faint);
+  cursor: not-allowed;
+}
+
+/* 조건 요약 칩은 읽기 전용이라 44px 규칙을 강제하지 않는다. */
+.dd-chip--summary {
+  min-height: auto;
+  padding: 7px 14px;
+  background: transparent;
+  font-size: 12px;
+}
+
+.dd-chip-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ── 조건 입력 화면 ───────────────────────────────────── */
+
+.dd-screen {
+  max-width: 430px;
+  margin: 0 auto;
+  padding-bottom: 40px;
+}
+
+.dd-screen__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 24px 22px 0;
+}
+
+.dd-screen__logo {
+  font-family: var(--font-title);
+  font-size: 24px;
+  color: var(--olive-ink);
+}
+
+.dd-screen__data-basis {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.dd-screen__title {
+  margin: 18px 22px 0;
+  font-family: var(--font-title);
+  font-size: 25px;
+  font-weight: 400;
+  line-height: 1.42;
+}
+
+.dd-screen__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 22px 18px 0;
+}
+
+.dd-screen__actions {
+  padding: 24px 18px 0;
+}
+
+.dd-screen__footnote {
+  margin: 20px 22px 0;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.7;
+  color: var(--ink-faint);
+}
+
+.dd-datetime-pair {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* 정상 상태 안내(올리브). 검증 오류·데이터 장애와 형태로 구분된다. */
+.dd-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 9px 11px;
+  background: var(--olive-soft);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--olive-ink);
+}
+
+/*
+ * 검증 오류 요약 배너.
+ * 자적색은 쓰지만 상단 8px 띠와 3px 이중 테두리는 쓰지 않는다. 그 두 형태는 데이터 장애 전용이다.
+ */
+.dd-error-summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 18px 18px 0;
+  padding: 14px 15px;
+  background: var(--alert-soft);
+  border: var(--border-card) solid var(--alert);
+}
+
+.dd-error-summary__icon {
+  flex-shrink: 0;
+}
+
+.dd-error-summary__title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--alert-ink);
+}
+
+.dd-error-summary__text {
+  margin: 5px 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.7;
+  color: var(--alert-ink);
+}
+
+/* 제출된 조건 요약. 다음 단계(추천 계산)는 아직 구현 범위가 아니다. */
+.dd-submitted {
+  margin: 22px 18px 0;
+  padding: 20px;
+  background: var(--card);
+  border: var(--border-card) solid var(--line);
+  box-shadow: var(--shadow-card);
+}
+
+.dd-submitted__title {
+  margin: 0 0 12px;
+  font-family: var(--font-title);
+  font-size: 18px;
+  font-weight: 400;
+}
+
+.dd-submitted__note {
+  margin: 14px 0 0;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.7;
+  color: var(--ink-faint);
+}
+
+.dd-submitted__actions {
+  margin-top: 16px;
+}

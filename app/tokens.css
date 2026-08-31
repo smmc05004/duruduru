@@ -1,0 +1,74 @@
+/*
+ * 확정 방향 H의 디자인 토큰.
+ *
+ * 정의는 docs/design/DESIGN_TOKENS.md이고 이 파일이 코드 반영이다. 한쪽만 고치지 않는다.
+ * 여기 없는 색·크기를 화면에서 새로 만들지 않는다. 파생이 필요하면 먼저 정의 문서에
+ * 파생 규칙과 함께 토큰으로 등록한다.
+ *
+ * Tailwind CSS와의 관계 —
+ * docs/agent/TECH_STACK.md는 Tailwind를 명시하고 package.json에 tailwindcss,
+ * @tailwindcss/postcss 의존성도 들어 있지만, 현재 저장소에는 PostCSS 설정 파일도
+ * `@import "tailwindcss"` 구문도 없어서 Tailwind가 실제로 동작하지 않는다(설치만 된 상태다).
+ * 그래서 이번 구현은 Tailwind 유틸리티 대신 이 토큰과 컴포넌트 클래스(app/globals.css)로 한다.
+ * Tailwind를 실제로 켤 때는 이 토큰을 `@theme`에 등록해 유틸리티가 같은 값을 읽게 하고,
+ * 값의 단일 출처를 이 파일로 유지한다.
+ */
+
+:root {
+  /* 바탕·표면 */
+  --paper: #efe9d5;
+  --paper-dot: #d9d0b3;
+  --card: #fbf8ee;
+  --card-muted: #f4f0e2;
+  --field: #fdfcf6;
+
+  /* 글자 */
+  --ink: #2b2a1d;
+  --ink-body: #3d3a2c;
+  --ink-muted: #5a5442;
+  --ink-faint: #6a6450;
+  --on-dark: #f6f2e5;
+
+  /* 선·그림자 */
+  --line: #33301f;
+  --line-dashed: #a8a081;
+  --shadow: #cfc5a4;
+
+  /* 강조 */
+  --olive: #4a6b2f;
+  --olive-ink: #3f6b2b;
+  --olive-bar: #6c9b4a;
+  --olive-soft: #e6efd8;
+  --mustard: #e0b743;
+  --mustard-soft: #f7e6b8;
+  --mustard-ink: #7a5710;
+  --terracotta: #c1502e;
+
+  /* 시간 막대 */
+  --track: #e7e1cd;
+  --track-move: #c3b998;
+
+  /* 상태 */
+  --skeleton: #ded8c2;
+  --alert: #8c2140;
+  --alert-soft: #f4dcdf;
+  --alert-ink: #6f1a33;
+
+  /* 형태 */
+  --radius-card: 0;
+  --radius-pill: 99px;
+  --radius-tag: 2px;
+  --border-card: 2px;
+  --border-alert: 3px;
+  --shadow-card: 5px 5px 0 var(--shadow);
+  --shadow-item: 4px 4px 0 var(--shadow);
+  --touch-min: 44px;
+
+  /*
+   * 서체. `--font-jua` 등은 app/layout.tsx의 next/font/google이 선언하는 변수다.
+   * 폴백 스택은 DESIGN_TOKENS.md의 `system-ui, 'Apple SD Gothic Neo', sans-serif`를 지킨다.
+   */
+  --font-title: var(--font-jua), system-ui, "Apple SD Gothic Neo", sans-serif;
+  --font-body: var(--font-gothic-a1), system-ui, "Apple SD Gothic Neo", sans-serif;
+  --font-hand: var(--font-gaegu), system-ui, "Apple SD Gothic Neo", sans-serif;
+}
