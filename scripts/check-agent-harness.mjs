@@ -26,19 +26,22 @@ const requiredSources = [
 
 const claudeEntrypoint = "CLAUDE.md";
 
-// 백틱 경로를 검사할 문서. 아래 목록에 더해 docs/agent/ 와 docs/product/ 아래 전부를 본다.
+// 백틱 경로를 검사할 문서. 아래 목록에 더해 referenceDirectories 아래의 문서와
+// .agents 아래의 모든 역할 문서를 자동으로 본다. 역할 문서를 고정 목록에 적으면
+// 새 역할이 추가될 때 조용히 검사에서 빠지므로 목록에 넣지 않는다.
 const referenceDocuments = [
   "AGENTS.md",
   "CLAUDE.md",
   "docs/development/BRANCH_WORKFLOW.md",
-  ".agents/pm/AGENT.md",
-  ".agents/employee/AGENT.md",
-  ".agents/reviewer/AGENT.md",
   ".github/pull_request_template.md",
 ];
 
 // 백틱 경로를 검사할 문서를 찾을 디렉터리.
 const referenceDirectories = ["docs/agent", "docs/product", "docs/design"];
+
+// 역할 문서를 찾을 디렉터리와 파일명. 하위 디렉터리마다 이 파일이 있으면 검사한다.
+const agentRoleDirectory = ".agents";
+const agentRoleDocumentName = "AGENT.md";
 
 // 디렉터리 없이 파일명만 쓴 참조(`PRD.md`)를 찾아볼 위치. 저장소 루트가 먼저다.
 const filenameSearchDirectories = [
@@ -46,6 +49,8 @@ const filenameSearchDirectories = [
   "docs/product",
   "docs/agent",
   "docs/development",
+  "docs/design",
+  "design",
   ".github",
   "scripts",
   "lib",
@@ -76,6 +81,8 @@ const ignoredPrefixes = ["node_modules/", ".work-cycles/"];
 const ignoredTokens = new Set([
   // .gitignore 대상이라 저장소에 존재할 수 없다. 예시 파일은 .env.local.example 이 따로 있다.
   ".env.local",
+  // 파일명이 아니라 디자인 작업 파일의 확장자 표기다. 실제 파일은 design/ 아래에 여러 개 있다.
+  ".dc.html",
 ]);
 
 async function exists(relativePath) {
@@ -127,6 +134,22 @@ async function referenceExists(token) {
   return false;
 }
 
+// .agents 아래의 모든 역할 문서(`.agents/<역할>/AGENT.md`)를 모은다.
+async function collectAgentRoleDocuments() {
+  const documents = [];
+  const entries = await readdir(path.join(repositoryRoot, agentRoleDirectory), { withFileTypes: true });
+
+  for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+    if (!entry.isDirectory()) continue;
+    const document = path.posix.join(agentRoleDirectory, entry.name, agentRoleDocumentName);
+    if (await exists(document)) {
+      documents.push(document);
+    }
+  }
+
+  return documents;
+}
+
 async function collectReferenceDocuments() {
   const documents = [...referenceDocuments];
 
@@ -138,7 +161,10 @@ async function collectReferenceDocuments() {
     }
   }
 
-  return documents;
+  documents.push(...(await collectAgentRoleDocuments()));
+
+  // 고정 목록과 자동 수집이 겹칠 수 있으므로 중복을 제거한다.
+  return [...new Set(documents)];
 }
 
 const missingSources = [];
