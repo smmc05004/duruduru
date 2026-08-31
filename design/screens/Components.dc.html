@@ -1,0 +1,310 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gaegu:wght@700&family=Gothic+A1:wght@500;600;700;800&family=Jua&display=swap">
+  <style>
+    body { margin:0; font-family:'Gothic A1',sans-serif; }
+    a { color:#4a6b2f; } a:hover { color:#2e441d; }
+  </style>
+</helmet>
+<div style="width:880px; min-height:2320px; color:#2b2a1d; background:#efe9d5; background-image:radial-gradient(#d9d0b3 1px, transparent 1px); background-size:16px 16px; padding:28px 28px 44px">
+
+  <p style="margin:0; font-family:'Jua',sans-serif; font-size:28px; color:#3f6b2b">두루두루 공통 컴포넌트</p>
+  <p style="margin:8px 0 0; font-size:12px; font-weight:600; line-height:1.7; color:#6b6550">방향 H 기준. 값은 docs/design/DESIGN_TOKENS.md의 토큰과 1:1로 대응한다. 오류·장애는 자적색(--alert), 정상 예외는 올리브·무채색으로만 쓴다.</p>
+
+  <p style="margin:30px 0 0; font-family:'Jua',sans-serif; font-size:20px">버튼</p>
+  <div style="display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:18px; margin-top:14px">
+    <div>
+      <p style="margin:0 0 8px; font-size:11px; font-weight:700; color:#6b6550">주요</p>
+      <div style="display:flex; align-items:center; justify-content:center; min-height:56px; background:#4a6b2f; border:2px solid #33301f; box-shadow:5px 5px 0 #cfc5a4; color:#f6f2e5; font-family:'Jua',sans-serif; font-size:18px">갈 수 있는 곳 찾기</div>
+    </div>
+    <div>
+      <p style="margin:0 0 8px; font-size:11px; font-weight:700; color:#6b6550">보조</p>
+      <div style="display:flex; align-items:center; justify-content:center; min-height:52px; background:#fbf8ee; border:2px solid #33301f; box-shadow:5px 5px 0 #cfc5a4; font-size:15px; font-weight:700">조건 수정하기</div>
+    </div>
+    <div>
+      <p style="margin:0 0 8px; font-size:11px; font-weight:700; color:#6b6550">비활성</p>
+      <div style="display:flex; align-items:center; justify-content:center; min-height:56px; background:#f4f0e2; border:2px dashed #a8a081; color:#8a8368; font-family:'Jua',sans-serif; font-size:18px">갈 수 있는 곳 찾기</div>
+    </div>
+    <div>
+      <p style="margin:0 0 8px; font-size:11px; font-weight:700; color:#6b6550">장애 복구 전용</p>
+      <div style="display:flex; align-items:center; justify-content:center; gap:8px; min-height:56px; background:#8c2140; border:2px solid #6f1a33; box-shadow:5px 5px 0 #cfc5a4; color:#f6f2e5; font-family:'Jua',sans-serif; font-size:18px">
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="#f6f2e5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16.4 10a6.4 6.4 0 1 1-2-4.6"></path><path d="M16.6 3.4v3.2h-3.2"></path></svg>
+        다시 시도하기
+      </div>
+    </div>
+  </div>
+
+  <p style="margin:34px 0 0; font-family:'Jua',sans-serif; font-size:20px">입력 필드 · 셀렉트 · 세그먼티드</p>
+  <div style="display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:18px; margin-top:14px">
+    <div>
+      <p style="margin:0 0 8px; font-size:11px; font-weight:700; color:#6b6550">입력 기본</p>
+      <div style="display:flex; align-items:center; justify-content:space-between; min-height:48px; padding:0 14px; background:#fdfcf6; border:2px solid #33301f">
+        <span style="font-size:11px; font-weight:600; color:#6b6550">출발</span>
+        <span style="font-size:15px; font-weight:700">2026-09-12 08:00</span>
+      </div>
+    </div>
+    <div>
+      <p style="margin:0 0 8px; font-size:11px; font-weight:700; color:#6b6550">입력 중 (포커스)</p>
+      <div style="display:flex; align-items:center; justify-content:space-between; min-height:48px; padding:0 14px; background:#fdfcf6; border:2.5px solid #4a6b2f; box-shadow:0 0 0 3px #e6efd8">
+        <span style="font-size:11px; font-weight:600; color:#3f6b2b">복귀 가능</span>
+        <span style="font-size:15px; font-weight:700">2026-09-13 20:00</span>
+      </div>
+    </div>
+    <div>
+      <p style="margin:0 0 8px; font-size:11px; font-weight:700; color:#6b6550">입력 오류</p>
+      <div style="display:flex; align-items:center; justify-content:space-between; min-height:48px; padding:0 14px; background:#fdfcf6; border:2px solid #8c2140">
+        <span style="font-size:11px; font-weight:600; color:#6f1a33">복귀 가능</span>
+        <span style="font-size:15px; font-weight:700; color:#6f1a33">2026-09-12 06:00</span>
+      </div>
+      <div style="display:flex; align-items:flex-start; gap:6px; margin-top:8px">
+        <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="#8c2140" stroke-width="1.9" stroke-linecap="round" style="flex-shrink:0; margin-top:2px"><circle cx="10" cy="10" r="7.2"></circle><path d="M7.4 7.4l5.2 5.2M12.6 7.4l-5.2 5.2"></path></svg>
+        <p style="margin:0; font-size:12px; font-weight:600; line-height:1.6; color:#6f1a33">출발 이후로 맞춰 주세요</p>
+      </div>
+    </div>
+    <div>
+      <p style="margin:0 0 8px; font-size:11px; font-weight:700; color:#6b6550">입력 비활성</p>
+      <div style="display:flex; align-items:center; justify-content:space-between; min-height:48px; padding:0 14px; background:#f4f0e2; border:2px dashed #a8a081">
+        <span style="font-size:11px; font-weight:600; color:#8a8368">복귀 가능</span>
+        <span style="width:96px; height:12px; background:#ded8c2"></span>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:18px; margin-top:20px">
+    <div>
+      <p style="margin:0 0 8px; font-size:11px; font-weight:700; color:#6b6550">셀렉트 기본</p>
+      <div style="display:flex; align-items:center; justify-content:space-between; min-height:48px; padding:0 14px; background:#fdfcf6; border:2px solid #33301f">
+        <span style="font-size:15px; font-weight:600">서울</span>
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="#33301f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 8L10 12.5 14.5 8"></path></svg>
+      </div>
+    </div>
+    <div>
+      <p style="margin:0 0 8px; font-size:11px; font-weight:700; color:#6b6550">셀렉트 미선택</p>
+      <div style="display:flex; align-items:center; justify-content:space-between; min-height:48px; padding:0 14px; background:#fdfcf6; border:2px solid #33301f">
+        <span style="font-size:15px; font-weight:600; color:#8a8368">출발지를 골라 주세요</span>
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="#33301f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 8L10 12.5 14.5 8"></path></svg>
+      </div>
+    </div>
+    <div style="grid-column:span 2">
+      <p style="margin:0 0 8px; font-size:11px; font-weight:700; color:#6b6550">세그먼티드 — 선택 / 미선택 / 비활성</p>
+      <div style="display:flex; border:2px solid #33301f; background:#fdfcf6">
+        <div style="flex-grow:1; display:flex; align-items:center; justify-content:center; min-height:46px; background:#4a6b2f; color:#f6f2e5; font-size:14px; font-weight:700">자차</div>
+        <div style="flex-grow:1; display:flex; align-items:center; justify-content:center; min-height:46px; font-size:14px; font-weight:600; border-left:2px solid #33301f">도보</div>
+        <div style="flex-grow:1; display:flex; align-items:center; justify-content:center; min-height:46px; background:#f4f0e2; color:#8a8368; font-size:14px; font-weight:600; border-left:2px solid #a8a081">대중교통</div>
+      </div>
+      <p style="margin:8px 0 0; font-size:11px; font-weight:500; color:#8a8368">가운데 칸은 미선택 표현용 자리다. 실제 지원 이동수단 목록은 정책 확정 후 데이터 계층이 정한다.</p>
+    </div>
+  </div>
+
+  <p style="margin:34px 0 0; font-family:'Jua',sans-serif; font-size:20px">칩 · 태그 · 신뢰도 표시</p>
+  <div style="display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:22px; margin-top:14px">
+    <div>
+      <p style="margin:0 0 10px; font-size:11px; font-weight:700; color:#6b6550">칩 — 조건 요약 / 관심사 미선택 / 관심사 선택 / 비활성</p>
+      <div style="display:flex; flex-wrap:wrap; gap:8px">
+        <span style="display:inline-flex; align-items:center; min-height:44px; padding:0 14px; border:1.5px solid #4a6b2f; border-radius:99px; font-size:12px; font-weight:600; color:#3f6b2b">9/12 08:00 출발</span>
+        <span style="display:inline-flex; align-items:center; min-height:44px; padding:0 16px; background:#fdfcf6; border:1.5px solid #4a6b2f; border-radius:99px; font-size:13px; font-weight:600; color:#3f6b2b">자연</span>
+        <span style="display:inline-flex; align-items:center; min-height:44px; padding:0 16px; background:#e0b743; border:1.5px solid #e0b743; border-radius:99px; font-size:13px; font-weight:700; color:#4a3708">역사</span>
+        <span style="display:inline-flex; align-items:center; min-height:44px; padding:0 16px; background:#f4f0e2; border:1.5px dashed #a8a081; border-radius:99px; font-size:13px; font-weight:600; color:#8a8368">미식</span>
+      </div>
+    </div>
+    <div>
+      <p style="margin:0 0 10px; font-size:11px; font-weight:700; color:#6b6550">태그 — 장소 / 축제 / 관심사 밖 / 결측</p>
+      <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center">
+        <span style="padding:5px 10px; background:#e6efd8; border-radius:2px; font-size:11px; font-weight:600; color:#3f6b2b">대릉원</span>
+        <span style="padding:5px 10px; background:#f7e6b8; border-radius:2px; font-size:11px; font-weight:600; color:#7a5710">신라문화제</span>
+        <span style="padding:5px 10px; background:#efe9d5; border:1px solid #a8a081; border-radius:2px; font-size:11px; font-weight:600; color:#6b6550">자연</span>
+        <span style="padding:5px 10px; background:#f4f0e2; border:1px dashed #a8a081; border-radius:2px; font-size:11px; font-weight:600; color:#8a8368">운영정보 없음</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:18px; margin-top:22px">
+    <div>
+      <p style="margin:0 0 8px; font-size:11px; font-weight:700; color:#6b6550">확인된 값</p>
+      <span style="display:inline-flex; align-items:center; gap:6px; padding:5px 10px; background:#e6efd8; font-size:11px; font-weight:600; color:#3f6b2b">
+        <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="#3f6b2b" stroke-width="2.1" stroke-linecap="round"><path d="M4 10.4l3.6 3.4L16 5.6"></path></svg>
+        운영 09:00–22:00 · 공식
+      </span>
+    </div>
+    <div>
+      <p style="margin:0 0 8px; font-size:11px; font-weight:700; color:#6b6550">추정값</p>
+      <span style="display:inline-flex; align-items:center; gap:6px; padding:5px 10px; background:#f7e6b8; font-size:11px; font-weight:700; color:#7a5710">
+        <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="#7a5710" stroke-width="2" stroke-linecap="round"><path d="M3.5 13.5c3-6 5-6 8 0M13 8.5h3.5"></path></svg>
+        추정 · 평균 이동
+      </span>
+    </div>
+    <div>
+      <p style="margin:0 0 8px; font-size:11px; font-weight:700; color:#6b6550">fallback / 오래된 값</p>
+      <span style="display:inline-flex; align-items:center; gap:6px; padding:5px 10px; background:#f7e6b8; border:1px dashed #7a5710; font-size:11px; font-weight:700; color:#7a5710">
+        <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="#7a5710" stroke-width="1.9" stroke-linecap="round"><circle cx="10" cy="10" r="7"></circle><path d="M10 6.4V10l2.4 1.6"></path></svg>
+        2026-08-30 값 사용
+      </span>
+    </div>
+    <div>
+      <p style="margin:0 0 8px; font-size:11px; font-weight:700; color:#6b6550">결측</p>
+      <span style="display:inline-flex; align-items:center; gap:6px; padding:5px 10px; background:#f4f0e2; border:1px dashed #a8a081; font-size:11px; font-weight:600; color:#8a8368">
+        <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="#8a8368" stroke-width="1.9" stroke-linecap="round"><path d="M4 10h12"></path></svg>
+        값 없음 · 일정에 넣지 않음
+      </span>
+    </div>
+  </div>
+
+  <p style="margin:34px 0 0; font-family:'Jua',sans-serif; font-size:20px">시간 막대</p>
+  <div style="display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:22px; margin-top:14px">
+    <div style="padding:18px 20px; background:#fbf8ee; border:2px solid #33301f; box-shadow:5px 5px 0 #cfc5a4">
+      <div style="display:flex; height:10px; border-radius:99px; overflow:hidden; background:#e7e1cd">
+        <div style="width:9.7%; background:#c3b998"></div>
+        <div style="flex-grow:1; background:#6c9b4a"></div>
+        <div style="width:9.7%; background:#c3b998"></div>
+      </div>
+      <div style="display:flex; justify-content:space-between; margin-top:7px; font-size:11px; font-weight:600; color:#6b6550">
+        <span>이동 3:30</span>
+        <span style="font-size:13px; font-weight:700; color:#3f6b2b">머무는 시간 29시간</span>
+        <span>이동 3:30</span>
+      </div>
+      <p style="margin:10px 0 0; font-size:11px; font-weight:500; color:#8a8368">막대 비율은 전체 여행시간 대비 실제 비율이다. 라벨 값과 어긋나게 그리지 않는다.</p>
+    </div>
+    <div style="padding:18px 20px; background:#f4f0e2; border:2px dashed #a8a081">
+      <div style="display:flex; height:10px; border-radius:99px; overflow:hidden; background:#e7e1cd">
+        <div style="width:23.3%; background:#c3b998"></div>
+        <div style="flex-grow:1; background:#ded8c2"></div>
+        <div style="width:23.3%; background:#c3b998"></div>
+      </div>
+      <div style="display:flex; justify-content:space-between; margin-top:7px; font-size:11px; font-weight:600; color:#8a8368">
+        <span>이동 2:48</span>
+        <span style="font-size:13px; font-weight:700; color:#6b6550">머무는 시간 6시간 24분</span>
+        <span>이동 2:48</span>
+      </div>
+      <p style="margin:10px 0 0; font-size:11px; font-weight:500; color:#8a8368">비활성·하위 후보에서는 체류 구간을 올리브 대신 무채색으로 둔다.</p>
+    </div>
+  </div>
+
+  <p style="margin:34px 0 0; font-family:'Jua',sans-serif; font-size:20px">목적지 카드</p>
+  <div style="display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:22px; margin-top:20px">
+    <div style="position:relative; padding:20px; background:#fbf8ee; border:2px solid #33301f; box-shadow:5px 5px 0 #cfc5a4">
+      <span style="position:absolute; top:-12px; left:16px; padding:3px 10px; background:#c1502e; color:#fbf8ee; font-family:'Gaegu',cursive; font-size:16px; font-weight:700; transform:rotate(-3deg)">가장 잘 맞아요</span>
+      <p style="margin:5px 0 0; font-family:'Jua',sans-serif; font-size:34px; line-height:1.15">경주</p>
+      <p style="margin:10px 0 0; font-size:12px; font-weight:600; color:#6b6550">추천 — 손글씨 라벨은 화면당 한 곳</p>
+    </div>
+    <div style="padding:20px; background:#fbf8ee; border:2px solid #33301f; box-shadow:5px 5px 0 #cfc5a4">
+      <p style="margin:0; font-family:'Jua',sans-serif; font-size:34px; line-height:1.15">공주</p>
+      <p style="margin:10px 0 0; font-size:12px; font-weight:600; color:#6b6550">기본 — 통과한 후보</p>
+    </div>
+    <div style="padding:20px; background:#f4f0e2; border:2px dashed #a8a081">
+      <p style="margin:0; font-family:'Jua',sans-serif; font-size:34px; line-height:1.15; color:#6b6550">강릉</p>
+      <p style="margin:10px 0 0; font-size:12px; font-weight:600; color:#8a8368">하위·비활성 — 시간은 되지만 관심사 밖</p>
+    </div>
+  </div>
+
+  <p style="margin:34px 0 0; font-family:'Jua',sans-serif; font-size:20px">타임라인 항목</p>
+  <div style="display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:18px; margin-top:14px">
+    <div style="display:flex; gap:12px">
+      <div style="display:flex; flex-direction:column; align-items:center; width:52px; flex-shrink:0">
+        <span style="font-size:12px; font-weight:800">08:00</span>
+        <span style="flex-grow:1; width:2px; margin-top:6px; background:#c3b998"></span>
+      </div>
+      <div style="flex-grow:1; padding:15px 16px; background:#fbf8ee; border:2px solid #33301f; box-shadow:4px 4px 0 #cfc5a4">
+        <span style="font-size:11px; font-weight:700; color:#6b6550">이동</span>
+        <p style="margin:7px 0 0; font-size:15px; font-weight:700">서울에서 경주로 출발</p>
+        <p style="margin:5px 0 0; font-size:12px; font-weight:500; color:#6b6550">왼쪽 굵은 띠 없음 = 이동</p>
+      </div>
+    </div>
+    <div style="display:flex; gap:12px">
+      <div style="display:flex; flex-direction:column; align-items:center; width:52px; flex-shrink:0">
+        <span style="font-size:12px; font-weight:800">11:30</span>
+        <span style="flex-grow:1; width:2px; margin-top:6px; background:#c3b998"></span>
+      </div>
+      <div style="flex-grow:1; padding:15px 16px; background:#fbf8ee; border:2px solid #33301f; box-shadow:4px 4px 0 #cfc5a4; border-left:6px solid #6c9b4a">
+        <span style="font-size:11px; font-weight:700; color:#3f6b2b">방문 · 역사</span>
+        <p style="margin:7px 0 0; font-size:15px; font-weight:700">대릉원</p>
+        <p style="margin:5px 0 0; font-size:12px; font-weight:500; color:#6b6550">왼쪽 올리브 띠 = 방문</p>
+      </div>
+    </div>
+    <div style="display:flex; gap:12px">
+      <div style="display:flex; flex-direction:column; align-items:center; width:52px; flex-shrink:0">
+        <span style="font-size:11px; font-weight:700; color:#8a8368">도착 후</span>
+        <span style="flex-grow:1; width:2px; margin-top:6px; background:#c3b998"></span>
+      </div>
+      <div style="flex-grow:1; padding:15px 16px; background:#fbf8ee; border:2px solid #33301f; box-shadow:4px 4px 0 #cfc5a4; border-left:6px solid #e0b743">
+        <span style="font-size:11px; font-weight:700; color:#7a5710">축제 · 제안</span>
+        <p style="margin:7px 0 0; font-size:15px; font-weight:700">신라문화제</p>
+        <p style="margin:5px 0 0; font-size:12px; font-weight:500; color:#6b6550">머스터드 띠 = 축제. 시각 확정 항목이 아니다</p>
+      </div>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:12px">
+      <div style="display:flex; gap:12px">
+        <div style="width:52px; flex-shrink:0; text-align:center; font-size:11px; font-weight:700; color:#8a8368">13:00</div>
+        <div style="flex-grow:1; display:flex; align-items:center; gap:9px; padding:11px 16px; background:#efe9d5; border:2px dashed #a8a081">
+          <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="#8a8368" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10h12M12.5 6.5L16 10l-3.5 3.5"></path></svg>
+          <span style="font-size:12px; font-weight:600; color:#6b6550">장소 사이 이동 30분 · 고정 추정값</span>
+        </div>
+      </div>
+      <div style="display:flex; gap:12px">
+        <div style="width:52px; flex-shrink:0; text-align:center; font-size:11px; font-weight:700; color:#8a8368">저녁</div>
+        <div style="flex-grow:1; padding:13px 16px; background:#f4f0e2; border:2px dashed #a8a081">
+          <span style="font-size:11px; font-weight:700; color:#6b6550">식사 시간</span>
+          <p style="margin:6px 0 0; font-size:13px; font-weight:700; color:#6b6550">아직 비어 있는 블록</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p style="margin:34px 0 0; font-family:'Jua',sans-serif; font-size:20px">배너</p>
+  <div style="display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:18px; margin-top:14px">
+    <div>
+      <p style="margin:0 0 8px; font-size:11px; font-weight:700; color:#6b6550">안내 — 정상 상태(통과·성공)</p>
+      <div style="display:flex; align-items:center; gap:11px; padding:15px; background:#e6efd8; border:2px solid #4a6b2f">
+        <svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="#3f6b2b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M4 10.4l3.6 3.4L16 5.6"></path></svg>
+        <p style="margin:0; font-size:13px; font-weight:700; color:#3f6b2b">복귀 20:00까지 딱 맞아요</p>
+      </div>
+    </div>
+    <div>
+      <p style="margin:0 0 8px; font-size:11px; font-weight:700; color:#6b6550">안내 — 진행 중</p>
+      <div style="display:flex; align-items:center; gap:11px; padding:15px; background:#e6efd8; border:2px solid #4a6b2f">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#3f6b2b" stroke-width="1.9" stroke-linecap="round" style="flex-shrink:0"><path d="M10 2.8a7.2 7.2 0 1 1-6.9 5.1"></path></svg>
+        <p style="margin:0; font-size:13px; font-weight:700; color:#3f6b2b">시간 안에 다녀올 수 있는 곳을 계산하고 있어요</p>
+      </div>
+    </div>
+    <div>
+      <p style="margin:0 0 8px; font-size:11px; font-weight:700; color:#6b6550">정상 예외 — 결과 없음 · 일정 생성 불가</p>
+      <div style="display:flex; align-items:flex-start; gap:11px; padding:15px; background:#fbf8ee; border:2px solid #33301f; box-shadow:5px 5px 0 #cfc5a4">
+        <svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="#6b6550" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="10" cy="10" r="7.2"></circle><path d="M10 6.4v.2M10 9.2v4.4"></path></svg>
+        <p style="margin:0; font-size:13px; font-weight:700; line-height:1.6; color:#3d3a2c">이번 조건으로는 다녀올 수 있는 곳이 없어요 <span style="font-weight:600; color:#8a8368">— 빨간색을 쓰지 않는다</span></p>
+      </div>
+    </div>
+    <div>
+      <p style="margin:0 0 8px; font-size:11px; font-weight:700; color:#6b6550">오류 — 시스템·데이터 장애</p>
+      <div style="display:flex; align-items:flex-start; gap:11px; padding:15px; background:#f4dcdf; border:3px double #8c2140">
+        <svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="#8c2140" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M10 2.6l7.6 13.6H2.4z"></path><path d="M10 7.6v3.8M10 13.8v.2"></path></svg>
+        <p style="margin:0; font-size:13px; font-weight:700; line-height:1.6; color:#6f1a33">정보를 불러오지 못했어요 <span style="font-weight:600">— 자적색 + 이중 테두리</span></p>
+      </div>
+    </div>
+  </div>
+
+  <p style="margin:34px 0 0; font-family:'Jua',sans-serif; font-size:20px">로딩 스켈레톤</p>
+  <div style="display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:18px; margin-top:14px">
+    <div style="padding:20px; background:#fbf8ee; border:2px solid #33301f; box-shadow:5px 5px 0 #cfc5a4">
+      <div style="display:flex; align-items:center; justify-content:space-between">
+        <div style="width:118px; height:32px; background:#ded8c2"></div>
+        <div style="width:58px; height:12px; background:#ded8c2"></div>
+      </div>
+      <div style="height:10px; margin-top:18px; border-radius:99px; background:#ded8c2"></div>
+      <div style="height:12px; margin-top:18px; background:#ded8c2"></div>
+      <div style="width:72%; height:12px; margin-top:8px; background:#ded8c2"></div>
+    </div>
+    <div style="display:flex; align-items:center">
+      <p style="margin:0; font-size:12px; font-weight:600; line-height:1.8; color:#6b6550">스켈레톤은 카드 껍데기(테두리·섀도)를 유지한 채 내용만 `--skeleton`으로 채운다. 조건 요약 카드는 스켈레톤으로 바꾸지 않고 실제 값을 유지한다.</p>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>
