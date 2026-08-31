@@ -2,9 +2,9 @@
 
 확정 방향 H의 값이다. 방향의 배경은 `docs/design/DESIGN_DIRECTION.md`에 있다.
 
-이 문서가 정의이고 `app/globals.css`가 코드 반영이다. 한쪽만 고치지 않는다. 여기 없는 색·크기를 화면에서 새로 만들지 않는다.
+이 문서가 정의이고 `app/tokens.css`가 코드 반영이다. 한쪽만 고치지 않는다. 여기 없는 색·크기를 화면에서 새로 만들지 않는다.
 
-> 현재 `app/globals.css`는 PoC 시절 토큰(Pretendard·Nanum Myeongjo·DM Mono, 크림/딥그린)을 쓰고 있다. 아래 토큰으로의 교체는 아직 코드에 반영되지 않았다.
+> 아래 색·형태·서체 토큰은 `app/tokens.css`의 `:root`에 반영돼 있고, 컴포넌트 스타일은 `app/globals.css`에 있다. PoC 시절 토큰(Pretendard·Nanum Myeongjo·DM Mono, 크림/딥그린)과 PoC 전용 클래스는 제거했다.
 
 ## 색
 
@@ -212,7 +212,7 @@
 
 ## 코드 반영용 CSS 커스텀 프로퍼티
 
-아래 블록이 위 표의 색 토큰과 1:1로 대응한다. **이 문서는 정의이고 코드 반영은 화면 구현과 함께 employee agent가 한다.** 이 블록을 그대로 옮기고, 여기 없는 값을 화면에서 새로 만들지 않는다.
+아래 블록이 위 표의 색 토큰과 1:1로 대응한다. **이 블록은 `app/tokens.css`의 `:root`에 그대로 반영돼 있다.** 여기 없는 값을 화면에서 새로 만들지 않는다.
 
 ```css
 :root {
@@ -272,11 +272,13 @@
 }
 ```
 
-웹폰트는 다음 한 줄로 불러온다.
+화면 시안(`design/screens/`)은 웹폰트를 다음 한 줄로 불러온다.
 
 ```html
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gaegu:wght@700&family=Gothic+A1:wght@500;600;700;800&family=Jua&display=swap">
 ```
+
+애플리케이션 코드는 같은 서체를 `app/layout.tsx`에서 `next/font/google`로 불러와 self-host한다. 폴백 스택은 위 서체 토큰에 그대로 들어 있다.
 
 ## 화면 시안
 
