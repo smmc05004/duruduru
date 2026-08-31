@@ -69,8 +69,10 @@ const ignoredPrefixes = ["node_modules/", ".work-cycles/"];
 // 경로처럼 생겼지만 경로가 아닌 토큰. 검사 범위를 넓히면 오탐이 함께 늘어나므로,
 // 예외는 이 목록에 이유와 함께 모아 두고 판정 규칙 자체를 느슨하게 만들지 않는다.
 // 여기에 토큰을 추가할 때는 왜 경로가 아닌지 주석으로 남긴다.
-// 예: ".env.local" — 커밋하지 않는 로컬 비밀 파일이라 저장소에 없는 것이 정상이다.
-const ignoredTokens = new Set([]);
+const ignoredTokens = new Set([
+  // .gitignore 대상이라 저장소에 존재할 수 없다. 예시 파일은 .env.local.example 이 따로 있다.
+  ".env.local",
+]);
 
 async function exists(relativePath) {
   try {
