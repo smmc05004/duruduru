@@ -1,0 +1,15 @@
+# Build and generated files
+.next/
+node_modules/
+coverage/
+playwright-report/
+test-results/
+next-env.d.ts
+
+# Design artefacts and agent instructions are maintained in their own formats.
+design/
+.agents/reviewer/
+
+# Local agent and environment state
+.work-cycles/
+.env*.local

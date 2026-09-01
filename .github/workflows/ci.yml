@@ -9,19 +9,53 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify:
     name: 검증
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: 저장소 가져오기
         uses: actions/checkout@v4
       - name: Node.js 설정
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.22.1
           cache: npm
       - name: 의존성 설치
         run: npm ci
       - name: 통합 검증
         run: npm run verify
+
+  e2e:
+    name: E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: 저장소 가져오기
+        uses: actions/checkout@v4
+      - name: Node.js 설정
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.1
+          cache: npm
+      - name: 의존성 설치
+        run: npm ci
+      - name: Chromium 설치
+        run: npx playwright install --with-deps chromium
+      - name: E2E 검증
+        run: npm run test:e2e
+      - name: Playwright 실패 산출물 업로드
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results-${{ github.run_id }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7

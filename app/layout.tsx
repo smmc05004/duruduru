@@ -22,8 +22,18 @@ import "./tokens.css";
  * `.variable`만 쓰고 `.className`은 쓰지 않는다. `.className`은 요소에 font-family를 직접
  * 적용해서 PoC 화면의 서체까지 바꾼다.
  */
-const jua = Jua({ weight: "400", subsets: ["latin"], variable: "--font-jua", display: "swap" });
-const gaegu = Gaegu({ weight: "700", subsets: ["latin"], variable: "--font-gaegu", display: "swap" });
+const jua = Jua({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-jua",
+  display: "swap",
+});
+const gaegu = Gaegu({
+  weight: "700",
+  subsets: ["latin"],
+  variable: "--font-gaegu",
+  display: "swap",
+});
 const gothicA1 = Gothic_A1({
   weight: ["500", "600", "700", "800"],
   subsets: ["latin"],
@@ -36,9 +46,14 @@ export const metadata: Metadata = {
   description: "목적지를 정하지 않아도 되는 국내 여행 계획 도우미",
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default function RootLayout({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="ko" className={`${jua.variable} ${gaegu.variable} ${gothicA1.variable}`}>
+    <html
+      lang="ko"
+      className={`${jua.variable} ${gaegu.variable} ${gothicA1.variable}`}
+    >
       <body>{children}</body>
     </html>
   );

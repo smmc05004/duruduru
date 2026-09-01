@@ -1,6 +1,10 @@
 import type { ReactNode } from "react";
 import { Button } from "./Button";
-import { formatClockDuration, formatHoursAndMinutes, formatPercent } from "@/lib/format-duration";
+import {
+  formatClockDuration,
+  formatHoursAndMinutes,
+  formatPercent,
+} from "@/lib/format-duration";
 import type { CandidateEvaluation } from "@/lib/recommendation";
 
 /*
@@ -12,7 +16,16 @@ import type { CandidateEvaluation } from "@/lib/recommendation";
  */
 
 const checkIcon = (
-  <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 20 20"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    aria-hidden="true"
+  >
     <path d="M3.4 13.6l4-5 3.2 3 5.9-7" />
   </svg>
 );
@@ -44,7 +57,13 @@ type Props = {
   onSelect: () => void;
 };
 
-export function CandidateCard({ candidate, selectedInterestCount, best, selected, onSelect }: Props) {
+export function CandidateCard({
+  candidate,
+  selectedInterestCount,
+  best,
+  selected,
+  onSelect,
+}: Props) {
   // 관심사와 겹치지 않는 후보는 시안대로 흐린 카드로 구분한다. 통과 여부와는 무관하다.
   const muted = candidate.interestMatches.length === 0;
   const oneWay = candidate.oneWayHours ?? 0;
@@ -52,8 +71,12 @@ export function CandidateCard({ candidate, selectedInterestCount, best, selected
   const total = oneWay * 2 + local;
   const movePercent = total > 0 ? (oneWay / total) * 100 : 0;
 
-  const timeFit = candidate.components.find((component) => component.id === "timeFit");
-  const interestFit = candidate.components.find((component) => component.id === "interestFit");
+  const timeFit = candidate.components.find(
+    (component) => component.id === "timeFit",
+  );
+  const interestFit = candidate.components.find(
+    (component) => component.id === "interestFit",
+  );
 
   return (
     <li
@@ -67,20 +90,31 @@ export function CandidateCard({ candidate, selectedInterestCount, best, selected
     >
       {best ? <span className="dd-candidate__best">가장 잘 맞아요</span> : null}
 
-      <div className="dd-candidate__head" style={best ? { marginTop: 5 } : undefined}>
+      <div
+        className="dd-candidate__head"
+        style={best ? { marginTop: 5 } : undefined}
+      >
         <h2 className="dd-candidate__name">{candidate.name}</h2>
         <span className="dd-candidate__region">{candidate.region}</span>
       </div>
 
       <div className="dd-timebar">
         <div className="dd-timebar__track">
-          <div className="dd-timebar__move" style={{ width: `${movePercent}%` }} />
+          <div
+            className="dd-timebar__move"
+            style={{ width: `${movePercent}%` }}
+          />
           <div className="dd-timebar__stay" />
-          <div className="dd-timebar__move" style={{ width: `${movePercent}%` }} />
+          <div
+            className="dd-timebar__move"
+            style={{ width: `${movePercent}%` }}
+          />
         </div>
         <div className="dd-timebar__labels">
           <span>이동 {formatClockDuration(oneWay)}</span>
-          <span className="dd-timebar__stay-label">머무는 시간 {formatHoursAndMinutes(local)}</span>
+          <span className="dd-timebar__stay-label">
+            머무는 시간 {formatHoursAndMinutes(local)}
+          </span>
           <span>이동 {formatClockDuration(oneWay)}</span>
         </div>
       </div>
@@ -91,7 +125,11 @@ export function CandidateCard({ candidate, selectedInterestCount, best, selected
         {candidate.tags.map((tag) => (
           <span
             key={tag}
-            className={candidate.interestMatches.includes(tag) ? "dd-tag" : "dd-tag dd-tag--plain"}
+            className={
+              candidate.interestMatches.includes(tag)
+                ? "dd-tag"
+                : "dd-tag dd-tag--plain"
+            }
           >
             {tag}
           </span>
@@ -105,31 +143,41 @@ export function CandidateCard({ candidate, selectedInterestCount, best, selected
       <div className="dd-basis">
         {timeFit?.available ? (
           <BasisItem>
-            시간 적합성 {formatPercent(timeFit.raw ?? 0)} · 쓸 수 있는 시간 중 이동에 쓰이지 않은 비율
+            시간 적합성 {formatPercent(timeFit.raw ?? 0)} · 쓸 수 있는 시간 중
+            이동에 쓰이지 않은 비율
           </BasisItem>
         ) : null}
         {interestFit?.available ? (
           <BasisItem>
-            관심사 일치 {candidate.interestMatches.length}/{selectedInterestCount} · 고른 관심사 중 겹친 개수
+            관심사 일치 {candidate.interestMatches.length}/
+            {selectedInterestCount} · 고른 관심사 중 겹친 개수
           </BasisItem>
         ) : (
-          <BasisItem>{interestFit?.unavailableReason ?? "관심사 근거 없음"}</BasisItem>
+          <BasisItem>
+            {interestFit?.unavailableReason ?? "관심사 근거 없음"}
+          </BasisItem>
         )}
         {/* F-05 신뢰도 표시 — 이동시간이 추정치이고 목업이라는 사실을 감추지 않는다. */}
         <BasisItem>
-          이동시간 추정 · {candidate.travel?.source} · {candidate.travel?.basisDate} 기준
+          이동시간 추정 · {candidate.travel?.source} ·{" "}
+          {candidate.travel?.basisDate} 기준
         </BasisItem>
       </div>
 
       <div className="dd-candidate__action">
-        <Button variant={best ? "primary" : "secondary"} onClick={onSelect} aria-pressed={selected}>
+        <Button
+          variant={best ? "primary" : "secondary"}
+          onClick={onSelect}
+          aria-pressed={selected}
+        >
           {candidate.name} 일정 보기
         </Button>
       </div>
 
       {selected ? (
         <p className="dd-candidate__selected-note">
-          {candidate.name}을(를) 골랐어요. 일정 결과 화면은 아직 준비 중이라 여기까지만 보여 드려요.
+          {candidate.name}을(를) 골랐어요. 일정 결과 화면은 아직 준비 중이라
+          여기까지만 보여 드려요.
         </p>
       ) : null}
     </li>

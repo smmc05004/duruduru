@@ -38,7 +38,10 @@ let statePath;
 
 beforeEach(async () => {
   workspace = await mkdtemp(path.join(os.tmpdir(), "work-cycle-test-"));
-  execFileSync("git", ["init", "-b", "feat/테스트-작업"], { cwd: workspace, stdio: "pipe" });
+  execFileSync("git", ["init", "-b", "feat/테스트-작업"], {
+    cwd: workspace,
+    stdio: "pipe",
+  });
   taskId = `cycle-test-${process.pid}-${Date.now()}`;
   statePath = path.join(workspace, ".work-cycles", `${taskId}.json`);
 });
@@ -51,7 +54,9 @@ describe("작업 사이클 그래프", () => {
   it("그래프와 검증·독립 리뷰 게이트를 표시한다", () => {
     const output = runCycle("graph");
 
-    expect(output).toContain("context --> plan --> implement --> verify --> review --> handoff");
+    expect(output).toContain(
+      "context --> plan --> implement --> verify --> review --> handoff",
+    );
     expect(output).toContain("검증: npm run verify");
     expect(output).toContain("독립 reviewer 검토");
   });
@@ -62,7 +67,15 @@ describe("작업 사이클 그래프", () => {
     runCycle("advance", taskId, "plan", "--evidence", "계획 작성");
     runCycle("advance", taskId, "implement", "--evidence", "구현 완료");
 
-    expect(runCycleExpectFailure("advance", taskId, "context", "--evidence", "재실행")).toContain("현재 완료할 수 있는 노드가 아닙니다");
+    expect(
+      runCycleExpectFailure(
+        "advance",
+        taskId,
+        "context",
+        "--evidence",
+        "재실행",
+      ),
+    ).toContain("현재 완료할 수 있는 노드가 아닙니다");
 
     runCycle("reopen", taskId, "implement", "--evidence", "수정 필요");
     const state = JSON.parse(await readFile(statePath, "utf8"));
@@ -80,6 +93,8 @@ describe("작업 사이클 그래프", () => {
     state.branch = "other-branch";
     await writeFile(statePath, JSON.stringify(state));
 
-    expect(runCycleExpectFailure("status", taskId)).toContain("브랜치에서만 진행할 수 있습니다");
+    expect(runCycleExpectFailure("status", taskId)).toContain(
+      "브랜치에서만 진행할 수 있습니다",
+    );
   });
 });

@@ -7,15 +7,28 @@ import type { InputHTMLAttributes } from "react";
  * 실제 포커스와 어긋날 수 없어야 한다.
  * 비활성일 때 값 자리는 `--skeleton` 블록으로 바뀐다(DESIGN_TOKENS.md 입력 필드 표).
  */
-type InputFieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, "className"> & {
+type InputFieldProps = Omit<
+  InputHTMLAttributes<HTMLInputElement>,
+  "className"
+> & {
   id: string;
   /** 컨트롤 안 왼쪽에 붙는 짧은 라벨. 예: "출발" */
   prefix?: string;
   invalid?: boolean;
 };
 
-export function InputField({ id, prefix, invalid = false, disabled = false, ...rest }: InputFieldProps) {
-  const classes = ["dd-control", invalid ? "dd-control--invalid" : null, disabled ? "dd-control--disabled" : null]
+export function InputField({
+  id,
+  prefix,
+  invalid = false,
+  disabled = false,
+  ...rest
+}: InputFieldProps) {
+  const classes = [
+    "dd-control",
+    invalid ? "dd-control--invalid" : null,
+    disabled ? "dd-control--disabled" : null,
+  ]
     .filter(Boolean)
     .join(" ");
 

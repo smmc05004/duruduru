@@ -39,7 +39,9 @@ function currentBranch() {
 
 function validateTaskId(taskId) {
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(taskId ?? "")) {
-    throw new Error("작업 ID는 영문 소문자, 숫자, 하이픈만 사용한 케밥 표기여야 합니다.");
+    throw new Error(
+      "작업 ID는 영문 소문자, 숫자, 하이픈만 사용한 케밥 표기여야 합니다.",
+    );
   }
 }
 
@@ -76,10 +78,14 @@ function nextStage(state) {
 }
 
 function assertReady(state, stage) {
-  const incomplete = stage.requires.filter((required) => state.stages[required].status !== "complete");
+  const incomplete = stage.requires.filter(
+    (required) => state.stages[required].status !== "complete",
+  );
 
   if (incomplete.length > 0) {
-    throw new Error(`${stage.label} 단계의 선행 조건이 완료되지 않았습니다: ${incomplete.join(", ")}`);
+    throw new Error(
+      `${stage.label} 단계의 선행 조건이 완료되지 않았습니다: ${incomplete.join(", ")}`,
+    );
   }
 }
 
@@ -87,7 +93,9 @@ function assertCurrentStage(state, stage) {
   const next = nextStage(state);
 
   if (!next || next.id !== stage.id) {
-    throw new Error(`현재 완료할 수 있는 노드가 아닙니다. 다음 노드: ${next?.id ?? "없음"}`);
+    throw new Error(
+      `현재 완료할 수 있는 노드가 아닙니다. 다음 노드: ${next?.id ?? "없음"}`,
+    );
   }
 }
 
@@ -95,7 +103,9 @@ function assertStateBranch(state) {
   const branch = currentBranch();
 
   if (branch !== state.branch) {
-    throw new Error(`작업 사이클은 ${state.branch} 브랜치에서만 진행할 수 있습니다. 현재 브랜치: ${branch || "detached HEAD"}`);
+    throw new Error(
+      `작업 사이클은 ${state.branch} 브랜치에서만 진행할 수 있습니다. 현재 브랜치: ${branch || "detached HEAD"}`,
+    );
   }
 }
 
@@ -126,7 +136,10 @@ context --> plan --> implement --> verify --> review --> handoff
 
 function runNpm(script) {
   const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
-  execFileSync(npmCommand, ["run", script], { cwd: repositoryRoot, stdio: "inherit" });
+  execFileSync(npmCommand, ["run", script], {
+    cwd: repositoryRoot,
+    stdio: "inherit",
+  });
 }
 
 async function main() {
@@ -142,11 +155,15 @@ async function main() {
     const branch = currentBranch();
 
     if (!branch || branch === "main") {
-      throw new Error("작업 사이클은 main이 아닌 작업 브랜치에서 시작해야 합니다.");
+      throw new Error(
+        "작업 사이클은 main이 아닌 작업 브랜치에서 시작해야 합니다.",
+      );
     }
 
     if (await stateExists(taskId)) {
-      throw new Error("같은 작업 ID의 사이클이 이미 있습니다. 재작업은 reopen 명령을 사용하세요.");
+      throw new Error(
+        "같은 작업 ID의 사이클이 이미 있습니다. 재작업은 reopen 명령을 사용하세요.",
+      );
     }
 
     const state = {
@@ -154,7 +171,9 @@ async function main() {
       id: taskId,
       branch,
       createdAt: new Date().toISOString(),
-      stages: Object.fromEntries(stages.map((stage) => [stage.id, { status: "pending" }])),
+      stages: Object.fromEntries(
+        stages.map((stage) => [stage.id, { status: "pending" }]),
+      ),
     };
 
     await saveState(state);
@@ -166,9 +185,15 @@ async function main() {
     const state = await loadState(taskId);
     assertStateBranch(state);
     console.log(`작업: ${state.id} (${state.branch})`);
-    stages.forEach((stage) => console.log(`- ${stage.id}: ${state.stages[stage.id].status}`));
+    stages.forEach((stage) =>
+      console.log(`- ${stage.id}: ${state.stages[stage.id].status}`),
+    );
     const next = nextStage(state);
-    console.log(next ? `다음 노드: ${next.id} (${next.label})` : "모든 노드가 완료되었습니다.");
+    console.log(
+      next
+        ? `다음 노드: ${next.id} (${next.label})`
+        : "모든 노드가 완료되었습니다.",
+    );
     return;
   }
 
@@ -177,10 +202,13 @@ async function main() {
     assertStateBranch(state);
     const stage = stages.find((candidate) => candidate.id === stageId);
     const evidenceIndex = options.indexOf("--evidence");
-    const evidence = evidenceIndex >= 0 ? options[evidenceIndex + 1] : undefined;
+    const evidence =
+      evidenceIndex >= 0 ? options[evidenceIndex + 1] : undefined;
 
     if (!stage || stage.id === "verify" || !evidence) {
-      throw new Error("verify는 verify 명령으로 처리하고, 다른 단계는 --evidence <근거>가 필요합니다.");
+      throw new Error(
+        "verify는 verify 명령으로 처리하고, 다른 단계는 --evidence <근거>가 필요합니다.",
+      );
     }
 
     completeStage(state, stage, evidence);
@@ -200,7 +228,13 @@ async function main() {
       runNpm("test:e2e");
     }
 
-    completeStage(state, stage, options.includes("--e2e") ? "npm run verify, npm run test:e2e" : "npm run verify");
+    completeStage(
+      state,
+      stage,
+      options.includes("--e2e")
+        ? "npm run verify, npm run test:e2e"
+        : "npm run verify",
+    );
     await saveState(state);
     console.log("verify 노드를 완료했습니다.");
     return;
@@ -211,13 +245,16 @@ async function main() {
     assertStateBranch(state);
     const stage = stages.find((candidate) => candidate.id === stageId);
     const evidenceIndex = options.indexOf("--evidence");
-    const evidence = evidenceIndex >= 0 ? options[evidenceIndex + 1] : undefined;
+    const evidence =
+      evidenceIndex >= 0 ? options[evidenceIndex + 1] : undefined;
 
     if (!stage || !evidence || state.stages[stage.id].status !== "complete") {
       throw new Error("완료된 노드와 --evidence <재작업 사유>가 필요합니다.");
     }
 
-    const stageIndex = stages.findIndex((candidate) => candidate.id === stage.id);
+    const stageIndex = stages.findIndex(
+      (candidate) => candidate.id === stage.id,
+    );
     stages.slice(stageIndex).forEach((candidate) => {
       state.stages[candidate.id] = {
         status: "pending",

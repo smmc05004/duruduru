@@ -69,6 +69,7 @@
    * 폴백 스택은 DESIGN_TOKENS.md의 `system-ui, 'Apple SD Gothic Neo', sans-serif`를 지킨다.
    */
   --font-title: var(--font-jua), system-ui, "Apple SD Gothic Neo", sans-serif;
-  --font-body: var(--font-gothic-a1), system-ui, "Apple SD Gothic Neo", sans-serif;
+  --font-body:
+    var(--font-gothic-a1), system-ui, "Apple SD Gothic Neo", sans-serif;
   --font-hand: var(--font-gaegu), system-ui, "Apple SD Gothic Neo", sans-serif;
 }

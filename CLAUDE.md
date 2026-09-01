@@ -12,5 +12,5 @@
 
 - 공유 프로젝트 설정은 `.claude/settings.json`에만 둔다. 인증 정보, 개인 경로, 토큰은 커밋하지 않는다.
 - 훅은 공통 npm 검증 명령만 호출한다. 훅의 동작을 제품·기술 규칙의 단일 출처로 만들지 않는다.
-- 편집 직후에는 `.claude/hooks/lint-changed-file.sh`가 그 파일만 lint 하고, 세션 종료 전에는 `.claude/hooks/verify-gate.sh`가 하네스 검사·lint·타입 검사를 병렬로 돌린다. Jest와 빌드는 느려서 훅에서 빠져 있으므로 `npm run verify`로 확인한다.
+- 편집 직후에는 `.claude/hooks/lint-changed-file.sh`가 그 파일만 lint 하고, 세션 종료 전에는 `.claude/hooks/verify-gate.sh`가 하네스 검사·lint·타입 검사를 병렬로 돌린다. Git 커밋 직전에는 공통 Husky 훅이 staged 파일만 Prettier·ESLint로 정리한다. Jest·빌드·전체 포맷 검사는 느려서 Claude 훅에 넣지 않으며 `npm run verify`와 CI에서 확인한다.
 - reviewer 역할은 구현 세션과 분리된 새 Claude 세션에서 실행한다.

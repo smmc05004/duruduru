@@ -1,4 +1,8 @@
-import { destinationsFrom, evaluateCandidates, type RecommendationOutcome } from "./recommendation";
+import {
+  destinationsFrom,
+  evaluateCandidates,
+  type RecommendationOutcome,
+} from "./recommendation";
 import { recommendationPolicyV1 } from "./trip-policy";
 import { provisionalTravelTimeAdapter } from "./travel-time";
 import type { ValidTripConditions } from "./trip-conditions";
@@ -15,7 +19,9 @@ import type { ValidTripConditions } from "./trip-conditions";
  */
 const MOCK_LATENCY_MS = 450;
 
-export function requestRecommendations(conditions: ValidTripConditions): Promise<RecommendationOutcome> {
+export function requestRecommendations(
+  conditions: ValidTripConditions,
+): Promise<RecommendationOutcome> {
   return new Promise((resolve) => {
     setTimeout(() => {
       resolve(

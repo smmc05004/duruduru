@@ -31,7 +31,9 @@ export function Chip(props: ChipProps) {
       role="checkbox"
       aria-checked={selected}
       disabled={disabled}
-      className={["dd-chip", selected ? "dd-chip--selected" : null].filter(Boolean).join(" ")}
+      className={["dd-chip", selected ? "dd-chip--selected" : null]
+        .filter(Boolean)
+        .join(" ")}
       onClick={onToggle}
     >
       {label}

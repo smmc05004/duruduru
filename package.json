@@ -2,20 +2,26 @@
   "name": "duruduru",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22.22.1 <23"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
     "lint:file": "eslint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
     "test": "jest --passWithNoTests",
     "test:e2e": "playwright test",
     "setup:e2e": "playwright install chromium",
-    "verify": "npm run check:agent-harness && npm run lint && npm run typecheck && npm run test && npm run build",
+    "verify": "npm run check:agent-harness && npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build",
     "cycle": "node scripts/work-cycle.mjs",
     "check:agent-harness": "node scripts/check-agent-harness.mjs",
-    "check:tour-api": "node --env-file-if-exists=.env.local scripts/probe-tourapi.mjs"
+    "check:tour-api": "node --env-file-if-exists=.env.local scripts/probe-tourapi.mjs",
+    "prepare": "husky"
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.3.3",
@@ -40,9 +46,19 @@
     "@types/react-dom": "^19.2.5",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.3.3",
+    "husky": "^9.1.7",
     "jest": "^30.4.2",
     "jest-environment-jsdom": "^30.4.1",
+    "lint-staged": "^17.4.1",
+    "prettier": "^3.9.6",
     "ts-node": "^10.9.2",
     "typescript": "^6.0.3"
+  },
+  "lint-staged": {
+    "*.{js,cjs,mjs,jsx,ts,tsx}": [
+      "prettier --write",
+      "eslint --fix"
+    ],
+    "*.{json,css,md,yml,yaml}": "prettier --write"
   }
 }

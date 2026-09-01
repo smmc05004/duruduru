@@ -23,24 +23,38 @@ describe("조건 입력 화면", () => {
     const user = userEvent.setup();
     render(<TripConditionsPage />);
 
-    await user.click(screen.getByRole("button", { name: "갈 수 있는 곳 찾기" }));
+    await user.click(
+      screen.getByRole("button", { name: "갈 수 있는 곳 찾기" }),
+    );
 
     expect(screen.getByText("고쳐야 할 항목이 4개 있어요")).toBeInTheDocument();
-    expect(screen.getByText("관심사를 하나 이상 골라 주세요.")).toBeInTheDocument();
+    expect(
+      screen.getByText("관심사를 하나 이상 골라 주세요."),
+    ).toBeInTheDocument();
     expect(screen.getByText("출발지를 골라 주세요.")).toBeInTheDocument();
     expect(screen.getByText("출발 일시를 골라 주세요.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "갈 수 있는 곳 찾기" })).toBeDisabled();
-    expect(screen.getByText("고쳐야 할 항목이 남아 있어 아직 찾을 수 없어요")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "갈 수 있는 곳 찾기" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByText("고쳐야 할 항목이 남아 있어 아직 찾을 수 없어요"),
+    ).toBeInTheDocument();
   });
 
   it("복귀가 출발보다 이르면 제출을 막고 복귀 항목에 오류를 붙인다", async () => {
     render(<TripConditionsPage />);
 
     const user = await fillConditions("2026-09-12T08:00", "2026-09-12T06:00");
-    await user.click(screen.getByRole("button", { name: "갈 수 있는 곳 찾기" }));
+    await user.click(
+      screen.getByRole("button", { name: "갈 수 있는 곳 찾기" }),
+    );
 
-    expect(screen.getByText("복귀 시각이 출발보다 빨라요. 출발 이후로 맞춰 주세요.")).toBeInTheDocument();
-    expect(screen.queryByRole("region", { name: "제출한 여행 조건" })).not.toBeInTheDocument();
+    expect(
+      screen.getByText("복귀 시각이 출발보다 빨라요. 출발 이후로 맞춰 주세요."),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("region", { name: "제출한 여행 조건" }),
+    ).not.toBeInTheDocument();
   });
 
   it("유효한 조건을 제출하면 조건 요약을 보인다", async () => {
@@ -49,7 +63,9 @@ describe("조건 입력 화면", () => {
     const user = await fillConditions("2026-09-12T08:00", "2026-09-13T20:00");
     expect(screen.getByText("쓸 수 있는 시간 36시간")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "갈 수 있는 곳 찾기" }));
+    await user.click(
+      screen.getByRole("button", { name: "갈 수 있는 곳 찾기" }),
+    );
 
     const summary = screen.getByRole("region", { name: "제출한 여행 조건" });
     expect(summary).toBeInTheDocument();
@@ -60,29 +76,39 @@ describe("조건 입력 화면", () => {
     const user = userEvent.setup();
     render(<TripConditionsPage />);
 
-    await user.click(screen.getByRole("button", { name: "갈 수 있는 곳 찾기" }));
+    await user.click(
+      screen.getByRole("button", { name: "갈 수 있는 곳 찾기" }),
+    );
 
     expect(screen.getByText("출발 일시를 골라 주세요.")).toBeInTheDocument();
-    expect(screen.getByText("복귀 가능 일시를 골라 주세요.")).toBeInTheDocument();
+    expect(
+      screen.getByText("복귀 가능 일시를 골라 주세요."),
+    ).toBeInTheDocument();
   });
 
   it("요약 배너가 세는 개수와 화면에 보이는 항목별 오류 메시지 수가 일치한다", async () => {
     const user = userEvent.setup();
     const { container } = render(<TripConditionsPage />);
 
-    await user.click(screen.getByRole("button", { name: "갈 수 있는 곳 찾기" }));
+    await user.click(
+      screen.getByRole("button", { name: "갈 수 있는 곳 찾기" }),
+    );
 
     const banner = screen.getByText(/고쳐야 할 항목이 (\d+)개 있어요/);
     const counted = Number(/(\d+)개/.exec(banner.textContent ?? "")?.[1]);
     expect(counted).toBeGreaterThan(0);
-    expect(container.querySelectorAll(".dd-field-error__text")).toHaveLength(counted);
+    expect(container.querySelectorAll(".dd-field-error__text")).toHaveLength(
+      counted,
+    );
   });
 
   it("각 입력의 aria-describedby가 자기 오류 메시지를 가리킨다", async () => {
     const user = userEvent.setup();
     render(<TripConditionsPage />);
 
-    await user.click(screen.getByRole("button", { name: "갈 수 있는 곳 찾기" }));
+    await user.click(
+      screen.getByRole("button", { name: "갈 수 있는 곳 찾기" }),
+    );
 
     const startAt = screen.getByLabelText("출발 일시");
     const returnBy = screen.getByLabelText("복귀 가능 일시");
@@ -109,10 +135,14 @@ describe("조건 입력 화면", () => {
     await fillConditions("2026-09-12T08:00", "2026-09-13T20:00");
 
     for (const label of ["출발 일시", "복귀 가능 일시"]) {
-      expect(screen.getByLabelText(label)).not.toHaveAttribute("aria-describedby");
+      expect(screen.getByLabelText(label)).not.toHaveAttribute(
+        "aria-describedby",
+      );
     }
     // 출발지는 오류가 없을 때 안내 문구가 연결된다.
-    const describedBy = screen.getByLabelText("어디서 출발해요?").getAttribute("aria-describedby");
+    const describedBy = screen
+      .getByLabelText("어디서 출발해요?")
+      .getAttribute("aria-describedby");
     expect(describedBy).toBeTruthy();
     expect(document.getElementById(describedBy ?? "")?.textContent).toContain(
       "지금은 주요 도시 단위로만 고를 수 있어요.",
@@ -123,7 +153,9 @@ describe("조건 입력 화면", () => {
     render(<TripConditionsPage />);
 
     expect(screen.getByRole("radio", { name: "대중교통" })).toBeDisabled();
-    expect(screen.getByText("대중교통은 아직 준비 중이라 고를 수 없어요.")).toBeInTheDocument();
+    expect(
+      screen.getByText("대중교통은 아직 준비 중이라 고를 수 없어요."),
+    ).toBeInTheDocument();
   });
 
   it("관심사 칩은 선택 상태를 토글한다", async () => {
@@ -145,7 +177,9 @@ describe("조건 입력 화면", () => {
 describe("추천 결과 화면", () => {
   async function submitTrip(startAt: string, returnBy: string) {
     const user = await fillConditions(startAt, returnBy);
-    await user.click(screen.getByRole("button", { name: "갈 수 있는 곳 찾기" }));
+    await user.click(
+      screen.getByRole("button", { name: "갈 수 있는 곳 찾기" }),
+    );
     return user;
   }
 
@@ -155,7 +189,9 @@ describe("추천 결과 화면", () => {
 
     expect(screen.getByRole("status")).toHaveTextContent("계산하고 있어요");
     // 계산 중에도 조건 요약이 남는다(4장 "로딩 중 조건 요약 유지").
-    expect(screen.getByRole("region", { name: "제출한 여행 조건" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "제출한 여행 조건" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("서울 출발")).toBeInTheDocument();
   });
 
@@ -163,28 +199,42 @@ describe("추천 결과 화면", () => {
     render(<TripConditionsPage />);
     await submitTrip("2026-09-12T08:00", "2026-09-13T20:00");
 
-    await waitFor(() => expect(screen.getByText(/다녀올 수 있는 곳 \d+군데/)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText(/다녀올 수 있는 곳 \d+군데/)).toBeInTheDocument(),
+    );
 
     // 시간 적합순 정렬: 왕복이 가장 짧은 공주가 앞선다(경주 3.5h / 공주 1.6h / 강릉 2.8h).
-    const names = screen.getAllByRole("heading", { level: 2 }).map((node) => node.textContent);
+    const names = screen
+      .getAllByRole("heading", { level: 2 })
+      .map((node) => node.textContent);
     expect(names[0]).toBe("공주");
     expect(screen.getByText("가장 잘 맞아요")).toBeInTheDocument();
     // F-03: 점수 숫자를 보이면 항목과 계산 원칙을 함께 보인다.
-    expect(screen.getAllByText(/쓸 수 있는 시간 중 이동에 쓰이지 않은 비율/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/고른 관심사 중 겹친 개수/).length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText(/쓸 수 있는 시간 중 이동에 쓰이지 않은 비율/).length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText(/고른 관심사 중 겹친 개수/).length,
+    ).toBeGreaterThan(0);
     // F-05: 이동시간이 추정·목업임을 표시한다.
-    expect(screen.getAllByText(/이동시간 추정 · PoC 목업/).length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText(/이동시간 추정 · PoC 목업/).length,
+    ).toBeGreaterThan(0);
   });
 
   it("후보를 고르면 선택 상태로 남고, 일정 결과가 아직 없다는 것을 알린다", async () => {
     render(<TripConditionsPage />);
     const user = await submitTrip("2026-09-12T08:00", "2026-09-13T20:00");
 
-    const button = await screen.findByRole("button", { name: "공주 일정 보기" });
+    const button = await screen.findByRole("button", {
+      name: "공주 일정 보기",
+    });
     await user.click(button);
 
     expect(button).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByText(/일정 결과 화면은 아직 준비 중/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/일정 결과 화면은 아직 준비 중/),
+    ).toBeInTheDocument();
   });
 
   it("모든 후보가 탈락하면 결과 없음을 정상 상태로 보이고 조정 행동을 안내한다", async () => {
@@ -196,7 +246,9 @@ describe("추천 결과 화면", () => {
     expect(screen.getByText("더 이른 시간에 출발하기")).toBeInTheDocument();
     expect(screen.getByText("복귀 시간을 늦춰보기")).toBeInTheDocument();
     // 후보를 지어내지 않는다.
-    expect(screen.queryByText(/다녀올 수 있는 곳 \d+군데/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/다녀올 수 있는 곳 \d+군데/),
+    ).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { level: 2 })).not.toBeInTheDocument();
   });
 
@@ -207,6 +259,8 @@ describe("추천 결과 화면", () => {
     await screen.findByText(/다녀올 수 있는 곳/);
     await user.click(screen.getByRole("button", { name: "조건 수정하기" }));
 
-    expect(screen.getByRole("button", { name: "갈 수 있는 곳 찾기" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "갈 수 있는 곳 찾기" }),
+    ).toBeInTheDocument();
   });
 });

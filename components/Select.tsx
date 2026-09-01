@@ -6,7 +6,10 @@ import type { SelectHTMLAttributes } from "react";
  */
 export type SelectOption = { value: string; label: string };
 
-type SelectProps = Omit<SelectHTMLAttributes<HTMLSelectElement>, "className" | "children"> & {
+type SelectProps = Omit<
+  SelectHTMLAttributes<HTMLSelectElement>,
+  "className" | "children"
+> & {
   id: string;
   options: SelectOption[];
   /** 값이 비었을 때 보이는 안내 문구. `--ink-faint`로 표시된다. */
@@ -24,7 +27,11 @@ export function Select({
   ...rest
 }: SelectProps) {
   const isPlaceholder = !value;
-  const classes = ["dd-control", invalid ? "dd-control--invalid" : null, disabled ? "dd-control--disabled" : null]
+  const classes = [
+    "dd-control",
+    invalid ? "dd-control--invalid" : null,
+    disabled ? "dd-control--disabled" : null,
+  ]
     .filter(Boolean)
     .join(" ");
 
@@ -32,7 +39,10 @@ export function Select({
     <div className={classes}>
       <select
         id={id}
-        className={["dd-control__select", isPlaceholder ? "dd-control__select--placeholder" : null]
+        className={[
+          "dd-control__select",
+          isPlaceholder ? "dd-control__select--placeholder" : null,
+        ]
           .filter(Boolean)
           .join(" ")}
         value={value}
