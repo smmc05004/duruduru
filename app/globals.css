@@ -481,3 +481,380 @@ button {
 .dd-submitted__actions {
   margin-top: 16px;
 }
+
+/* ── 추천 결과·결과 없음·계산 중 (F-02·F-03·F-05) ──────────── */
+/* design/screens/Main.dc.html, NoResult.dc.html, Loading.dc.html 기준.
+   값은 모두 app/tokens.css의 토큰에서 온다. */
+
+.dd-badge-hours {
+  padding: 6px 11px;
+  background: var(--olive);
+  color: var(--on-dark);
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: var(--radius-tag);
+  transform: rotate(-2deg);
+}
+
+.dd-summary-card {
+  margin: 20px 18px 0;
+  padding: 20px;
+  background: var(--card);
+  border: var(--border-card) solid var(--line);
+  box-shadow: var(--shadow-card);
+}
+
+.dd-summary-card__title {
+  margin: 0;
+  /* 시안의 두 줄 제목을 유지한다. 문자열의 줄바꿈을 그대로 쓴다. */
+  white-space: pre-line;
+  font-family: var(--font-title);
+  font-size: 25px;
+  font-weight: 400;
+  line-height: 1.42;
+  color: var(--ink);
+}
+
+.dd-summary-card__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 15px;
+}
+
+.dd-pill {
+  padding: 6px 11px;
+  border: 1.5px solid var(--olive);
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--olive-ink);
+}
+
+.dd-pill--interest {
+  padding: 6px 11px;
+  background: var(--mustard);
+  border: none;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--mustard-ink);
+}
+
+.dd-list-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 22px 22px 0;
+}
+
+.dd-list-head__count {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-body);
+}
+
+.dd-list-head__order {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-faint);
+}
+
+.dd-candidates {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 14px 18px 0;
+  margin: 0;
+  list-style: none;
+}
+
+.dd-candidate {
+  position: relative;
+  padding: 20px;
+  background: var(--card);
+  border: var(--border-card) solid var(--line);
+  box-shadow: var(--shadow-card);
+}
+
+/* 관심사와 겹치지 않는 후보. 통과했지만 근거가 약하다는 것을 시안대로 드러낸다. */
+.dd-candidate--muted {
+  background: var(--card-muted);
+  border: var(--border-card) dashed var(--line-dashed);
+  box-shadow: none;
+}
+
+.dd-candidate--selected {
+  border-color: var(--olive);
+}
+
+.dd-candidate__best {
+  position: absolute;
+  top: -12px;
+  left: 16px;
+  padding: 3px 10px;
+  background: var(--terracotta);
+  color: var(--card);
+  font-family: var(--font-hand);
+  font-size: 16px;
+  font-weight: 700;
+  transform: rotate(-3deg);
+}
+
+.dd-candidate__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.dd-candidate__name {
+  margin: 0;
+  font-family: var(--font-title);
+  font-size: 34px;
+  font-weight: 400;
+  line-height: 1.15;
+  color: var(--ink);
+}
+
+.dd-candidate--muted .dd-candidate__name {
+  color: var(--ink-muted);
+}
+
+.dd-candidate__region {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.dd-timebar {
+  margin-top: 16px;
+}
+
+.dd-timebar__track {
+  display: flex;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  background: var(--track);
+}
+
+.dd-timebar__move {
+  background: var(--track-move);
+}
+
+.dd-timebar__stay {
+  flex-grow: 1;
+  background: var(--olive-bar);
+}
+
+.dd-timebar__labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 7px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.dd-timebar__stay-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--olive-ink);
+}
+
+.dd-candidate__reason {
+  margin: 15px 0 0;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.7;
+  color: var(--ink-body);
+}
+
+.dd-candidate--muted .dd-candidate__reason {
+  color: var(--ink-muted);
+}
+
+.dd-tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 13px;
+}
+
+.dd-tag {
+  padding: 5px 10px;
+  background: var(--olive-soft);
+  border-radius: var(--radius-tag);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--olive-ink);
+}
+
+.dd-tag--plain {
+  background: var(--paper);
+  border: 1px solid var(--line-dashed);
+  color: var(--ink-muted);
+}
+
+.dd-basis {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 14px;
+  padding-top: 13px;
+  border-top: 1.5px dashed var(--line-dashed);
+}
+
+.dd-basis__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-faint);
+}
+
+.dd-basis__item svg {
+  flex-shrink: 0;
+}
+
+.dd-candidate__action {
+  margin-top: 16px;
+}
+
+.dd-candidate__selected-note {
+  margin: 10px 0 0;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.7;
+  color: var(--ink-faint);
+}
+
+/* 결과 없음 (정상 상태다. 시스템·데이터 장애와 시각적으로 구분한다 — 4장) */
+
+.dd-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 20px 18px 0;
+  padding: 26px 20px;
+  background: var(--card);
+  border: var(--border-card) solid var(--line);
+  box-shadow: var(--shadow-card);
+}
+
+.dd-empty__title {
+  margin: 18px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.7;
+  text-align: center;
+  color: var(--ink-body);
+}
+
+.dd-empty__note {
+  margin: 10px 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.7;
+  text-align: center;
+  color: var(--ink-faint);
+}
+
+.dd-suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  padding: 20px 18px 0;
+  margin: 0;
+  list-style: none;
+}
+
+.dd-suggestions__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 0 16px;
+  background: var(--card);
+  border: var(--border-card) solid var(--line);
+  box-shadow: var(--shadow-card);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.dd-suggestions__item svg {
+  flex-shrink: 0;
+}
+
+/* 계산 중 */
+
+.dd-calculating {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 18px 18px 0;
+  padding: 14px 15px;
+  background: var(--olive-soft);
+  border: var(--border-card) solid var(--olive);
+}
+
+.dd-calculating p {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--olive-ink);
+}
+
+.dd-calculating svg {
+  flex-shrink: 0;
+}
+
+.dd-skeleton-card {
+  padding: 20px;
+  background: var(--card);
+  border: var(--border-card) solid var(--line);
+  box-shadow: var(--shadow-card);
+}
+
+.dd-skeleton {
+  background: var(--skeleton);
+}
+
+.dd-skeleton--title {
+  width: 118px;
+  height: 32px;
+}
+
+.dd-skeleton--region {
+  width: 58px;
+  height: 12px;
+}
+
+.dd-skeleton--bar {
+  height: 10px;
+  margin-top: 18px;
+  border-radius: var(--radius-pill);
+}
+
+.dd-skeleton--line {
+  height: 12px;
+  margin-top: 18px;
+}
+
+.dd-skeleton--line-short {
+  width: 72%;
+  height: 12px;
+  margin-top: 8px;
+}
+
+.dd-skeleton-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dd-result-actions {
+  padding: 22px 18px 0;
+}

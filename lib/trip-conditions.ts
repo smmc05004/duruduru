@@ -17,7 +17,7 @@ export type TripConditionsDraft = {
   interests: string[];
 };
 
-export type TripConditionsField = "originId" | "startAt" | "returnBy" | "transport";
+export type TripConditionsField = "originId" | "startAt" | "returnBy" | "transport" | "interests";
 
 export type TripConditionsError = { field: TripConditionsField; message: string };
 
@@ -101,6 +101,17 @@ export function validateTripConditions(draft: TripConditionsDraft, support: Supp
     errors.push({ field: "transport", message: "이동수단을 골라 주세요." });
   } else if (!transport || !transport.supported) {
     errors.push({ field: "transport", message: "아직 지원하지 않는 이동수단이에요. 자차로 골라 주세요." });
+  }
+
+  /*
+   * 관심사 1개 이상 필수 (2026-08-31 확정 — DECISIONS.md 7.3절).
+   * 두 가지 이유가 있다. (1) 층 ①의 관심사 일치 산식이 선택 관심사 개수를 분모로 쓰므로
+   * 0개는 정의되지 않는다(7.2절). (2) 관심사는 사용자가 준 유일한 취향 신호이고, 0개를
+   * 허용하면 추천이 "가장 가까운 목적지 나열"에 가까워진다.
+   * 엔진 쪽 안전장치(0개면 관심사 항 제외 후 재정규화)는 그대로 남아 있다.
+   */
+  if (draft.interests.length === 0) {
+    errors.push({ field: "interests", message: "관심사를 하나 이상 골라 주세요." });
   }
 
   if (errors.length > 0 || !startAt || !returnBy || !transport) return { ok: false, errors };

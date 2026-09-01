@@ -29,8 +29,15 @@ describe("validateTripConditions", () => {
     expect(result.conditions.availableHours).toBe(36);
   });
 
-  it("관심사는 0개여도 통과한다", () => {
-    expect(validateTripConditions(draft({ interests: [] }), provisionalSupportSet).ok).toBe(true);
+  /*
+   * 이 자리에는 "관심사는 0개여도 통과한다"가 있었다. 2026-08-31 F-01이 관심사 1개 이상
+   * 필수로 바뀌어(DECISIONS.md 7.3절) 기대가 뒤집혔다. 새 단정은 아래 "관심사 필수 검증"에 있다.
+   */
+  it("관심사를 여러 개 골라도 통과하고 원문 순서를 유지한다", () => {
+    const result = validateTripConditions(draft({ interests: ["역사", "자연"] }), provisionalSupportSet);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.conditions.interests).toEqual(["역사", "자연"]);
   });
 
   it("복귀가 출발보다 이른 입력은 차단하고 복귀 항목에 오류를 붙인다", () => {
@@ -104,5 +111,22 @@ describe("validateTripConditions", () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.errors).toHaveLength(2);
+  });
+});
+
+/*
+ * 관심사 1개 이상 필수 (2026-08-31 확정 — DECISIONS.md 7.3절, FUNCTIONAL_SPEC.md F-01).
+ * 명세가 앞서 있고 구현이 따라오지 않았던 구간이다.
+ */
+describe("관심사 필수 검증", () => {
+  it("관심사를 하나도 고르지 않으면 필수값 누락으로 제출을 막는다", () => {
+    const result = validateTripConditions(draft({ interests: [] }), provisionalSupportSet);
+    expect(result.ok).toBe(false);
+    expect(messagesFor(result, "interests")).toHaveLength(1);
+  });
+
+  it("관심사를 하나 이상 고르면 통과한다", () => {
+    const result = validateTripConditions(draft({ interests: ["역사"] }), provisionalSupportSet);
+    expect(result.ok).toBe(true);
   });
 });
