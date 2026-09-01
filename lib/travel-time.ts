@@ -30,7 +30,11 @@ export type TravelTimeEstimate = {
 
 export type TravelTimeAdapter = {
   /** 값을 만들 수 없으면 null이다. 임의값으로 채우지 않는다. */
-  lookup(originId: string, destinationId: string, transport: TransportMode): TravelTimeEstimate | null;
+  lookup(
+    originId: string,
+    destinationId: string,
+    transport: TransportMode,
+  ): TravelTimeEstimate | null;
   source: string;
   basisDate: string;
   provisional: boolean;
@@ -48,10 +52,14 @@ export const provisionalTravelTimeAdapter: TravelTimeAdapter = {
   basisDate: POC_BASIS_DATE,
   provisional: true,
   lookup(_originId, destinationId, transport) {
-    const destination = pocDestinations.find((item) => item.id === destinationId);
+    const destination = pocDestinations.find(
+      (item) => item.id === destinationId,
+    );
     if (!destination) return null;
-    const oneWayHours = transport === "car" ? destination.driveHours : destination.publicHours;
-    if (typeof oneWayHours !== "number" || Number.isNaN(oneWayHours)) return null;
+    const oneWayHours =
+      transport === "car" ? destination.driveHours : destination.publicHours;
+    if (typeof oneWayHours !== "number" || Number.isNaN(oneWayHours))
+      return null;
     return {
       destinationId,
       oneWayHours,

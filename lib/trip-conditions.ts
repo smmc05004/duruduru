@@ -17,9 +17,13 @@ export type TripConditionsDraft = {
   interests: string[];
 };
 
-export type TripConditionsField = "originId" | "startAt" | "returnBy" | "transport" | "interests";
+export type TripConditionsField =
+  "originId" | "startAt" | "returnBy" | "transport" | "interests";
 
-export type TripConditionsError = { field: TripConditionsField; message: string };
+export type TripConditionsError = {
+  field: TripConditionsField;
+  message: string;
+};
 
 /** 검증을 통과한 조건. 원문과 정규화값을 함께 유지한다(F-01 처리 규칙). */
 export type ValidTripConditions = {
@@ -65,14 +69,22 @@ function parseInTripTimeZone(value: string): Date | null {
  * 임의 하한을 넣으면 그 상수가 사실상 제품 결정이 된다. 그래서 출발과 복귀가 같은 시각인
  * 입력도 차단하지 않는다("출발 이상이 아닌 복귀"만 오류다).
  */
-export function validateTripConditions(draft: TripConditionsDraft, support: SupportSet): TripConditionsResult {
+export function validateTripConditions(
+  draft: TripConditionsDraft,
+  support: SupportSet,
+): TripConditionsResult {
   const errors: TripConditionsError[] = [];
 
-  const origin = support.origins.find((candidate) => candidate.id === draft.originId);
+  const origin = support.origins.find(
+    (candidate) => candidate.id === draft.originId,
+  );
   if (!draft.originId) {
     errors.push({ field: "originId", message: "출발지를 골라 주세요." });
   } else if (!origin) {
-    errors.push({ field: "originId", message: "아직 지원하지 않는 출발지예요. 목록에서 골라 주세요." });
+    errors.push({
+      field: "originId",
+      message: "아직 지원하지 않는 출발지예요. 목록에서 골라 주세요.",
+    });
   }
 
   let startAt: Date | null = null;
@@ -80,27 +92,46 @@ export function validateTripConditions(draft: TripConditionsDraft, support: Supp
     errors.push({ field: "startAt", message: "출발 일시를 골라 주세요." });
   } else {
     startAt = parseInTripTimeZone(draft.startAt);
-    if (!startAt) errors.push({ field: "startAt", message: "날짜와 시각을 읽을 수 없어요. 다시 골라 주세요." });
+    if (!startAt)
+      errors.push({
+        field: "startAt",
+        message: "날짜와 시각을 읽을 수 없어요. 다시 골라 주세요.",
+      });
   }
 
   let returnBy: Date | null = null;
   if (!draft.returnBy) {
-    errors.push({ field: "returnBy", message: "복귀 가능 일시를 골라 주세요." });
+    errors.push({
+      field: "returnBy",
+      message: "복귀 가능 일시를 골라 주세요.",
+    });
   } else {
     returnBy = parseInTripTimeZone(draft.returnBy);
-    if (!returnBy) errors.push({ field: "returnBy", message: "날짜와 시각을 읽을 수 없어요. 다시 골라 주세요." });
+    if (!returnBy)
+      errors.push({
+        field: "returnBy",
+        message: "날짜와 시각을 읽을 수 없어요. 다시 골라 주세요.",
+      });
   }
 
   // 두 값을 모두 읽을 수 있을 때만 순서를 판정한다. 읽을 수 없는 값으로 순서를 주장하지 않는다.
   if (startAt && returnBy && returnBy.getTime() < startAt.getTime()) {
-    errors.push({ field: "returnBy", message: "복귀 시각이 출발보다 빨라요. 출발 이후로 맞춰 주세요." });
+    errors.push({
+      field: "returnBy",
+      message: "복귀 시각이 출발보다 빨라요. 출발 이후로 맞춰 주세요.",
+    });
   }
 
-  const transport = support.transports.find((candidate) => candidate.id === draft.transport);
+  const transport = support.transports.find(
+    (candidate) => candidate.id === draft.transport,
+  );
   if (!draft.transport) {
     errors.push({ field: "transport", message: "이동수단을 골라 주세요." });
   } else if (!transport || !transport.supported) {
-    errors.push({ field: "transport", message: "아직 지원하지 않는 이동수단이에요. 자차로 골라 주세요." });
+    errors.push({
+      field: "transport",
+      message: "아직 지원하지 않는 이동수단이에요. 자차로 골라 주세요.",
+    });
   }
 
   /*
@@ -111,10 +142,14 @@ export function validateTripConditions(draft: TripConditionsDraft, support: Supp
    * 엔진 쪽 안전장치(0개면 관심사 항 제외 후 재정규화)는 그대로 남아 있다.
    */
   if (draft.interests.length === 0) {
-    errors.push({ field: "interests", message: "관심사를 하나 이상 골라 주세요." });
+    errors.push({
+      field: "interests",
+      message: "관심사를 하나 이상 골라 주세요.",
+    });
   }
 
-  if (errors.length > 0 || !startAt || !returnBy || !transport) return { ok: false, errors };
+  if (errors.length > 0 || !startAt || !returnBy || !transport)
+    return { ok: false, errors };
 
   return {
     ok: true,
@@ -131,7 +166,9 @@ export function validateTripConditions(draft: TripConditionsDraft, support: Supp
 }
 
 /** 항목별 오류를 화면이 바로 쓸 수 있는 형태로 모은다. */
-export function errorsByField(errors: TripConditionsError[]): Partial<Record<TripConditionsField, string>> {
+export function errorsByField(
+  errors: TripConditionsError[],
+): Partial<Record<TripConditionsField, string>> {
   const map: Partial<Record<TripConditionsField, string>> = {};
   for (const error of errors) {
     if (!map[error.field]) map[error.field] = error.message;

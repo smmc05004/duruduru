@@ -3,7 +3,12 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/Button";
 import { Chip } from "@/components/Chip";
-import { FieldCard, fieldErrorId, fieldHintId, type FieldCardError } from "@/components/FieldCard";
+import {
+  FieldCard,
+  fieldErrorId,
+  fieldHintId,
+  type FieldCardError,
+} from "@/components/FieldCard";
 import { InputField } from "@/components/InputField";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { Select } from "@/components/Select";
@@ -11,7 +16,10 @@ import { CandidateCard } from "@/components/CandidateCard";
 import { formatHoursAndMinutes } from "@/lib/format-duration";
 import type { RecommendationOutcome } from "@/lib/recommendation";
 import { requestRecommendations } from "@/lib/recommendation-request";
-import { provisionalInterestTags, provisionalSupportSet } from "@/lib/support-conditions";
+import {
+  provisionalInterestTags,
+  provisionalSupportSet,
+} from "@/lib/support-conditions";
 import {
   errorsByField,
   validateTripConditions,
@@ -38,7 +46,9 @@ const emptyDraft: TripConditionsDraft = {
   startAt: "",
   returnBy: "",
   // 이동수단은 지원 목록에서 유일하게 정식 지원되는 값을 초기 선택으로 둔다(시안과 같다).
-  transport: provisionalSupportSet.transports.find((transport) => transport.supported)?.id ?? "",
+  transport:
+    provisionalSupportSet.transports.find((transport) => transport.supported)
+      ?.id ?? "",
   interests: [],
 };
 
@@ -78,17 +88,39 @@ function formatDateTime(value: Date) {
 type Phase =
   | { kind: "input" }
   | { kind: "calculating"; conditions: ValidTripConditions }
-  | { kind: "result"; conditions: ValidTripConditions; outcome: RecommendationOutcome };
-
+  | {
+      kind: "result";
+      conditions: ValidTripConditions;
+      outcome: RecommendationOutcome;
+    };
 
 const spinnerIcon = (
-  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" aria-hidden="true">
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 20 20"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.9"
+    strokeLinecap="round"
+    aria-hidden="true"
+  >
     <path d="M10 2.8a7.2 7.2 0 1 1-6.9 5.1" />
   </svg>
 );
 
 const emptyIllustration = (
-  <svg width="96" height="72" viewBox="0 0 120 90" fill="none" stroke="var(--line-dashed)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <svg
+    width="96"
+    height="72"
+    viewBox="0 0 120 90"
+    fill="none"
+    stroke="var(--line-dashed)"
+    strokeWidth="2.4"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
     <path d="M12 22l32-10 32 10 32-10v56l-32 10-32-10-32 10z" />
     <path d="M44 12v56M76 22v56" />
     <path d="M52 44h16M60 36v16" stroke="var(--track-move)" />
@@ -96,21 +128,49 @@ const emptyIllustration = (
 );
 
 const earlierIcon = (
-  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="var(--olive-ink)" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 20 20"
+    fill="none"
+    stroke="var(--olive-ink)"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    aria-hidden="true"
+  >
     <circle cx="10" cy="10" r="7.2" />
     <path d="M10 6.2V10l-2.6 1.8" />
   </svg>
 );
 
 const laterIcon = (
-  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="var(--olive-ink)" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 20 20"
+    fill="none"
+    stroke="var(--olive-ink)"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    aria-hidden="true"
+  >
     <circle cx="10" cy="10" r="7.2" />
     <path d="M10 6.2V10l2.6 1.8" />
   </svg>
 );
 
 const placeIcon = (
-  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="var(--olive-ink)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 20 20"
+    fill="none"
+    stroke="var(--olive-ink)"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
     <path d="M10 17.2s5.6-5 5.6-9.2A5.6 5.6 0 0 0 4.4 8c0 4.2 5.6 9.2 5.6 9.2z" />
     <circle cx="10" cy="8" r="2" />
   </svg>
@@ -118,20 +178,34 @@ const placeIcon = (
 
 /** 조건 요약. 계산 중·결과·결과 없음 세 상태가 같은 요약을 유지한다(4장). */
 function originName(originId: string) {
-  return provisionalSupportSet.origins.find((origin) => origin.id === originId)?.name ?? originId;
+  return (
+    provisionalSupportSet.origins.find((origin) => origin.id === originId)
+      ?.name ?? originId
+  );
 }
 
-function ConditionSummary({ conditions, title }: { conditions: ValidTripConditions; title: string }) {
+function ConditionSummary({
+  conditions,
+  title,
+}: {
+  conditions: ValidTripConditions;
+  title: string;
+}) {
   const transportName =
-    provisionalSupportSet.transports.find((transport) => transport.id === conditions.transport)?.name ??
-    conditions.transport;
+    provisionalSupportSet.transports.find(
+      (transport) => transport.id === conditions.transport,
+    )?.name ?? conditions.transport;
   return (
     <section className="dd-summary-card" aria-label="제출한 여행 조건">
       <p className="dd-summary-card__title">{title}</p>
       <div className="dd-summary-card__chips">
         <span className="dd-pill">{originName(conditions.originId)} 출발</span>
-        <span className="dd-pill">{formatDateTime(conditions.startAt)} 출발</span>
-        <span className="dd-pill">{formatDateTime(conditions.returnBy)} 복귀</span>
+        <span className="dd-pill">
+          {formatDateTime(conditions.startAt)} 출발
+        </span>
+        <span className="dd-pill">
+          {formatDateTime(conditions.returnBy)} 복귀
+        </span>
         <span className="dd-pill">{transportName}</span>
         {conditions.interests.map((interest) => (
           <span key={interest} className="dd-pill--interest">
@@ -147,11 +221,12 @@ function ResultHeader({ conditions }: { conditions: ValidTripConditions }) {
   return (
     <div className="dd-screen__header">
       <span className="dd-screen__logo">두루두루</span>
-      <span className="dd-badge-hours">{formatHoursAndMinutes(conditions.availableHours)}</span>
+      <span className="dd-badge-hours">
+        {formatHoursAndMinutes(conditions.availableHours)}
+      </span>
     </div>
   );
 }
-
 
 export default function TripConditionsPage() {
   const [draft, setDraft] = useState<TripConditionsDraft>(emptyDraft);
@@ -159,8 +234,12 @@ export default function TripConditionsPage() {
   const [phase, setPhase] = useState<Phase>({ kind: "input" });
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const result = useMemo(() => validateTripConditions(draft, provisionalSupportSet), [draft]);
-  const fieldErrors = result.ok || !attempted ? {} : errorsByField(result.errors);
+  const result = useMemo(
+    () => validateTripConditions(draft, provisionalSupportSet),
+    [draft],
+  );
+  const fieldErrors =
+    result.ok || !attempted ? {} : errorsByField(result.errors);
   const errorCount = result.ok || !attempted ? 0 : result.errors.length;
 
   /*
@@ -184,24 +263,35 @@ export default function TripConditionsPage() {
    * 카드 단위로 고르지 않고 입력 단위로 모아 넘긴다. 요약 배너가 세는 개수와 화면에
    * 보이는 메시지 수가 어긋나면 사용자는 무엇을 더 고쳐야 하는지 알 수 없다.
    */
-  function cardErrors(...fields: [TripConditionsField, string][]): FieldCardError[] {
+  function cardErrors(
+    ...fields: [TripConditionsField, string][]
+  ): FieldCardError[] {
     return fields
       .filter(([field]) => fieldErrors[field])
-      .map(([field, inputId]) => ({ inputId, message: fieldErrors[field] as string }));
+      .map(([field, inputId]) => ({
+        inputId,
+        message: fieldErrors[field] as string,
+      }));
   }
 
   /** 오류가 있으면 오류 텍스트를, 없으면 안내 문구를 가리킨다. */
-  function describedBy(field: TripConditionsField, inputId: string, hasHint = false) {
+  function describedBy(
+    field: TripConditionsField,
+    inputId: string,
+    hasHint = false,
+  ) {
     if (fieldErrors[field]) return fieldErrorId(inputId);
     return hasHint ? fieldHintId(inputId) : undefined;
   }
 
-  const transportOptions = provisionalSupportSet.transports.map((transport) => ({
-    value: transport.id,
-    label: transport.name,
-    icon: transport.id === "car" ? carIcon : undefined,
-    disabled: !transport.supported,
-  }));
+  const transportOptions = provisionalSupportSet.transports.map(
+    (transport) => ({
+      value: transport.id,
+      label: transport.name,
+      icon: transport.id === "car" ? carIcon : undefined,
+      disabled: !transport.supported,
+    }),
+  );
   const transportHint = provisionalSupportSet.transports.find(
     (transport) => !transport.supported && transport.unsupportedReason,
   )?.unsupportedReason;
@@ -281,12 +371,14 @@ export default function TripConditionsPage() {
             <section className="dd-empty" aria-label="결과 없음">
               {emptyIllustration}
               <p className="dd-empty__title">
-                쓸 수 있는 시간이 {formatHoursAndMinutes(conditions.availableHours)}라, 왕복 이동과 최소로
-                머물러야 하는 {duration?.minimumLocalStayHours}시간({duration?.label})을 함께 넣을 수 있는 곳이
-                없었어요.
+                쓸 수 있는 시간이{" "}
+                {formatHoursAndMinutes(conditions.availableHours)}라, 왕복
+                이동과 최소로 머물러야 하는 {duration?.minimumLocalStayHours}
+                시간({duration?.label})을 함께 넣을 수 있는 곳이 없었어요.
               </p>
               <p className="dd-empty__note">
-                억지로 채우지 않고 그대로 알려드려요. 아래처럼 조건을 조금만 바꾸면 다시 찾아볼 수 있어요.
+                억지로 채우지 않고 그대로 알려드려요. 아래처럼 조건을 조금만
+                바꾸면 다시 찾아볼 수 있어요.
               </p>
             </section>
             <ul className="dd-suggestions">
@@ -309,7 +401,9 @@ export default function TripConditionsPage() {
         {phase.kind === "result" && passed.length > 0 ? (
           <>
             <div className="dd-list-head">
-              <span className="dd-list-head__count">다녀올 수 있는 곳 {passed.length}군데</span>
+              <span className="dd-list-head__count">
+                다녀올 수 있는 곳 {passed.length}군데
+              </span>
               <span className="dd-list-head__order">시간 적합순</span>
             </div>
             <ul className="dd-candidates">
@@ -328,16 +422,22 @@ export default function TripConditionsPage() {
         ) : null}
 
         <div className="dd-result-actions">
-          <Button variant={noResult ? "primary" : "secondary"} onClick={() => setPhase({ kind: "input" })}>
+          <Button
+            variant={noResult ? "primary" : "secondary"}
+            onClick={() => setPhase({ kind: "input" })}
+          >
             조건 수정하기
           </Button>
         </div>
 
         <p className="dd-screen__footnote">
-          이동시간은 평균값 기반 추정치예요. 실시간 교통 상황은 반영하지 않아요. 지금 쓰는 이동시간과
-          목적지 목록은 확정 데이터가 아니라 임시값이라, 정식 데이터가 붙으면 결과가 달라질 수 있어요.
-          시간 제약을 통과하지 못한 곳은 아예 보여주지 않아요.
-          {phase.kind === "result" ? ` (${duration?.label} 기준 최소 ${duration?.minimumLocalStayHours}시간 · 점수 정책 ${phase.outcome.policyVersion})` : ""}
+          이동시간은 평균값 기반 추정치예요. 실시간 교통 상황은 반영하지 않아요.
+          지금 쓰는 이동시간과 목적지 목록은 확정 데이터가 아니라 임시값이라,
+          정식 데이터가 붙으면 결과가 달라질 수 있어요. 시간 제약을 통과하지
+          못한 곳은 아예 보여주지 않아요.
+          {phase.kind === "result"
+            ? ` (${duration?.label} 기준 최소 ${duration?.minimumLocalStayHours}시간 · 점수 정책 ${phase.outcome.policyVersion})`
+            : ""}
         </p>
       </main>
     );
@@ -389,8 +489,12 @@ export default function TripConditionsPage() {
             <path d="M10 7.8v3.4M10 13.6v.2" />
           </svg>
           <div>
-            <p className="dd-error-summary__title">고쳐야 할 항목이 {errorCount}개 있어요</p>
-            <p className="dd-error-summary__text">아래 표시된 곳을 고치면 바로 찾아볼 수 있어요.</p>
+            <p className="dd-error-summary__title">
+              고쳐야 할 항목이 {errorCount}개 있어요
+            </p>
+            <p className="dd-error-summary__text">
+              아래 표시된 곳을 고치면 바로 찾아볼 수 있어요.
+            </p>
           </div>
         </div>
       ) : null}
@@ -420,7 +524,10 @@ export default function TripConditionsPage() {
 
           <FieldCard
             label="언제 나가서 언제까지 돌아와요?"
-            errors={cardErrors(["startAt", "start-at"], ["returnBy", "return-by"])}
+            errors={cardErrors(
+              ["startAt", "start-at"],
+              ["returnBy", "return-by"],
+            )}
           >
             <div className="dd-datetime-pair">
               <InputField
@@ -475,7 +582,11 @@ export default function TripConditionsPage() {
               options={transportOptions}
               value={draft.transport}
               invalid={Boolean(fieldErrors.transport)}
-              describedBy={describedBy("transport", "transport", Boolean(transportHint))}
+              describedBy={describedBy(
+                "transport",
+                "transport",
+                Boolean(transportHint),
+              )}
               onChange={(value) => update({ transport: value })}
             />
           </FieldCard>
@@ -490,7 +601,9 @@ export default function TripConditionsPage() {
               className="dd-chip-group"
               role="group"
               aria-label="관심사"
-              aria-describedby={fieldErrors.interests ? fieldErrorId("interests") : undefined}
+              aria-describedby={
+                fieldErrors.interests ? fieldErrorId("interests") : undefined
+              }
             >
               {provisionalInterestTags.map((tag) => (
                 <Chip
@@ -510,7 +623,9 @@ export default function TripConditionsPage() {
             갈 수 있는 곳 찾기
           </Button>
           {errorCount > 0 ? (
-            <p className="dd-button-note">고쳐야 할 항목이 남아 있어 아직 찾을 수 없어요</p>
+            <p className="dd-button-note">
+              고쳐야 할 항목이 남아 있어 아직 찾을 수 없어요
+            </p>
           ) : null}
         </div>
       </form>

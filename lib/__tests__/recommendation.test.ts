@@ -1,6 +1,13 @@
 import { describe, expect, it } from "@jest/globals";
-import { destinationsFrom, evaluateCandidates, resolveTripDuration } from "@/lib/recommendation";
-import { recommendationPolicyV1, type RecommendationPolicy } from "@/lib/trip-policy";
+import {
+  destinationsFrom,
+  evaluateCandidates,
+  resolveTripDuration,
+} from "@/lib/recommendation";
+import {
+  recommendationPolicyV1,
+  type RecommendationPolicy,
+} from "@/lib/trip-policy";
 import type { TravelTimeAdapter, TravelTimeEstimate } from "@/lib/travel-time";
 import { provisionalSupportSet } from "@/lib/support-conditions";
 import { validateTripConditions } from "@/lib/trip-conditions";
@@ -15,7 +22,10 @@ function conditions(startAt: string, returnBy: string, interests: string[]) {
     { originId: "seoul", startAt, returnBy, transport: "car", interests },
     provisionalSupportSet,
   );
-  if (!result.ok) throw new Error(`테스트 조건이 검증을 통과하지 못했습니다: ${JSON.stringify(result.errors)}`);
+  if (!result.ok)
+    throw new Error(
+      `테스트 조건이 검증을 통과하지 못했습니다: ${JSON.stringify(result.errors)}`,
+    );
   return result.conditions;
 }
 
@@ -40,13 +50,31 @@ function adapterOf(oneWayHours: Record<string, number>): TravelTimeAdapter {
   };
 }
 
-const gyeongju = { id: "gyeongju", name: "경주", region: "경상북도", tags: ["역사", "문화"] };
-const gangneung = { id: "gangneung", name: "강릉", region: "강원특별자치도", tags: ["자연", "미식"] };
-const both = { id: "both", name: "둘다", region: "어딘가", tags: ["역사", "자연"] };
+const gyeongju = {
+  id: "gyeongju",
+  name: "경주",
+  region: "경상북도",
+  tags: ["역사", "문화"],
+};
+const gangneung = {
+  id: "gangneung",
+  name: "강릉",
+  region: "강원특별자치도",
+  tags: ["자연", "미식"],
+};
+const both = {
+  id: "both",
+  name: "둘다",
+  region: "어딘가",
+  tags: ["역사", "자연"],
+};
 
 describe("여행 유형 판별 (DECISIONS 7.4 · 6.3 일반화)", () => {
   it("같은 KST 달력일이면 당일치기이고 최소 체류시간은 4시간이다", () => {
-    const duration = resolveTripDuration(conditions("2026-09-12T08:00", "2026-09-12T22:00", ["역사"]), recommendationPolicyV1);
+    const duration = resolveTripDuration(
+      conditions("2026-09-12T08:00", "2026-09-12T22:00", ["역사"]),
+      recommendationPolicyV1,
+    );
     expect(duration.days).toBe(1);
     expect(duration.nights).toBe(0);
     expect(duration.label).toBe("당일치기");
@@ -54,19 +82,28 @@ describe("여행 유형 판별 (DECISIONS 7.4 · 6.3 일반화)", () => {
   });
 
   it("달력일이 하나 넘어가면 1박 2일이고 8시간이다", () => {
-    const duration = resolveTripDuration(conditions("2026-09-12T08:00", "2026-09-13T20:00", ["역사"]), recommendationPolicyV1);
+    const duration = resolveTripDuration(
+      conditions("2026-09-12T08:00", "2026-09-13T20:00", ["역사"]),
+      recommendationPolicyV1,
+    );
     expect(duration.label).toBe("1박 2일");
     expect(duration.minimumLocalStayHours).toBe(8);
   });
 
   it("달력일이 둘 넘어가면 2박 3일이고 12시간이다", () => {
-    const duration = resolveTripDuration(conditions("2026-09-12T08:00", "2026-09-14T20:00", ["역사"]), recommendationPolicyV1);
+    const duration = resolveTripDuration(
+      conditions("2026-09-12T08:00", "2026-09-14T20:00", ["역사"]),
+      recommendationPolicyV1,
+    );
     expect(duration.label).toBe("2박 3일");
     expect(duration.minimumLocalStayHours).toBe(12);
   });
 
   it("밤을 새워 달력일만 넘어가는 일정도 달력일 규칙대로 1박 2일로 센다 (무박은 별도 유형이 아니다)", () => {
-    const duration = resolveTripDuration(conditions("2026-09-12T08:00", "2026-09-13T02:00", ["역사"]), recommendationPolicyV1);
+    const duration = resolveTripDuration(
+      conditions("2026-09-12T08:00", "2026-09-13T02:00", ["역사"]),
+      recommendationPolicyV1,
+    );
     expect(duration.label).toBe("1박 2일");
     expect(duration.minimumLocalStayHours).toBe(8);
   });
@@ -78,7 +115,11 @@ describe("통과·탈락 판정 (FUNCTIONAL_SPEC 8.1 딱 충족 / 1분 미달)",
 
   it("딱 충족하는 후보는 통과한다", () => {
     const outcome = evaluateCandidates(
-      { conditions: trip, destinations: [gyeongju], travelTime: adapterOf({ gyeongju: 4 }) },
+      {
+        conditions: trip,
+        destinations: [gyeongju],
+        travelTime: adapterOf({ gyeongju: 4 }),
+      },
       recommendationPolicyV1,
     );
     expect(outcome.passed.map((item) => item.id)).toEqual(["gyeongju"]);
@@ -87,7 +128,11 @@ describe("통과·탈락 판정 (FUNCTIONAL_SPEC 8.1 딱 충족 / 1분 미달)",
 
   it("1분 미달하는 후보는 제외된다", () => {
     const outcome = evaluateCandidates(
-      { conditions: trip, destinations: [gyeongju], travelTime: adapterOf({ gyeongju: 4 + 0.5 / 60 }) },
+      {
+        conditions: trip,
+        destinations: [gyeongju],
+        travelTime: adapterOf({ gyeongju: 4 + 0.5 / 60 }),
+      },
       recommendationPolicyV1,
     );
     expect(outcome.passed).toHaveLength(0);
@@ -107,26 +152,41 @@ describe("통과·탈락 판정 (FUNCTIONAL_SPEC 8.1 딱 충족 / 1분 미달)",
 });
 
 describe("점수 구성요소 산식 (DECISIONS 7.1 · 7.2)", () => {
-  const trip = conditions("2026-09-12T08:00", "2026-09-13T20:00", ["역사", "자연"]);
+  const trip = conditions("2026-09-12T08:00", "2026-09-13T20:00", [
+    "역사",
+    "자연",
+  ]);
 
   it("관심사 일치는 일치 태그 수 / 선택 관심사 수다", () => {
     const outcome = evaluateCandidates(
-      { conditions: trip, destinations: [gyeongju, both], travelTime: adapterOf({ gyeongju: 3.5, both: 3.5 }) },
+      {
+        conditions: trip,
+        destinations: [gyeongju, both],
+        travelTime: adapterOf({ gyeongju: 3.5, both: 3.5 }),
+      },
       recommendationPolicyV1,
     );
     const interestOf = (id: string) =>
-      outcome.passed.find((item) => item.id === id)!.components.find((c) => c.id === "interestFit")!.raw;
+      outcome.passed
+        .find((item) => item.id === id)!
+        .components.find((c) => c.id === "interestFit")!.raw;
     expect(interestOf("gyeongju")).toBeCloseTo(0.5, 10);
     expect(interestOf("both")).toBeCloseTo(1, 10);
   });
 
   it("시간 적합성은 현지 이용 가능 시간 / (복귀 − 출발)이며 후보 집합이 바뀌어도 같다", () => {
-    const timeFitOf = (destinations: typeof gyeongju[]) => {
+    const timeFitOf = (destinations: (typeof gyeongju)[]) => {
       const outcome = evaluateCandidates(
-        { conditions: trip, destinations, travelTime: adapterOf({ gyeongju: 3.5, both: 1.6, gangneung: 2.8 }) },
+        {
+          conditions: trip,
+          destinations,
+          travelTime: adapterOf({ gyeongju: 3.5, both: 1.6, gangneung: 2.8 }),
+        },
         recommendationPolicyV1,
       );
-      return outcome.candidates.find((item) => item.id === "gyeongju")!.components.find((c) => c.id === "timeFit")!.raw;
+      return outcome.candidates
+        .find((item) => item.id === "gyeongju")!
+        .components.find((c) => c.id === "timeFit")!.raw;
     };
     // 36시간 − 왕복 7시간 = 29시간, 29/36
     expect(timeFitOf([gyeongju])).toBeCloseTo(29 / 36, 10);
@@ -135,7 +195,11 @@ describe("점수 구성요소 산식 (DECISIONS 7.1 · 7.2)", () => {
 
   it("축제 미구현 구간에서는 시간 0.60 / 관심사 0.40으로 재정규화한다", () => {
     const outcome = evaluateCandidates(
-      { conditions: trip, destinations: [gyeongju], travelTime: adapterOf({ gyeongju: 3.5 }) },
+      {
+        conditions: trip,
+        destinations: [gyeongju],
+        travelTime: adapterOf({ gyeongju: 3.5 }),
+      },
       recommendationPolicyV1,
     );
     const candidate = outcome.passed[0];
@@ -158,7 +222,9 @@ describe("관심사 0개 안전장치 (DECISIONS 6.1 · 7.3)", () => {
     );
     const candidate = outcome.passed[0];
     expect(candidate.usedWeights).toEqual({ timeFit: 1 });
-    expect(candidate.components.find((c) => c.id === "interestFit")!.available).toBe(false);
+    expect(
+      candidate.components.find((c) => c.id === "interestFit")!.available,
+    ).toBe(false);
     expect(candidate.score).toBeCloseTo(29 / 36, 10);
   });
 });
@@ -170,7 +236,11 @@ describe("정렬·동점 규칙 (DECISIONS 6.1)", () => {
 
   it("점수가 다르면 점수 내림차순이다", () => {
     const outcome = evaluateCandidates(
-      { conditions: trip, destinations: [far, near], travelTime: adapterOf({ "a-far": 3.5, "b-near": 1.6 }) },
+      {
+        conditions: trip,
+        destinations: [far, near],
+        travelTime: adapterOf({ "a-far": 3.5, "b-near": 1.6 }),
+      },
       recommendationPolicyV1,
     );
     expect(outcome.passed.map((item) => item.id)).toEqual(["b-near", "a-far"]);
@@ -180,17 +250,27 @@ describe("정렬·동점 규칙 (DECISIONS 6.1)", () => {
     const sameA = { id: "z-same", name: "지", region: "가", tags: ["역사"] };
     const sameB = { id: "a-same", name: "에이", region: "나", tags: ["역사"] };
     const outcome = evaluateCandidates(
-      { conditions: trip, destinations: [sameA, sameB], travelTime: adapterOf({ "z-same": 2, "a-same": 2 }) },
+      {
+        conditions: trip,
+        destinations: [sameA, sameB],
+        travelTime: adapterOf({ "z-same": 2, "a-same": 2 }),
+      },
       recommendationPolicyV1,
     );
     expect(outcome.passed.map((item) => item.id)).toEqual(["a-same", "z-same"]);
-    expect(outcome.tiebreaks).toEqual([{ winnerId: "a-same", loserId: "z-same", stepId: "destinationId" }]);
+    expect(outcome.tiebreaks).toEqual([
+      { winnerId: "a-same", loserId: "z-same", stepId: "destinationId" },
+    ]);
   });
 
   it("같은 입력이면 입력 배열 순서가 달라도 같은 순서가 나온다", () => {
-    const build = (destinations: typeof gyeongju[]) =>
+    const build = (destinations: (typeof gyeongju)[]) =>
       evaluateCandidates(
-        { conditions: trip, destinations, travelTime: adapterOf({ "a-far": 3.5, "b-near": 1.6, gyeongju: 3.5 }) },
+        {
+          conditions: trip,
+          destinations,
+          travelTime: adapterOf({ "a-far": 3.5, "b-near": 1.6, gyeongju: 3.5 }),
+        },
         recommendationPolicyV1,
       ).passed.map((item) => item.id);
     expect(build([far, near, gyeongju])).toEqual(build([gyeongju, near, far]));
@@ -203,7 +283,11 @@ describe("정책 주입 (DECISIONS 6.1 세 가지 요구)", () => {
   it("정책이 주입되지 않으면 임의값으로 대체하지 않고 실패한다", () => {
     expect(() =>
       evaluateCandidates(
-        { conditions: trip, destinations: [gyeongju], travelTime: adapterOf({ gyeongju: 3.5 }) },
+        {
+          conditions: trip,
+          destinations: [gyeongju],
+          travelTime: adapterOf({ gyeongju: 3.5 }),
+        },
         undefined as unknown as RecommendationPolicy,
       ),
     ).toThrow(/정책/);
@@ -211,28 +295,42 @@ describe("정책 주입 (DECISIONS 6.1 세 가지 요구)", () => {
 
   it("결과에 정책 버전과 구성요소별 점수가 남는다", () => {
     const outcome = evaluateCandidates(
-      { conditions: trip, destinations: [gyeongju], travelTime: adapterOf({ gyeongju: 3.5 }) },
+      {
+        conditions: trip,
+        destinations: [gyeongju],
+        travelTime: adapterOf({ gyeongju: 3.5 }),
+      },
       recommendationPolicyV1,
     );
     expect(outcome.policyVersion).toBe(recommendationPolicyV1.version);
-    expect(outcome.passed[0].policyVersion).toBe(recommendationPolicyV1.version);
-    expect(outcome.passed[0].components.map((c) => c.id)).toEqual(["timeFit", "interestFit"]);
-    expect(outcome.passed[0].components[0].weighted).toBeCloseTo(0.6 * (29 / 36), 10);
+    expect(outcome.passed[0].policyVersion).toBe(
+      recommendationPolicyV1.version,
+    );
+    expect(outcome.passed[0].components.map((c) => c.id)).toEqual([
+      "timeFit",
+      "interestFit",
+    ]);
+    expect(outcome.passed[0].components[0].weighted).toBeCloseTo(
+      0.6 * (29 / 36),
+      10,
+    );
   });
 
   it("동점 단계 목록은 코드 분기가 아니라 정책의 순서 있는 데이터다", () => {
-    expect(recommendationPolicyV1.tiebreakSteps.map((step) => step.id)).toEqual([
-      "localAvailableHours",
-      "roundTripHours",
-      "destinationId",
-    ]);
+    expect(recommendationPolicyV1.tiebreakSteps.map((step) => step.id)).toEqual(
+      ["localAvailableHours", "roundTripHours", "destinationId"],
+    );
   });
 });
 
 describe("목업 목적지 어댑터", () => {
   it("PoC 목업 목적지를 후보 형태로 바꿔 준다", () => {
     const list = destinationsFrom();
-    expect(list.map((item) => item.id)).toEqual(["gyeongju", "gongju", "gangneung"]);
+    expect(list.map((item) => item.id)).toEqual([
+      "gyeongju",
+      "gongju",
+      "gangneung",
+    ]);
     expect(list[0].tags).toContain("역사");
   });
 });

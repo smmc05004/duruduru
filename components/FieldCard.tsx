@@ -50,7 +50,9 @@ export function FieldCard({
   const labelContent = (
     <>
       {label}
-      {labelAside ? <span className="dd-field-card__label-aside"> {labelAside}</span> : null}
+      {labelAside ? (
+        <span className="dd-field-card__label-aside"> {labelAside}</span>
+      ) : null}
     </>
   );
 
@@ -83,14 +85,20 @@ export function FieldCard({
                 <circle cx="10" cy="10" r="7.2" />
                 <path d="M7.4 7.4l5.2 5.2M12.6 7.4l-5.2 5.2" />
               </svg>
-              <p className="dd-field-error__text" id={fieldErrorId(error.inputId)}>
+              <p
+                className="dd-field-error__text"
+                id={fieldErrorId(error.inputId)}
+              >
                 {error.message}
               </p>
             </div>
           ))}
         </div>
       ) : hint ? (
-        <p className="dd-field-card__hint" id={hintFor ? fieldHintId(hintFor) : undefined}>
+        <p
+          className="dd-field-card__hint"
+          id={hintFor ? fieldHintId(hintFor) : undefined}
+        >
           {hint}
         </p>
       ) : null}

@@ -1,5 +1,9 @@
 import { destinations as pocDestinations } from "./mock-data";
-import type { RecommendationPolicy, ScoreComponentId, TiebreakMetricId } from "./trip-policy";
+import type {
+  RecommendationPolicy,
+  ScoreComponentId,
+  TiebreakMetricId,
+} from "./trip-policy";
 import type { TravelTimeAdapter, TravelTimeEstimate } from "./travel-time";
 import type { ValidTripConditions } from "./trip-conditions";
 
@@ -76,7 +80,11 @@ export type TripDuration = {
   minimumLocalStayHours: number;
 };
 
-export type TiebreakRecord = { winnerId: string; loserId: string; stepId: TiebreakMetricId };
+export type TiebreakRecord = {
+  winnerId: string;
+  loserId: string;
+  stepId: TiebreakMetricId;
+};
 
 export type RecommendationInput = {
   conditions: ValidTripConditions;
@@ -123,7 +131,10 @@ export function resolveTripDuration(
   conditions: Pick<ValidTripConditions, "startAt" | "returnBy">,
   policy: RecommendationPolicy,
 ): TripDuration {
-  const days = Math.max(1, kstDayIndex(conditions.returnBy) - kstDayIndex(conditions.startAt) + 1);
+  const days = Math.max(
+    1,
+    kstDayIndex(conditions.returnBy) - kstDayIndex(conditions.startAt) + 1,
+  );
   const nights = days - 1;
   return {
     days,
@@ -134,9 +145,14 @@ export function resolveTripDuration(
 }
 
 /** 동점 단계 id로 비교값을 찾는다. 단계의 순서와 방향은 정책 데이터가 정한다. */
-const tiebreakMetrics: Record<TiebreakMetricId, (candidate: CandidateEvaluation) => number | string> = {
-  localAvailableHours: (candidate) => candidate.localAvailableHours ?? Number.NEGATIVE_INFINITY,
-  roundTripHours: (candidate) => candidate.roundTripHours ?? Number.POSITIVE_INFINITY,
+const tiebreakMetrics: Record<
+  TiebreakMetricId,
+  (candidate: CandidateEvaluation) => number | string
+> = {
+  localAvailableHours: (candidate) =>
+    candidate.localAvailableHours ?? Number.NEGATIVE_INFINITY,
+  roundTripHours: (candidate) =>
+    candidate.roundTripHours ?? Number.POSITIVE_INFINITY,
   destinationId: (candidate) => candidate.id,
 };
 
@@ -158,7 +174,10 @@ function compareByTiebreaks(
     } else {
       order = left < right ? -1 : 1;
     }
-    return { order: step.direction === "desc" ? -order : order, stepId: step.id };
+    return {
+      order: step.direction === "desc" ? -order : order,
+      stepId: step.id,
+    };
   }
   return { order: 0, stepId: null };
 }
@@ -171,8 +190,14 @@ function evaluateOne(
 ): CandidateEvaluation {
   const { conditions } = input;
   const totalAvailableHours = conditions.availableHours;
-  const travel = input.travelTime.lookup(conditions.originId, destination.id, conditions.transport);
-  const interestMatches = conditions.interests.filter((interest) => destination.tags.includes(interest));
+  const travel = input.travelTime.lookup(
+    conditions.originId,
+    destination.id,
+    conditions.transport,
+  );
+  const interestMatches = conditions.interests.filter((interest) =>
+    destination.tags.includes(interest),
+  );
 
   const base = {
     id: destination.id,
@@ -202,10 +227,14 @@ function evaluateOne(
 
   const roundTripHours = travel.oneWayHours * 2;
   const localAvailableHours = totalAvailableHours - roundTripHours;
-  const passed = round(localAvailableHours) >= round(duration.minimumLocalStayHours);
+  const passed =
+    round(localAvailableHours) >= round(duration.minimumLocalStayHours);
 
   // 구성요소의 원값. 계산할 수 없으면 null이며 0으로 대체하지 않는다.
-  const rawValues: Record<ScoreComponentId, { raw: number | null; reason?: string }> = {
+  const rawValues: Record<
+    ScoreComponentId,
+    { raw: number | null; reason?: string }
+  > = {
     timeFit:
       totalAvailableHours > 0
         ? { raw: Math.max(0, localAvailableHours) / totalAvailableHours }
@@ -213,8 +242,14 @@ function evaluateOne(
     interestFit:
       conditions.interests.length > 0
         ? { raw: interestMatches.length / conditions.interests.length }
-        : { raw: null, reason: "고른 관심사가 없어 관심사 항을 빼고 계산했어요." },
-    festivalFit: { raw: null, reason: "축제 추천(F-06)이 아직 구현되지 않았어요." },
+        : {
+            raw: null,
+            reason: "고른 관심사가 없어 관심사 항을 빼고 계산했어요.",
+          },
+    festivalFit: {
+      raw: null,
+      reason: "축제 추천(F-06)이 아직 구현되지 않았어요.",
+    },
   };
 
   /*
@@ -223,7 +258,9 @@ function evaluateOne(
    * WeightSet 주석에 있다 — 유도값(0.588/0.412)과 확정값(0.60/0.40)이 다르다.
    */
   const usableIds = policy.components
-    .filter((component) => component.enabled && rawValues[component.id].raw !== null)
+    .filter(
+      (component) => component.enabled && rawValues[component.id].raw !== null,
+    )
     .map((component) => component.id);
   const weightSet = policy.weightSets.find(
     (candidate) =>
@@ -236,20 +273,24 @@ function evaluateOne(
     );
   }
 
-  const components: ScoreComponentResult[] = policy.components.map((component) => {
-    const value = rawValues[component.id];
-    const available = usableIds.includes(component.id);
-    const weight = available ? weightSet.weights[component.id] ?? 0 : 0;
-    return {
-      id: component.id,
-      label: component.label,
-      available,
-      unavailableReason: available ? undefined : component.disabledReason ?? value.reason,
-      raw: available ? value.raw : null,
-      weight,
-      weighted: available ? (value.raw as number) * weight : 0,
-    };
-  });
+  const components: ScoreComponentResult[] = policy.components.map(
+    (component) => {
+      const value = rawValues[component.id];
+      const available = usableIds.includes(component.id);
+      const weight = available ? (weightSet.weights[component.id] ?? 0) : 0;
+      return {
+        id: component.id,
+        label: component.label,
+        available,
+        unavailableReason: available
+          ? undefined
+          : (component.disabledReason ?? value.reason),
+        raw: available ? value.raw : null,
+        weight,
+        weighted: available ? (value.raw as number) * weight : 0,
+      };
+    },
+  );
 
   const usedWeights: Partial<Record<ScoreComponentId, number>> = {};
   for (const component of components) {
@@ -267,7 +308,9 @@ function evaluateOne(
       ? undefined
       : `왕복 이동 ${roundTripHours.toFixed(1)}시간을 빼면 ${Math.max(0, localAvailableHours).toFixed(1)}시간만 남아, 최소로 머물러야 하는 ${duration.minimumLocalStayHours}시간에 모자라요.`,
     score: components.reduce((sum, component) => sum + component.weighted, 0),
-    components: components.filter((component) => component.available || component.id !== "festivalFit"),
+    components: components.filter(
+      (component) => component.available || component.id !== "festivalFit",
+    ),
     usedWeights,
   };
 }
@@ -292,11 +335,13 @@ export function evaluateCandidates(
   );
 
   const tiebreaks: TiebreakRecord[] = [];
-  const passed = [...candidates.filter((candidate) => candidate.passed)].sort((a, b) => {
-    const byScore = round(b.score) - round(a.score);
-    if (byScore !== 0) return byScore;
-    return compareByTiebreaks(a, b, policy).order;
-  });
+  const passed = [...candidates.filter((candidate) => candidate.passed)].sort(
+    (a, b) => {
+      const byScore = round(b.score) - round(a.score);
+      if (byScore !== 0) return byScore;
+      return compareByTiebreaks(a, b, policy).order;
+    },
+  );
 
   // 정렬이 끝난 뒤, 점수가 같았던 인접 쌍이 몇 단계에서 갈렸는지 남긴다.
   for (let index = 1; index < passed.length; index += 1) {
@@ -304,7 +349,8 @@ export function evaluateCandidates(
     const loser = passed[index];
     if (round(winner.score) !== round(loser.score)) continue;
     const { stepId } = compareByTiebreaks(winner, loser, policy);
-    if (stepId) tiebreaks.push({ winnerId: winner.id, loserId: loser.id, stepId });
+    if (stepId)
+      tiebreaks.push({ winnerId: winner.id, loserId: loser.id, stepId });
   }
 
   return {

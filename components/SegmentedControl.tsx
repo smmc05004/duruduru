@@ -49,12 +49,17 @@ export function SegmentedControl({
             role="radio"
             aria-checked={selected}
             disabled={option.disabled}
-            className={["dd-segmented__item", selected ? "dd-segmented__item--selected" : null]
+            className={[
+              "dd-segmented__item",
+              selected ? "dd-segmented__item--selected" : null,
+            ]
               .filter(Boolean)
               .join(" ")}
             onClick={() => onChange(option.value)}
           >
-            {option.icon ? <span className="dd-segmented__icon">{option.icon}</span> : null}
+            {option.icon ? (
+              <span className="dd-segmented__icon">{option.icon}</span>
+            ) : null}
             {option.label}
           </button>
         );

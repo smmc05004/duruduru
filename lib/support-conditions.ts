@@ -57,7 +57,8 @@ export const provisionalSupportSet: SupportSet = {
     },
   ],
   provisional: true,
-  source: "PoC 목업(lib/mock-data.ts, 이전 app/page.tsx 폼)에서 이어받은 임시 목록",
+  source:
+    "PoC 목업(lib/mock-data.ts, 이전 app/page.tsx 폼)에서 이어받은 임시 목록",
   basisDate: "2026-08-30",
 };
 
@@ -66,4 +67,9 @@ export const provisionalSupportSet: SupportSet = {
  * 이 값은 lib/mock-data.ts의 `Attraction.category`에서 이어받았다.
  * 관심사는 0개 이상이므로 검증 대상이 아니고, 화면의 선택지 제공에만 쓴다.
  */
-export const provisionalInterestTags = ["역사", "자연", "문화", "미식"] as const;
+export const provisionalInterestTags = [
+  "역사",
+  "자연",
+  "문화",
+  "미식",
+] as const;

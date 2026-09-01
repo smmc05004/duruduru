@@ -13,11 +13,19 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   children: ReactNode;
 };
 
-export function Button({ variant, children, className, type = "button", ...rest }: ButtonProps) {
+export function Button({
+  variant,
+  children,
+  className,
+  type = "button",
+  ...rest
+}: ButtonProps) {
   return (
     <button
       type={type}
-      className={["dd-button", `dd-button--${variant}`, className].filter(Boolean).join(" ")}
+      className={["dd-button", `dd-button--${variant}`, className]
+        .filter(Boolean)
+        .join(" ")}
       {...rest}
     >
       {children}

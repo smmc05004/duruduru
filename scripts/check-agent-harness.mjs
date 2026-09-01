@@ -2,7 +2,10 @@ import { access, readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const repositoryRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+);
 
 const requiredSources = [
   "AGENTS.md",
@@ -126,7 +129,11 @@ async function referenceExists(token) {
   }
 
   for (const directory of filenameSearchDirectories) {
-    if (await exists(directory ? path.posix.join(directory, normalized) : normalized)) {
+    if (
+      await exists(
+        directory ? path.posix.join(directory, normalized) : normalized,
+      )
+    ) {
       return true;
     }
   }
@@ -137,11 +144,17 @@ async function referenceExists(token) {
 // .agents 아래의 모든 역할 문서(`.agents/<역할>/AGENT.md`)를 모은다.
 async function collectAgentRoleDocuments() {
   const documents = [];
-  const entries = await readdir(path.join(repositoryRoot, agentRoleDirectory), { withFileTypes: true });
+  const entries = await readdir(path.join(repositoryRoot, agentRoleDirectory), {
+    withFileTypes: true,
+  });
 
   for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
     if (!entry.isDirectory()) continue;
-    const document = path.posix.join(agentRoleDirectory, entry.name, agentRoleDocumentName);
+    const document = path.posix.join(
+      agentRoleDirectory,
+      entry.name,
+      agentRoleDocumentName,
+    );
     if (await exists(document)) {
       documents.push(document);
     }
@@ -154,7 +167,9 @@ async function collectReferenceDocuments() {
   const documents = [...referenceDocuments];
 
   for (const directory of referenceDirectories) {
-    for (const entry of (await readdir(path.join(repositoryRoot, directory))).sort()) {
+    for (const entry of (
+      await readdir(path.join(repositoryRoot, directory))
+    ).sort()) {
       if (entry.endsWith(".md")) {
         documents.push(path.posix.join(directory, entry));
       }
@@ -175,8 +190,13 @@ for (const source of requiredSources) {
   }
 }
 
-const claudeContents = await readFile(path.join(repositoryRoot, claudeEntrypoint), "utf8");
-const importedSources = [...claudeContents.matchAll(/^@(.+)$/gm)].map((match) => match[1]);
+const claudeContents = await readFile(
+  path.join(repositoryRoot, claudeEntrypoint),
+  "utf8",
+);
+const importedSources = [...claudeContents.matchAll(/^@(.+)$/gm)].map(
+  (match) => match[1],
+);
 const missingImports = [];
 
 for (const source of importedSources) {
@@ -215,7 +235,11 @@ for (const document of await collectReferenceDocuments()) {
   }
 }
 
-if (missingSources.length > 0 || missingImports.length > 0 || brokenReferences.length > 0) {
+if (
+  missingSources.length > 0 ||
+  missingImports.length > 0 ||
+  brokenReferences.length > 0
+) {
   if (missingSources.length > 0) {
     console.error("필수 에이전트 문서가 없습니다:");
     missingSources.forEach((source) => console.error(`- ${source}`));
@@ -229,7 +253,9 @@ if (missingSources.length > 0 || missingImports.length > 0 || brokenReferences.l
   if (brokenReferences.length > 0) {
     console.error("문서가 가리키는 경로가 실제로 없습니다:");
     brokenReferences.forEach((reference) => console.error(`- ${reference}`));
-    console.error("문서를 현재 코드에 맞게 고치거나, 경로가 아니면 백틱을 제거하세요.");
+    console.error(
+      "문서를 현재 코드에 맞게 고치거나, 경로가 아니면 백틱을 제거하세요.",
+    );
   }
 
   process.exitCode = 1;

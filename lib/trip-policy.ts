@@ -47,7 +47,8 @@ export type WeightSet = {
 };
 
 /** 동점 단계 식별자. 값 추출은 엔진이 이 id로 찾는다. */
-export type TiebreakMetricId = "localAvailableHours" | "roundTripHours" | "destinationId";
+export type TiebreakMetricId =
+  "localAvailableHours" | "roundTripHours" | "destinationId";
 
 export type TiebreakStep = {
   id: TiebreakMetricId;
@@ -80,7 +81,8 @@ export const recommendationPolicyV1: RecommendationPolicy = {
       id: "festivalFit",
       label: "축제 적합성",
       enabled: false,
-      disabledReason: "축제 추천(F-06)이 아직 구현되지 않아 점수에 넣지 않아요.",
+      disabledReason:
+        "축제 추천(F-06)이 아직 구현되지 않아 점수에 넣지 않아요.",
     },
   ],
   weightSets: [
@@ -102,8 +104,16 @@ export const recommendationPolicyV1: RecommendationPolicy = {
     },
   ],
   tiebreakSteps: [
-    { id: "localAvailableHours", label: "현지 이용 가능 시간이 긴 곳", direction: "desc" },
-    { id: "roundTripHours", label: "왕복 이동시간이 짧은 곳", direction: "asc" },
+    {
+      id: "localAvailableHours",
+      label: "현지 이용 가능 시간이 긴 곳",
+      direction: "desc",
+    },
+    {
+      id: "roundTripHours",
+      label: "왕복 이동시간이 짧은 곳",
+      direction: "asc",
+    },
     { id: "destinationId", label: "목적지 식별자 오름차순", direction: "asc" },
   ],
 };
