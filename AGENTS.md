@@ -6,6 +6,7 @@
 - `docs/agent/WORKFLOW.md`
 - `docs/agent/WORK_CYCLE.md`
 - `docs/agent/TECH_STACK.md`
+- `docs/development/IMPLEMENTATION_PLAN.md` — 기능·에픽의 최신 구현 상태와 다음 employee 작업
 
 이 프로젝트에서 제품 범위, 우선순위, 데이터 신뢰도 또는 사용자 흐름에 영향을 주는 작업을 시작하기 전에 다음 문서를 읽는다.
 
