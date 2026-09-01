@@ -196,7 +196,7 @@ describe("추천 결과 화면", () => {
     expect(screen.getByText("더 이른 시간에 출발하기")).toBeInTheDocument();
     expect(screen.getByText("복귀 시간을 늦춰보기")).toBeInTheDocument();
     // 후보를 지어내지 않는다.
-    expect(screen.queryByText(/다녀올 수 있는 곳 \\d+군데/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/다녀올 수 있는 곳 \d+군데/)).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { level: 2 })).not.toBeInTheDocument();
   });
 
