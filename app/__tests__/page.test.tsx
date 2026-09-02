@@ -2,7 +2,11 @@ import { describe, expect, it } from "@jest/globals";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import TripConditionsPage from "../page";
+import { evaluateRecommendationRequest } from "@/lib/recommendation-request";
+import { pocDataAdapter } from "@/lib/poc-data-adapter";
+import { recommendationPolicyV1 } from "@/lib/trip-policy";
 import { supportConditionsV1, type SupportSet } from "@/lib/support-conditions";
+import type { ValidTripConditions } from "@/lib/trip-conditions";
 
 /*
  * 조건 입력 화면의 표시·전환만 확인한다. 검증 규칙 자체는
@@ -17,6 +21,17 @@ async function fillConditions(startAt: string, returnBy: string) {
   // 관심사는 1개 이상 필수다(DECISIONS.md 7.3절).
   await user.click(screen.getByRole("checkbox", { name: "역사" }));
   return user;
+}
+
+/* 화면 표시 테스트용 계약 데이터. 실제 화면 기본 경로는 E4의 결측 어댑터를 사용한다. */
+function requestWithFixture(conditions: ValidTripConditions) {
+  return Promise.resolve(
+    evaluateRecommendationRequest(
+      conditions,
+      pocDataAdapter,
+      recommendationPolicyV1,
+    ),
+  );
 }
 
 describe("조건 입력 화면", () => {
@@ -244,7 +259,11 @@ describe("추천 결과 화면", () => {
   }
 
   it("제출 직후에는 조건 요약을 유지한 채 계산 중 상태를 보인다", async () => {
-    render(<TripConditionsPage />);
+    render(
+      <TripConditionsPage
+        loadRecommendations={() => new Promise(() => undefined)}
+      />,
+    );
     await submitTrip("2026-09-12T08:00", "2026-09-13T20:00");
 
     expect(screen.getByRole("status")).toHaveTextContent("계산하고 있어요");
@@ -255,8 +274,29 @@ describe("추천 결과 화면", () => {
     expect(screen.getByText("서울특별시 출발")).toBeInTheDocument();
   });
 
-  it("통과 후보가 있으면 후보 카드와 근거·신뢰도를 보인다", async () => {
+  it("이동시간이 결측이면 시간 부족 결과나 조건 조정 대신 데이터 부족을 알린다", async () => {
     render(<TripConditionsPage />);
+    await submitTrip("2026-09-12T08:00", "2026-09-13T20:00");
+
+    const unavailable = await screen.findByRole("alert", {
+      name: "추천 데이터 부족",
+    });
+    expect(unavailable).toHaveTextContent(
+      "이동시간 데이터를 아직 준비하지 못했어요",
+    );
+    expect(
+      screen.queryByRole("region", { name: "결과 없음" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("더 이른 시간에 출발하기"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/가능 여부나 점수를 임의로 계산하지 않았어요/),
+    ).toBeInTheDocument();
+  });
+
+  it("통과 후보가 있으면 후보 카드와 근거·신뢰도를 보인다", async () => {
+    render(<TripConditionsPage loadRecommendations={requestWithFixture} />);
     await submitTrip("2026-09-12T08:00", "2026-09-13T20:00");
 
     await waitFor(() =>
@@ -283,7 +323,7 @@ describe("추천 결과 화면", () => {
   });
 
   it("후보를 고르면 선택 상태로 남고, 일정 결과가 아직 없다는 것을 알린다", async () => {
-    render(<TripConditionsPage />);
+    render(<TripConditionsPage loadRecommendations={requestWithFixture} />);
     const user = await submitTrip("2026-09-12T08:00", "2026-09-13T20:00");
 
     const button = await screen.findByRole("button", {
@@ -298,7 +338,7 @@ describe("추천 결과 화면", () => {
   });
 
   it("모든 후보가 탈락하면 결과 없음을 정상 상태로 보이고 조정 행동을 안내한다", async () => {
-    render(<TripConditionsPage />);
+    render(<TripConditionsPage loadRecommendations={requestWithFixture} />);
     await submitTrip("2026-09-12T09:00", "2026-09-12T14:00");
 
     const empty = await screen.findByRole("region", { name: "결과 없음" });
@@ -313,7 +353,7 @@ describe("추천 결과 화면", () => {
   });
 
   it("조건 수정하기를 누르면 입력 화면으로 돌아간다", async () => {
-    render(<TripConditionsPage />);
+    render(<TripConditionsPage loadRecommendations={requestWithFixture} />);
     const user = await submitTrip("2026-09-12T08:00", "2026-09-13T20:00");
 
     await screen.findByText(/다녀올 수 있는 곳/);

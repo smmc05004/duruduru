@@ -1,5 +1,4 @@
-import type { DomainDataAdapter } from "./domain-data";
-import { pocDataAdapter } from "./poc-data-adapter";
+import type { DataProvenance, DomainDataAdapter } from "./domain-data";
 import type { TransportMode } from "./support-conditions";
 
 /*
@@ -25,6 +24,7 @@ export type TravelTimeEstimate = {
   kind: "estimate";
   source: string;
   basisDate: string;
+  provenance?: DataProvenance;
   /** 정식 정책이 아닌 임시값인가 */
   provisional: boolean;
 };
@@ -59,12 +59,9 @@ export function travelTimeAdapterFrom(
         kind: "estimate",
         source: record.provenance.source,
         basisDate: record.basisDate,
+        provenance: record.provenance,
         provisional: record.provenance.dataStatus !== "normal",
       };
     },
   };
 }
-
-/** E1의 명시적 PoC 어댑터. E2에서 실제 내부 데이터 어댑터로 교체한다. */
-export const provisionalTravelTimeAdapter =
-  travelTimeAdapterFrom(pocDataAdapter);

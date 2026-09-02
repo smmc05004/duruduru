@@ -1,4 +1,8 @@
-import type { DomainDataAdapter } from "./domain-data";
+import type {
+  DataProvenance,
+  DestinationTag,
+  DomainDataAdapter,
+} from "./domain-data";
 import type {
   RecommendationPolicy,
   ScoreComponentId,
@@ -31,6 +35,18 @@ export type DestinationCandidate = {
   name: string;
   region: string;
   tags: string[];
+  /** 계약 어댑터가 제공한 태그별 근거. 기존 순수 엔진 호출에서는 생략될 수 있다. */
+  tagRecords?: DestinationTag[];
+  /** 빈 태그가 실제 무관함인지 미수집인지 구분하는 목록 수준 출처. */
+  tagProvenance?: DataProvenance;
+  /** 계약 어댑터가 제공한 목적지 출처. 기존 순수 엔진 호출에서는 생략될 수 있다. */
+  provenance?: DataProvenance;
+};
+
+export type CandidateDataEvidence = {
+  destination: DataProvenance;
+  tags: { records: DestinationTag[]; provenance: DataProvenance };
+  travel: { dataStatus: "missing"; reason: string } | TravelTimeEstimate;
 };
 
 export type ScoreComponentResult = {
@@ -67,6 +83,7 @@ export type CandidateEvaluation = {
   /** 재정규화 후 실제 사용된 가중치 (기록 요구 — DECISIONS 6.1절 3항) */
   usedWeights: Partial<Record<ScoreComponentId, number>>;
   policyVersion: string;
+  data: CandidateDataEvidence;
 };
 
 export type TripDuration = {
@@ -93,6 +110,9 @@ export type RecommendationInput = {
 };
 
 export type RecommendationOutcome = {
+  kind: "recommendations" | "no-results" | "data-unavailable";
+  supportVersion: ValidTripConditions["supportVersion"];
+  timeZone: ValidTripConditions["timeZone"];
   policyVersion: string;
   duration: TripDuration;
   minimumLocalStayHours: number;
@@ -104,6 +124,7 @@ export type RecommendationOutcome = {
   rejected: CandidateEvaluation[];
   /** 동점이 몇 단계에서 갈렸는지 (기록 요구 — DECISIONS 6.1절 3항) */
   tiebreaks: TiebreakRecord[];
+  adjustableConditions: ("startAt" | "returnBy" | "originId")[];
 };
 
 const HOUR_MS = 3_600_000;
@@ -158,6 +179,12 @@ const tiebreakMetrics: Record<
 /** 부동소수 오차로 동점이 갈리지 않게 비교 전 자릿수를 맞춘다. */
 const round = (value: number) => Math.round(value * 1e9) / 1e9;
 
+function isMissingTravel(
+  travel: CandidateDataEvidence["travel"],
+): travel is { dataStatus: "missing"; reason: string } {
+  return "dataStatus" in travel;
+}
+
 function compareByTiebreaks(
   a: CandidateEvaluation,
   b: CandidateEvaluation,
@@ -197,6 +224,7 @@ function evaluateOne(
   const interestMatches = conditions.interests.filter((interest) =>
     destination.tags.includes(interest),
   );
+  const tagDataAvailable = destination.tagProvenance?.dataStatus !== "missing";
 
   const base = {
     id: destination.id,
@@ -206,6 +234,25 @@ function evaluateOne(
     minimumLocalStayHours: duration.minimumLocalStayHours,
     interestMatches,
     policyVersion: policy.version,
+    data: {
+      destination: destination.provenance ?? {
+        source: "직접 주입된 엔진 후보 — 출처 미기록",
+        collectedAt: "",
+        dataStatus: "missing",
+      },
+      tags: {
+        records: destination.tagRecords ?? [],
+        provenance: destination.tagProvenance ?? {
+          source: "직접 주입된 엔진 후보 — 태그 목록 출처 미기록",
+          collectedAt: "",
+          dataStatus: "missing",
+        },
+      },
+      travel: travel ?? {
+        dataStatus: "missing" as const,
+        reason: "출발지·목적지 이동시간 데이터가 아직 준비되지 않았어요.",
+      },
+    },
   };
 
   if (!travel) {
@@ -238,8 +285,12 @@ function evaluateOne(
       totalAvailableHours > 0
         ? { raw: Math.max(0, localAvailableHours) / totalAvailableHours }
         : { raw: null, reason: "쓸 수 있는 시간이 0이라 계산할 수 없어요." },
-    interestFit:
-      conditions.interests.length > 0
+    interestFit: !tagDataAvailable
+      ? {
+          raw: null,
+          reason: "목적지 관심사 태그 데이터가 아직 준비되지 않았어요.",
+        }
+      : conditions.interests.length > 0
         ? { raw: interestMatches.length / conditions.interests.length }
         : {
             raw: null,
@@ -353,6 +404,14 @@ export function evaluateCandidates(
   }
 
   return {
+    kind:
+      passed.length > 0
+        ? "recommendations"
+        : candidates.some((candidate) => isMissingTravel(candidate.data.travel))
+          ? "data-unavailable"
+          : "no-results",
+    supportVersion: input.conditions.supportVersion,
+    timeZone: input.conditions.timeZone,
     policyVersion: policy.version,
     duration,
     minimumLocalStayHours: duration.minimumLocalStayHours,
@@ -361,20 +420,13 @@ export function evaluateCandidates(
     passed,
     rejected: candidates.filter((candidate) => !candidate.passed),
     tiebreaks,
+    adjustableConditions:
+      passed.length === 0 &&
+      !candidates.some((candidate) => isMissingTravel(candidate.data.travel))
+        ? ["startAt", "returnBy", "originId"]
+        : [],
   };
 }
-
-/*
- * 지원 목적지 목록. lib/support-conditions.ts의 `provisionalSupportSet`과 같은 이유로 임시값이다.
- * docs/product/DECISIONS.md 1절의 `초기 지역`이 `제안` 상태이고, 5.4절이 "지원 목적지 목록"을
- * F-02의 남은 데이터 차단으로 적었다. 값은 PoC 목업(lib/mock-data.ts)에서 이어받았고
- * **정식 정책으로 승격하지 않는다.**
- */
-export const provisionalDestinationSource = {
-  provisional: true,
-  source: "PoC 목업(lib/mock-data.ts) — 지원 지역 결정 전 임시 목록",
-  basisDate: "2026-08-30",
-};
 
 export function destinationsFrom(
   data: Pick<DomainDataAdapter, "listDestinations">,
@@ -384,5 +436,8 @@ export function destinationsFrom(
     name: destination.name,
     region: destination.region,
     tags: destination.tags.map((tag) => tag.tag),
+    tagRecords: destination.tags.map((tag) => ({ ...tag })),
+    tagProvenance: { ...destination.tagProvenance },
+    provenance: { ...destination.provenance },
   }));
 }

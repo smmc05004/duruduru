@@ -121,7 +121,7 @@ test("관심사를 고르지 않으면 제출을 막고 항목 오류를 보인�
   await expect(page.getByText(/다녀올 수 있는 곳 \d+군데/)).toHaveCount(0);
 });
 
-test("유효한 조건을 제출하면 계산 중을 거쳐 추천 결과가 보인다", async ({
+test("실측 이동시간이 없으면 후보를 지어내지 않고 결측 결과를 유지한다", async ({
   page,
 }) => {
   await page.goto("/");
@@ -129,34 +129,18 @@ test("유효한 조건을 제출하면 계산 중을 거쳐 추천 결과가 보
 
   await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
 
-  // 계산 중에도 조건 요약이 남는다(FUNCTIONAL_SPEC.md 4장).
-  await expect(page.getByRole("status")).toContainText("계산하고 있어요");
+  // E4의 기본 데이터 계층은 E2 실측 이동시간을 아직 갖지 않는다. 조건 요약은 남고,
+  // PoC 후보나 시간 부족 안내로 대체하지 않는다. 상세 provenance 표시는 E5 범위다.
   await expect(
     page.getByRole("region", { name: "제출한 여행 조건" }),
   ).toBeVisible();
-
-  await expect(page.getByText(/다녀올 수 있는 곳 \d+군데/)).toBeVisible();
-  await expect(page.getByText("시간 적합순")).toBeVisible();
-  // 왕복이 가장 짧은 공주가 첫 후보다.
-  await expect(page.getByRole("heading", { level: 2 }).first()).toHaveText(
-    "공주",
-  );
-  await expect(page.getByText("가장 잘 맞아요")).toBeVisible();
-
-  // F-03 근거와 F-05 신뢰도 표시
   await expect(
-    page.getByText(/쓸 수 있는 시간 중 이동에 쓰이지 않은 비율/).first(),
-  ).toBeVisible();
-  await expect(
-    page.getByText(/고른 관심사 중 겹친 개수/).first(),
-  ).toBeVisible();
-  await expect(
-    page.getByText(/이동시간 추정 · PoC 목업/).first(),
-  ).toBeVisible();
-
-  // 목적지 선택은 선택 상태까지만 간다(일정 결과 화면은 범위 밖).
-  await page.getByRole("button", { name: "공주 일정 보기" }).click();
-  await expect(page.getByText(/일정 결과 화면은 아직 준비 중/)).toBeVisible();
+    page.getByRole("alert", { name: "추천 데이터 부족" }),
+  ).toContainText("이동시간 데이터를 아직 준비하지 못했어요");
+  await expect(page.getByRole("region", { name: "결과 없음" })).toHaveCount(0);
+  await expect(page.getByText("더 이른 시간에 출발하기")).toHaveCount(0);
+  await expect(page.getByText(/다녀올 수 있는 곳 \d+군데/)).toHaveCount(0);
+  await expect(page.getByRole("heading", { level: 2 })).toHaveCount(0);
 });
 
 test("모든 후보가 시간 제약에 걸리면 결과 없음을 정상 상태로 보인다", async ({
