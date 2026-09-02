@@ -9,7 +9,7 @@ import {
   type RecommendationPolicy,
 } from "@/lib/trip-policy";
 import type { TravelTimeAdapter, TravelTimeEstimate } from "@/lib/travel-time";
-import { provisionalSupportSet } from "@/lib/support-conditions";
+import { supportConditionsV1 } from "@/lib/support-conditions";
 import { pocDataAdapter } from "@/lib/poc-data-adapter";
 import { validateTripConditions } from "@/lib/trip-conditions";
 
@@ -21,7 +21,7 @@ import { validateTripConditions } from "@/lib/trip-conditions";
 function conditions(startAt: string, returnBy: string, interests: string[]) {
   const result = validateTripConditions(
     { originId: "seoul", startAt, returnBy, transport: "car", interests },
-    provisionalSupportSet,
+    supportConditionsV1,
   );
   if (!result.ok)
     throw new Error(

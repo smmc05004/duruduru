@@ -12,7 +12,7 @@ import type {
 } from "./domain-data";
 import { destinations as rawDestinations } from "./mock-data";
 import type { ScheduleDestination } from "./planner";
-import { provisionalSupportSet } from "./support-conditions";
+import { supportConditionsV1 } from "./support-conditions";
 
 export type { DomainDataStatus } from "./domain-data";
 
@@ -108,7 +108,7 @@ function festivalRecords(
 
 export const pocDataAdapter: DomainDataAdapter = {
   listOrigins: (): OriginRecord[] =>
-    provisionalSupportSet.origins.map((origin) => ({
+    supportConditionsV1.origins.map((origin) => ({
       id: origin.id,
       name: origin.name,
       region: origin.region,

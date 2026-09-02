@@ -17,8 +17,9 @@ import { formatHoursAndMinutes } from "@/lib/format-duration";
 import type { RecommendationOutcome } from "@/lib/recommendation";
 import { requestRecommendations } from "@/lib/recommendation-request";
 import {
-  provisionalInterestTags,
-  provisionalSupportSet,
+  interestTags,
+  loadSupportConditions,
+  type SupportSet,
 } from "@/lib/support-conditions";
 import {
   errorsByField,
@@ -39,18 +40,18 @@ import {
  * 범위 밖: 일정 결과 화면(F-04). 그래서 목적지 선택은 "선택 상태"까지만 간다.
  */
 
-const emptyDraft: TripConditionsDraft = {
-  // 출발지·일시는 기본값을 넣지 않는다. 임의 기본값은 사용자가 고르지 않은 조건을
-  // 고른 것처럼 만들고, 검증이 통과하는 이유를 감춘다.
-  originId: "",
-  startAt: "",
-  returnBy: "",
-  // 이동수단은 지원 목록에서 유일하게 정식 지원되는 값을 초기 선택으로 둔다(시안과 같다).
-  transport:
-    provisionalSupportSet.transports.find((transport) => transport.supported)
-      ?.id ?? "",
-  interests: [],
-};
+function emptyDraft(support?: SupportSet): TripConditionsDraft {
+  return {
+    // 출발지·일시는 기본값을 넣지 않는다. 임의 기본값은 사용자가 고르지 않은 조건을
+    // 고른 것처럼 만들고, 검증이 통과하는 이유를 감춘다.
+    originId: "",
+    startAt: "",
+    returnBy: "",
+    // 이동수단은 지원 목록에서 유일하게 정식 지원되는 값을 초기 선택으로 둔다(시안과 같다).
+    transport: support?.transports[0]?.id ?? "",
+    interests: [],
+  };
+}
 
 const carIcon = (
   <svg
@@ -93,6 +94,14 @@ type Phase =
       conditions: ValidTripConditions;
       outcome: RecommendationOutcome;
     };
+
+type SupportConditionsState =
+  { kind: "ready"; support: SupportSet } | { kind: "error" };
+
+type TripConditionsPageProps = {
+  /** 테스트와 이후 데이터 계층 전환에서 지원 조건 실패를 재현하는 읽기 경계 */
+  loadConditions?: () => SupportSet;
+};
 
 const spinnerIcon = (
   <svg
@@ -177,11 +186,8 @@ const placeIcon = (
 );
 
 /** 조건 요약. 계산 중·결과·결과 없음 세 상태가 같은 요약을 유지한다(4장). */
-function originName(originId: string) {
-  return (
-    provisionalSupportSet.origins.find((origin) => origin.id === originId)
-      ?.name ?? originId
-  );
+function originName(conditions: ValidTripConditions) {
+  return conditions.origin.name;
 }
 
 function ConditionSummary({
@@ -191,22 +197,22 @@ function ConditionSummary({
   conditions: ValidTripConditions;
   title: string;
 }) {
-  const transportName =
-    provisionalSupportSet.transports.find(
-      (transport) => transport.id === conditions.transport,
-    )?.name ?? conditions.transport;
   return (
     <section className="dd-summary-card" aria-label="제출한 여행 조건">
       <p className="dd-summary-card__title">{title}</p>
       <div className="dd-summary-card__chips">
-        <span className="dd-pill">{originName(conditions.originId)} 출발</span>
+        <span className="dd-pill">{originName(conditions)} 출발</span>
         <span className="dd-pill">
           {formatDateTime(conditions.startAt)} 출발
         </span>
         <span className="dd-pill">
           {formatDateTime(conditions.returnBy)} 복귀
         </span>
-        <span className="dd-pill">{transportName}</span>
+        <span className="dd-pill">{conditions.transportName}</span>
+        <span className="dd-pill">{conditions.tripType.label}</span>
+        <span className="dd-pill">
+          {conditions.timeZone} · 지원 조건 {conditions.supportVersion}
+        </span>
         {conditions.interests.map((interest) => (
           <span key={interest} className="dd-pill--interest">
             {interest}
@@ -228,19 +234,36 @@ function ResultHeader({ conditions }: { conditions: ValidTripConditions }) {
   );
 }
 
-export default function TripConditionsPage() {
-  const [draft, setDraft] = useState<TripConditionsDraft>(emptyDraft);
+export default function TripConditionsPage({
+  loadConditions = loadSupportConditions,
+}: TripConditionsPageProps) {
+  const [supportState, setSupportState] = useState<SupportConditionsState>(
+    () => {
+      try {
+        return { kind: "ready", support: loadConditions() };
+      } catch {
+        return { kind: "error" };
+      }
+    },
+  );
+  const [draft, setDraft] = useState<TripConditionsDraft>(() =>
+    emptyDraft(
+      supportState.kind === "ready" ? supportState.support : undefined,
+    ),
+  );
   const [attempted, setAttempted] = useState(false);
   const [phase, setPhase] = useState<Phase>({ kind: "input" });
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
+  const support = supportState.kind === "ready" ? supportState.support : null;
   const result = useMemo(
-    () => validateTripConditions(draft, provisionalSupportSet),
-    [draft],
+    () => (support ? validateTripConditions(draft, support) : null),
+    [draft, support],
   );
   const fieldErrors =
-    result.ok || !attempted ? {} : errorsByField(result.errors);
-  const errorCount = result.ok || !attempted ? 0 : result.errors.length;
+    !result || result.ok || !attempted ? {} : errorsByField(result.errors);
+  const errorCount =
+    !result || result.ok || !attempted ? 0 : result.errors.length;
 
   /*
    * 계산은 비동기 경계 뒤에 있다(lib/recommendation-request.ts). 조건이 바뀌면 이전 결과는
@@ -284,22 +307,10 @@ export default function TripConditionsPage() {
     return hasHint ? fieldHintId(inputId) : undefined;
   }
 
-  const transportOptions = provisionalSupportSet.transports.map(
-    (transport) => ({
-      value: transport.id,
-      label: transport.name,
-      icon: transport.id === "car" ? carIcon : undefined,
-      disabled: !transport.supported,
-    }),
-  );
-  const transportHint = provisionalSupportSet.transports.find(
-    (transport) => !transport.supported && transport.unsupportedReason,
-  )?.unsupportedReason;
-
   function submit(event: FormEvent) {
     event.preventDefault();
     setAttempted(true);
-    if (!result.ok) {
+    if (!result || !result.ok) {
       // 검증을 통과하지 못한 조건은 추천 엔진으로 넘어가지 않는다(F-01 수용 기준).
       setPhase({ kind: "input" });
       return;
@@ -322,7 +333,56 @@ export default function TripConditionsPage() {
     });
   }
 
-  const availableHours = result.ok ? result.conditions.availableHours : null;
+  const availableHours = result?.ok ? result.conditions.availableHours : null;
+
+  if (supportState.kind === "error") {
+    return (
+      <main className="dd-screen">
+        <div className="dd-screen__header">
+          <span className="dd-screen__logo">두루두루</span>
+        </div>
+        <section
+          className="dd-error-summary"
+          role="alert"
+          aria-label="지원 조건 오류"
+        >
+          <div>
+            <p className="dd-error-summary__title">
+              여행 조건을 불러오지 못했어요
+            </p>
+            <p className="dd-error-summary__text">
+              임의 조건으로 추천하지 않았어요. 다시 시도해 주세요.
+            </p>
+          </div>
+        </section>
+        <div className="dd-screen__actions">
+          <Button
+            type="button"
+            variant="primary"
+            onClick={() => {
+              try {
+                const nextSupport = loadConditions();
+                setDraft(emptyDraft(nextSupport));
+                setSupportState({ kind: "ready", support: nextSupport });
+              } catch {
+                setSupportState({ kind: "error" });
+              }
+            }}
+          >
+            다시 시도하기
+          </Button>
+        </div>
+      </main>
+    );
+  }
+
+  const loadedSupport = supportState.support;
+  const transportOptions = loadedSupport.transports.map((transport) => ({
+    value: transport.id,
+    label: transport.name,
+    icon: transport.id === "car" ? carIcon : undefined,
+  }));
+  const transportHint = "현재는 자차 여행만 지원해요.";
 
   if (phase.kind !== "input") {
     const { conditions } = phase;
@@ -339,7 +399,7 @@ export default function TripConditionsPage() {
           title={
             noResult
               ? "이번 시간에는\n다녀올 수 있는 곳이 없어요"
-              : `${originName(conditions.originId)}에서 출발해서\n다시 돌아올 수 있는 곳`
+              : `${originName(conditions)}에서 출발해서\n다시 돌아올 수 있는 곳`
           }
         />
 
@@ -461,7 +521,7 @@ export default function TripConditionsPage() {
             <circle cx="10" cy="10" r="7.2" />
             <path d="M10 6.2V10l2.6 1.8" />
           </svg>
-          지원 조건 {provisionalSupportSet.basisDate} 기준
+          지원 조건 {loadedSupport.basisDate} 기준
         </span>
       </div>
 
@@ -504,13 +564,13 @@ export default function TripConditionsPage() {
           <FieldCard
             label="어디서 출발해요?"
             htmlFor="origin"
-            hint="지금은 주요 도시 단위로만 고를 수 있어요."
+            hint="승인된 도시 대표 기준점에서 출발해요."
             hintFor="origin"
             errors={cardErrors(["originId", "origin"])}
           >
             <Select
               id="origin"
-              options={provisionalSupportSet.origins.map((origin) => ({
+              options={loadedSupport.origins.map((origin) => ({
                 value: origin.id,
                 label: origin.name,
               }))}
@@ -605,7 +665,7 @@ export default function TripConditionsPage() {
                 fieldErrors.interests ? fieldErrorId("interests") : undefined
               }
             >
-              {provisionalInterestTags.map((tag) => (
+              {interestTags.map((tag) => (
                 <Chip
                   key={tag}
                   variant="selectable"

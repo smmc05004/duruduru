@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import { provisionalSupportSet } from "../support-conditions";
+import { supportConditionsV1 } from "../support-conditions";
 import {
   validateTripConditions,
   type TripConditionsDraft,
@@ -28,7 +28,7 @@ const messagesFor = (
 
 describe("validateTripConditions", () => {
   it("유효한 조건은 통과하고 정규화된 조건을 돌려준다", () => {
-    const result = validateTripConditions(draft(), provisionalSupportSet);
+    const result = validateTripConditions(draft(), supportConditionsV1);
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -43,6 +43,14 @@ describe("validateTripConditions", () => {
       "2026-09-13T11:00:00.000Z",
     );
     expect(result.conditions.availableHours).toBe(36);
+    expect(result.conditions.supportVersion).toBe("2026-09-02");
+    expect(result.conditions.timeZone).toBe("Asia/Seoul");
+    expect(result.conditions.tripType).toMatchObject({
+      days: 2,
+      nights: 1,
+      label: "1박 2일",
+    });
+    expect(result.conditions.origin.representativePoint).toBeDefined();
   });
 
   /*
@@ -52,7 +60,7 @@ describe("validateTripConditions", () => {
   it("관심사를 여러 개 골라도 통과하고 원문 순서를 유지한다", () => {
     const result = validateTripConditions(
       draft({ interests: ["역사", "자연"] }),
-      provisionalSupportSet,
+      supportConditionsV1,
     );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -62,7 +70,7 @@ describe("validateTripConditions", () => {
   it("복귀가 출발보다 이른 입력은 차단하고 복귀 항목에 오류를 붙인다", () => {
     const result = validateTripConditions(
       draft({ startAt: "2026-09-12T08:00", returnBy: "2026-09-12T06:00" }),
-      provisionalSupportSet,
+      supportConditionsV1,
     );
 
     expect(result.ok).toBe(false);
@@ -74,7 +82,7 @@ describe("validateTripConditions", () => {
   it("복귀와 출발이 같은 시각이면 차단하지 않는다", () => {
     const result = validateTripConditions(
       draft({ startAt: "2026-09-12T08:00", returnBy: "2026-09-12T08:00" }),
-      provisionalSupportSet,
+      supportConditionsV1,
     );
 
     expect(result.ok).toBe(true);
@@ -83,7 +91,7 @@ describe("validateTripConditions", () => {
   it("필수값이 비면 항목별 오류를 만든다", () => {
     const result = validateTripConditions(
       draft({ originId: "", startAt: "", returnBy: "", transport: "" }),
-      provisionalSupportSet,
+      supportConditionsV1,
     );
 
     expect(result.ok).toBe(false);
@@ -99,7 +107,7 @@ describe("validateTripConditions", () => {
   it("파싱할 수 없는 일시는 해당 항목의 오류가 된다", () => {
     const result = validateTripConditions(
       draft({ startAt: "2026-09-99T99:99" }),
-      provisionalSupportSet,
+      supportConditionsV1,
     );
 
     expect(result.ok).toBe(false);
@@ -111,7 +119,7 @@ describe("validateTripConditions", () => {
   it("일시를 읽을 수 없으면 복귀 순서 검사를 대신 주장하지 않는다", () => {
     const result = validateTripConditions(
       draft({ returnBy: "" }),
-      provisionalSupportSet,
+      supportConditionsV1,
     );
 
     expect(messagesFor(result, "returnBy")).toEqual([
@@ -122,7 +130,7 @@ describe("validateTripConditions", () => {
   it("지원하지 않는 출발지는 차단한다", () => {
     const result = validateTripConditions(
       draft({ originId: "cheongju" }),
-      provisionalSupportSet,
+      supportConditionsV1,
     );
 
     expect(result.ok).toBe(false);
@@ -134,7 +142,7 @@ describe("validateTripConditions", () => {
   it("지원하지 않는 이동수단은 차단한다", () => {
     const result = validateTripConditions(
       draft({ transport: "public" }),
-      provisionalSupportSet,
+      supportConditionsV1,
     );
 
     expect(result.ok).toBe(false);
@@ -146,7 +154,7 @@ describe("validateTripConditions", () => {
   it("여러 항목이 동시에 잘못되면 오류를 모두 모아 준다", () => {
     const result = validateTripConditions(
       draft({ originId: "cheongju", returnBy: "2026-09-12T06:00" }),
-      provisionalSupportSet,
+      supportConditionsV1,
     );
 
     expect(result.ok).toBe(false);
@@ -163,7 +171,7 @@ describe("관심사 필수 검증", () => {
   it("관심사를 하나도 고르지 않으면 필수값 누락으로 제출을 막는다", () => {
     const result = validateTripConditions(
       draft({ interests: [] }),
-      provisionalSupportSet,
+      supportConditionsV1,
     );
     expect(result.ok).toBe(false);
     expect(messagesFor(result, "interests")).toHaveLength(1);
@@ -172,7 +180,7 @@ describe("관심사 필수 검증", () => {
   it("관심사를 하나 이상 고르면 통과한다", () => {
     const result = validateTripConditions(
       draft({ interests: ["역사"] }),
-      provisionalSupportSet,
+      supportConditionsV1,
     );
     expect(result.ok).toBe(true);
   });

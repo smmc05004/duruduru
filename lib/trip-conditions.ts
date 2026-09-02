@@ -5,7 +5,11 @@
  * 수용 기준: 복귀가 출발보다 빠른 입력은 추천 엔진에 전달되지 않는다.
  */
 
-import type { SupportSet, TransportMode } from "./support-conditions";
+import type {
+  SupportSet,
+  SupportedOrigin,
+  TransportMode,
+} from "./support-conditions";
 
 /** 사용자가 폼에 입력한 원문. 정규화되지 않은 문자열 그대로다. */
 export type TripConditionsDraft = {
@@ -28,10 +32,18 @@ export type TripConditionsError = {
 /** 검증을 통과한 조건. 원문과 정규화값을 함께 유지한다(F-01 처리 규칙). */
 export type ValidTripConditions = {
   originId: string;
+  /** 제출 당시 출발지·대표 기준점 스냅샷 */
+  origin: SupportedOrigin;
   startAt: Date;
   returnBy: Date;
   transport: TransportMode;
+  transportName: string;
   interests: string[];
+  /** 같은 입력을 해석한 지원 범위·시간대 버전 */
+  supportVersion: string;
+  timeZone: SupportSet["timeZone"];
+  /** KST 달력일 기준으로 판별한 유형. */
+  tripType: { days: number; nights: number; label: string };
   /** 복귀 − 출발. 표시용 값이며 최소 여행 기간 판정에는 쓰지 않는다. */
   availableHours: number;
   raw: TripConditionsDraft;
@@ -59,6 +71,23 @@ function parseInTripTimeZone(value: string): Date | null {
   const inZone = new Date(parsed.getTime() + 9 * 3_600_000);
   const roundTrip = `${inZone.toISOString().slice(0, 10)}T${inZone.toISOString().slice(11, 16)}`;
   return roundTrip === value ? parsed : null;
+}
+
+function tripTypeInKst(startAt: Date, returnBy: Date) {
+  const dayMs = 86_400_000;
+  const kstOffsetMs = 9 * 3_600_000;
+  const days = Math.max(
+    1,
+    Math.floor((returnBy.getTime() + kstOffsetMs) / dayMs) -
+      Math.floor((startAt.getTime() + kstOffsetMs) / dayMs) +
+      1,
+  );
+  const nights = days - 1;
+  return {
+    days,
+    nights,
+    label: nights === 0 ? "당일치기" : `${nights}박 ${days}일`,
+  };
 }
 
 /*
@@ -127,7 +156,7 @@ export function validateTripConditions(
   );
   if (!draft.transport) {
     errors.push({ field: "transport", message: "이동수단을 골라 주세요." });
-  } else if (!transport || !transport.supported) {
+  } else if (!transport) {
     errors.push({
       field: "transport",
       message: "아직 지원하지 않는 이동수단이에요. 자차로 골라 주세요.",
@@ -148,17 +177,25 @@ export function validateTripConditions(
     });
   }
 
-  if (errors.length > 0 || !startAt || !returnBy || !transport)
+  if (errors.length > 0 || !startAt || !returnBy || !transport || !origin)
     return { ok: false, errors };
 
   return {
     ok: true,
     conditions: {
       originId: draft.originId,
+      origin: {
+        ...origin,
+        representativePoint: { ...origin.representativePoint },
+      },
       startAt,
       returnBy,
       transport: transport.id,
+      transportName: transport.name,
       interests: [...draft.interests],
+      supportVersion: support.version,
+      timeZone: support.timeZone,
+      tripType: tripTypeInKst(startAt, returnBy),
       availableHours: (returnBy.getTime() - startAt.getTime()) / 3_600_000,
       raw: { ...draft, interests: [...draft.interests] },
     },

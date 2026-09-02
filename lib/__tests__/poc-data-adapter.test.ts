@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { pocDataAdapter, type DomainDataStatus } from "@/lib/poc-data-adapter";
+import { supportConditionsV1 } from "@/lib/support-conditions";
 
 const expectedTemporaryStatus: DomainDataStatus = "estimate";
 
@@ -66,5 +67,11 @@ describe("PoC 데이터 어댑터", () => {
       coordinates: null,
       provenance: { dataStatus: expectedTemporaryStatus },
     });
+  });
+
+  it("PoC 출발지 투영은 E3의 정식 지원 조건 목록을 직접 따른다", () => {
+    expect(pocDataAdapter.listOrigins().map((origin) => origin.id)).toEqual(
+      supportConditionsV1.origins.map((origin) => origin.id),
+    );
   });
 });
