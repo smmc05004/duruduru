@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import TripConditionsPage from "../page";
+import { supportConditionsV1, type SupportSet } from "@/lib/support-conditions";
 
 /*
  * 조건 입력 화면의 표시·전환만 확인한다. 검증 규칙 자체는
@@ -19,6 +20,58 @@ async function fillConditions(startAt: string, returnBy: string) {
 }
 
 describe("조건 입력 화면", () => {
+  it("로더가 준 지원 조건으로 출발지 선택지와 기준일을 함께 표시한다", () => {
+    const alternateSupport: SupportSet = {
+      ...supportConditionsV1,
+      version: "test-version",
+      basisDate: "2026-09-03",
+      origins: [
+        {
+          ...supportConditionsV1.origins[0],
+          id: "test-origin",
+          name: "테스트 출발지",
+        },
+      ],
+    };
+    render(<TripConditionsPage loadConditions={() => alternateSupport} />);
+
+    expect(
+      screen.getByRole("option", { name: "테스트 출발지" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("option", { name: "서울특별시" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("지원 조건 2026-09-03 기준")).toBeInTheDocument();
+  });
+
+  it("지원 조건을 읽지 못하면 추천 대신 재시도를 안내하고, 성공 시에만 입력을 보인다", async () => {
+    let attempts = 0;
+    render(
+      <TripConditionsPage
+        loadConditions={() => {
+          attempts += 1;
+          if (attempts === 1) throw new Error("지원 조건을 읽지 못함");
+          return supportConditionsV1;
+        }}
+      />,
+    );
+
+    expect(
+      screen.getByRole("alert", { name: "지원 조건 오류" }),
+    ).toHaveTextContent("임의 조건으로 추천하지 않았어요");
+    expect(
+      screen.queryByRole("button", { name: "갈 수 있는 곳 찾기" }),
+    ).not.toBeInTheDocument();
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "다시 시도하기" }));
+
+    expect(
+      screen.getByRole("button", { name: "갈 수 있는 곳 찾기" }),
+    ).toBeInTheDocument();
+  });
+
   it("필수값 없이 제출하면 요약 배너와 항목별 오류를 보이고 제출 버튼을 비활성으로 만든다", async () => {
     const user = userEvent.setup();
     render(<TripConditionsPage />);
@@ -69,7 +122,11 @@ describe("조건 입력 화면", () => {
 
     const summary = screen.getByRole("region", { name: "제출한 여행 조건" });
     expect(summary).toBeInTheDocument();
-    expect(screen.getByText("서울 출발")).toBeInTheDocument();
+    expect(screen.getByText("서울특별시 출발")).toBeInTheDocument();
+    expect(screen.getByText("1박 2일")).toBeInTheDocument();
+    expect(
+      screen.getByText("Asia/Seoul · 지원 조건 2026-09-02"),
+    ).toBeInTheDocument();
   });
 
   it("출발과 복귀가 동시에 잘못되면 두 오류 메시지가 모두 보인다", async () => {
@@ -145,16 +202,19 @@ describe("조건 입력 화면", () => {
       .getAttribute("aria-describedby");
     expect(describedBy).toBeTruthy();
     expect(document.getElementById(describedBy ?? "")?.textContent).toContain(
-      "지금은 주요 도시 단위로만 고를 수 있어요.",
+      "승인된 도시 대표 기준점에서 출발해요.",
     );
   });
 
-  it("대중교통은 고를 수 없다", () => {
+  it("자차만 정식 이동수단으로 보이고 대중교통 선택지는 없다", () => {
     render(<TripConditionsPage />);
 
-    expect(screen.getByRole("radio", { name: "대중교통" })).toBeDisabled();
+    expect(screen.getByRole("radio", { name: "자차" })).toBeEnabled();
     expect(
-      screen.getByText("대중교통은 아직 준비 중이라 고를 수 없어요."),
+      screen.queryByRole("radio", { name: "대중교통" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText("현재는 자차 여행만 지원해요."),
     ).toBeInTheDocument();
   });
 
@@ -192,7 +252,7 @@ describe("추천 결과 화면", () => {
     expect(
       screen.getByRole("region", { name: "제출한 여행 조건" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("서울 출발")).toBeInTheDocument();
+    expect(screen.getByText("서울특별시 출발")).toBeInTheDocument();
   });
 
   it("통과 후보가 있으면 후보 카드와 근거·신뢰도를 보인다", async () => {

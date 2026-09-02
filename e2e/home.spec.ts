@@ -38,8 +38,12 @@ test("유효한 여행 조건을 제출하면 제출한 조건이 요약으로 �
 
   const summary = page.getByRole("region", { name: "제출한 여행 조건" });
   await expect(summary).toBeVisible();
-  await expect(summary.getByText("서울 출발")).toBeVisible();
+  await expect(summary.getByText("서울특별시 출발")).toBeVisible();
   await expect(summary.getByText("역사")).toBeVisible();
+  await expect(summary.getByText("1박 2일")).toBeVisible();
+  await expect(
+    summary.getByText("Asia/Seoul · 지원 조건 2026-09-02"),
+  ).toBeVisible();
 });
 
 test("복귀가 출발보다 이른 입력은 제출되지 않는다", async ({ page }) => {
@@ -63,13 +67,14 @@ test("복귀가 출발보다 이른 입력은 제출되지 않는다", async ({ 
   ).toHaveCount(0);
 });
 
-test("대중교통은 고를 수 없다", async ({ page }) => {
+test("자차만 정식 이동수단으로 보이고 대중교통 선택지는 없다", async ({
+  page,
+}) => {
   await page.goto("/");
 
-  await expect(page.getByRole("radio", { name: "대중교통" })).toBeDisabled();
-  await expect(
-    page.getByText("대중교통은 아직 준비 중이라 고를 수 없어요."),
-  ).toBeVisible();
+  await expect(page.getByRole("radio", { name: "자차" })).toBeEnabled();
+  await expect(page.getByRole("radio", { name: "대중교통" })).toHaveCount(0);
+  await expect(page.getByText("현재는 자차 여행만 지원해요.")).toBeVisible();
 });
 
 test("출발과 복귀가 동시에 비어 있으면 두 오류가 모두 보이고 배너 개수와 일치한다", async ({
