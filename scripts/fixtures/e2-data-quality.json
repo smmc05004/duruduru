@@ -1,0 +1,200 @@
+[
+  {
+    "kind": "attraction",
+    "requiredFields": [
+      "destinationId",
+      "coordinates",
+      "operatingHours",
+      "closedDays",
+      "sourceUrl"
+    ],
+    "evidence": {
+      "source": "fixture: TourAPI 관광지·문화시설",
+      "sourceUrl": "https://example.invalid/tourapi",
+      "collectedAt": "2026-09-02T00:00:00.000Z",
+      "updatedAt": null,
+      "dataStatus": "normal",
+      "populationCount": 3,
+      "sampleCount": 2,
+      "limitations": [
+        "고정 fixture는 외부 API 연결 없이 조사 계산을 재현한다.",
+        "운영시간 원문은 파싱 성공을 뜻하지 않는다."
+      ]
+    },
+    "records": [
+      {
+        "sourceRecordId": "tourapi:attraction:gyeongju:sample-1",
+        "fields": {
+          "destinationId": "gyeongju",
+          "coordinates": "129.2,35.8",
+          "operatingHours": "09:00-18:00",
+          "closedDays": "월요일",
+          "sourceUrl": "https://example.invalid/tourapi/1"
+        }
+      },
+      {
+        "sourceRecordId": "tourapi:attraction:gyeongju:sample-2",
+        "fields": {
+          "destinationId": "gyeongju",
+          "coordinates": "129.3,35.9",
+          "operatingHours": null,
+          "closedDays": null,
+          "sourceUrl": "https://example.invalid/tourapi/2"
+        }
+      }
+    ]
+  },
+  {
+    "kind": "festival",
+    "requiredFields": [
+      "destinationId",
+      "startsOn",
+      "endsOn",
+      "coordinates",
+      "sourceUrl"
+    ],
+    "evidence": {
+      "source": "fixture: TourAPI 축제",
+      "sourceUrl": "https://example.invalid/tourapi",
+      "collectedAt": "2026-09-02T00:00:00.000Z",
+      "updatedAt": null,
+      "dataStatus": "normal",
+      "populationCount": 2,
+      "sampleCount": 2,
+      "limitations": [
+        "고정 fixture는 외부 API 연결 없이 조사 계산을 재현한다.",
+        "축제의 현재 개최 여부는 실제 수집 시 다시 확인해야 한다."
+      ]
+    },
+    "records": [
+      {
+        "sourceRecordId": "tourapi:festival:gyeongju:sample-1",
+        "fields": {
+          "destinationId": "gyeongju",
+          "startsOn": "20260910",
+          "endsOn": "20260920",
+          "coordinates": "129.2,35.8",
+          "sourceUrl": "https://example.invalid/tourapi/f1"
+        }
+      },
+      {
+        "sourceRecordId": "tourapi:festival:gyeongju:sample-2",
+        "fields": {
+          "destinationId": "gyeongju",
+          "startsOn": null,
+          "endsOn": null,
+          "coordinates": null,
+          "sourceUrl": "https://example.invalid/tourapi/f2"
+        }
+      }
+    ]
+  },
+  {
+    "kind": "restaurant",
+    "requiredFields": [
+      "destinationId",
+      "coordinates",
+      "operatingHours",
+      "closedDays",
+      "menuText",
+      "sourceUrl"
+    ],
+    "evidence": {
+      "source": "fixture: TourAPI 음식점",
+      "sourceUrl": "https://example.invalid/tourapi",
+      "collectedAt": "2026-09-02T00:00:00.000Z",
+      "updatedAt": null,
+      "dataStatus": "normal",
+      "populationCount": 211,
+      "sampleCount": 2,
+      "limitations": [
+        "고정 fixture는 외부 API 연결 없이 조사 계산을 재현한다.",
+        "운영시간은 자유 서식이므로 파싱 성공을 뜻하지 않는다."
+      ]
+    },
+    "records": [
+      {
+        "sourceRecordId": "tourapi:restaurant:gyeongju:sample-1",
+        "fields": {
+          "destinationId": "gyeongju",
+          "coordinates": "129.2,35.8",
+          "operatingHours": "10:00-20:00",
+          "closedDays": "월요일",
+          "menuText": "원문 보존",
+          "sourceUrl": "https://example.invalid/tourapi/r1"
+        }
+      },
+      {
+        "sourceRecordId": "tourapi:restaurant:gyeongju:sample-2",
+        "fields": {
+          "destinationId": "gyeongju",
+          "coordinates": "129.3,35.9",
+          "operatingHours": "",
+          "closedDays": null,
+          "menuText": "원문 보존",
+          "sourceUrl": "https://example.invalid/tourapi/r2"
+        }
+      }
+    ]
+  },
+  {
+    "kind": "representative-food",
+    "requiredFields": [
+      "destinationId",
+      "name",
+      "aliases",
+      "sourceType",
+      "confidence",
+      "verifiedAt",
+      "provider",
+      "dataset",
+      "sourceUrl",
+      "evidence"
+    ],
+    "evidence": {
+      "source": "fixture: 대표음식 교차 대조 미실시",
+      "sourceUrl": "https://example.invalid/food-unverified",
+      "collectedAt": "2026-09-02T00:00:00.000Z",
+      "updatedAt": null,
+      "dataStatus": "missing",
+      "populationCount": 2,
+      "sampleCount": 2,
+      "limitations": [
+        "고정 fixture는 외부 API 연결 없이 조사 계산을 재현한다.",
+        "대표음식 교차 대조와 실제 목록 승인은 아직 수행하지 않았다."
+      ]
+    },
+    "records": [
+      {
+        "sourceRecordId": "food-source:gyeongju:sample-1",
+        "fields": {
+          "destinationId": null,
+          "name": null,
+          "aliases": null,
+          "sourceType": null,
+          "confidence": null,
+          "verifiedAt": null,
+          "provider": null,
+          "dataset": null,
+          "sourceUrl": null,
+          "evidence": null
+        }
+      },
+      {
+        "sourceRecordId": "food-source:gyeongju:sample-2",
+        "fields": {
+          "destinationId": null,
+          "name": null,
+          "aliases": null,
+          "sourceType": null,
+          "confidence": null,
+          "verifiedAt": null,
+          "provider": null,
+          "dataset": null,
+          "sourceUrl": null,
+          "evidence": null
+        }
+      }
+    ]
+  }
+]

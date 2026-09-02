@@ -71,7 +71,7 @@ async function inspectDestination(target, codes) {
     throw new Error(
       `ldongCode2에서 ${target}시 법정동 코드를 찾지 못했습니다.`,
     );
-  const [attractions, culturalFacilities] = await Promise.all([
+  const [attractions, culturalFacilities, restaurants] = await Promise.all([
     request("areaBasedList2", {
       lDongRegnCd: legalCode.lDongRegnCd,
       lDongSignguCd: legalCode.lDongSignguCd,
@@ -81,6 +81,11 @@ async function inspectDestination(target, codes) {
       lDongRegnCd: legalCode.lDongRegnCd,
       lDongSignguCd: legalCode.lDongSignguCd,
       contentTypeId: "14",
+    }),
+    request("areaBasedList2", {
+      lDongRegnCd: legalCode.lDongRegnCd,
+      lDongSignguCd: legalCode.lDongSignguCd,
+      contentTypeId: "39",
     }),
   ]);
   const places = [...asList(attractions), ...asList(culturalFacilities)];
@@ -122,16 +127,41 @@ async function inspectDestination(target, codes) {
       eventStartDate: festivalStart,
     }),
   );
+  const restaurantSamples = restaurants.slice(0, 5);
+  const restaurantDetails = [];
+  for (const restaurant of restaurantSamples) {
+    const intro =
+      asList(
+        await request("detailIntro2", {
+          contentId: String(restaurant.contentid),
+          contentTypeId: String(restaurant.contenttypeid),
+        }),
+      )[0] ?? {};
+    restaurantDetails.push({
+      id: `tourapi:restaurant:${target}:${restaurant.contentid}`,
+      hasCoordinates: truthy(restaurant.mapx) && truthy(restaurant.mapy),
+      hasHours: truthy(introField(intro, "opentimefood")),
+      hasClosedDays: truthy(introField(intro, "restdatefood")),
+      hasMenuText:
+        truthy(intro.firstmenu) ||
+        truthy(intro.treatmenu) ||
+        truthy(intro.treatmenufood),
+    });
+  }
   return {
     target,
     legalCode,
     places: places.length,
     details,
     festivals: festivals.slice(0, 3).map((festival) => ({
+      id: `tourapi:festival:${target}:${festival.contentid}`,
       title: festival.title,
       start: festival.eventstartdate,
       end: festival.eventenddate,
     })),
+    // areaBasedList2 첫 페이지(최대 20건) 결과로, 전체 음식점 수가 아니다.
+    restaurantsPageOneCount: restaurants.length,
+    restaurantDetails,
   };
 }
 
@@ -145,7 +175,7 @@ for (const target of targets) {
   try {
     const result = await inspectDestination(target, codes);
     console.log(
-      `## ${target}: 법정동 ${result.legalCode.lDongRegnCd}-${result.legalCode.lDongSignguCd}, 관광지·문화시설 ${result.places}건, 현재 이후 축제 ${result.festivals.length}건`,
+      `## ${target}: 법정동 ${result.legalCode.lDongRegnCd}-${result.legalCode.lDongSignguCd}, 관광지·문화시설 첫 페이지 ${result.places}건, 현재 이후 축제 첫 페이지 ${result.festivals.length}건 (전체 건수 아님)`,
     );
     console.table(
       result.details.map(
@@ -171,13 +201,37 @@ for (const target of targets) {
       if (detail.hasHours || detail.hasClosedDays) operationalCovered += 1;
     }
     if (result.festivals.length) console.table(result.festivals);
+    const restaurantCoverage = [
+      "hasCoordinates",
+      "hasHours",
+      "hasClosedDays",
+      "hasMenuText",
+    ].map((field) => ({
+      field,
+      present: result.restaurantDetails.filter((detail) => detail[field])
+        .length,
+      sampled: result.restaurantDetails.length,
+    }));
+    console.log(
+      `음식점 첫 페이지 ${result.restaurantsPageOneCount}건 중 상세 표본 ${result.restaurantDetails.length}건 (전체 건수·충족률 아님)`,
+    );
+    console.table(
+      result.restaurantDetails.map((detail) => ({
+        id: detail.id,
+        coordinates: detail.hasCoordinates ? "Y" : "N",
+        hours: detail.hasHours ? "Y" : "N",
+        closedDays: detail.hasClosedDays ? "Y" : "N",
+        menuText: detail.hasMenuText ? "Y" : "N",
+      })),
+    );
+    console.table(restaurantCoverage);
   } catch (error) {
     console.error(`## ${target}: ${error.message}`);
   }
 }
 console.log(
-  `\n운영 정보(운영시간 또는 휴무일) 충족률: ${operationalCovered}/${operationalTotal} (${operationalTotal ? Math.round((operationalCovered / operationalTotal) * 100) : 0}%)`,
+  `\n운영 정보(운영시간 또는 휴무일) 상세 표본 충족률: ${operationalCovered}/${operationalTotal} (${operationalTotal ? Math.round((operationalCovered / operationalTotal) * 100) : 0}%; 첫 페이지의 최대 5건 상세 표본, 전체 충족률 아님)`,
 );
 console.log(
-  "판정: 주소·좌표·관광지/축제 목록은 TourAPI로 검증 가능. 운영 정보가 없는 관광지는 별도 보완 데이터 또는 카테고리 기본값이 필요합니다.",
+  "판정: 이 프로브는 첫 페이지·상세 표본의 필드 존재만 확인한다. 전체 지역 충족률·정식 지원 여부는 페이지네이션 조사 전 확정하지 않는다.",
 );
