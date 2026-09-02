@@ -1,5 +1,8 @@
 import { describe, expect, it } from "@jest/globals";
-import { destinations } from "@/lib/mock-data";
+import {
+  pocDataAdapter,
+  scheduleDestinationFromPoc,
+} from "@/lib/poc-data-adapter";
 import {
   buildItinerary,
   type ScheduleItem,
@@ -16,9 +19,10 @@ const defaultInput: TripInput = {
   interests: ["역사"],
 };
 
-const gyeongju = destinations.find(
-  (destination) => destination.id === "gyeongju",
-)!;
+const gyeongju = scheduleDestinationFromPoc("gyeongju")!;
+const destinations = pocDataAdapter
+  .listDestinations()
+  .map((destination) => scheduleDestinationFromPoc(destination.id)!);
 
 const placedItems = (items: ScheduleItem[]) =>
   items.filter((item) => item.type !== "이동" && item.type !== "축제");

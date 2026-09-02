@@ -1,4 +1,5 @@
-import { destinations as pocDestinations } from "./mock-data";
+import type { DomainDataAdapter } from "./domain-data";
+import { pocDataAdapter } from "./poc-data-adapter";
 import type { TransportMode } from "./support-conditions";
 
 /*
@@ -47,26 +48,38 @@ const POC_BASIS_DATE = "2026-08-30";
  * PoC 목업은 출발지를 구분하지 않는다(목적지마다 값 하나뿐이다). 그 한계를 감추지 않기 위해
  * originId를 받지만 쓰지 않는다는 사실을 여기 적어 둔다. 정식 데이터가 오면 출발지별로 갈린다.
  */
-export const provisionalTravelTimeAdapter: TravelTimeAdapter = {
-  source: POC_SOURCE,
-  basisDate: POC_BASIS_DATE,
-  provisional: true,
-  lookup(_originId, destinationId, transport) {
-    const destination = pocDestinations.find(
-      (item) => item.id === destinationId,
-    );
-    if (!destination) return null;
-    const oneWayHours =
-      transport === "car" ? destination.driveHours : destination.publicHours;
-    if (typeof oneWayHours !== "number" || Number.isNaN(oneWayHours))
-      return null;
-    return {
-      destinationId,
-      oneWayHours,
-      kind: "estimate",
-      source: POC_SOURCE,
-      basisDate: POC_BASIS_DATE,
-      provisional: true,
-    };
-  },
-};
+export function travelTimeAdapterFrom(
+  data: Pick<DomainDataAdapter, "lookupOriginTravelTime">,
+): TravelTimeAdapter {
+  const provenance = data.lookupOriginTravelTime(
+    "__metadata__",
+    "gyeongju",
+    "car",
+  )?.provenance;
+  return {
+    source: provenance?.source ?? POC_SOURCE,
+    basisDate: provenance?.collectedAt ?? POC_BASIS_DATE,
+    provisional: provenance?.dataStatus !== "normal",
+    lookup(originId, destinationId, transport) {
+      const record = data.lookupOriginTravelTime(
+        originId,
+        destinationId,
+        transport,
+      );
+      if (!record || record.oneWayHours === null) return null;
+      return {
+        destinationId,
+        oneWayHours: record.oneWayHours,
+        kind:
+          record.provenance.dataStatus === "normal" ? "estimate" : "estimate",
+        source: record.provenance.source,
+        basisDate: record.basisDate,
+        provisional: record.provenance.dataStatus !== "normal",
+      };
+    },
+  };
+}
+
+/** E1의 명시적 PoC 어댑터. E2에서 실제 내부 데이터 어댑터로 교체한다. */
+export const provisionalTravelTimeAdapter =
+  travelTimeAdapterFrom(pocDataAdapter);

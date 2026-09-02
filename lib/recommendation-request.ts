@@ -5,6 +5,7 @@ import {
 } from "./recommendation";
 import { recommendationPolicyV1 } from "./trip-policy";
 import { provisionalTravelTimeAdapter } from "./travel-time";
+import { pocDataAdapter } from "./poc-data-adapter";
 import type { ValidTripConditions } from "./trip-conditions";
 
 /*
@@ -28,7 +29,7 @@ export function requestRecommendations(
         evaluateCandidates(
           {
             conditions,
-            destinations: destinationsFrom(),
+            destinations: destinationsFrom(pocDataAdapter),
             travelTime: provisionalTravelTimeAdapter,
           },
           recommendationPolicyV1,

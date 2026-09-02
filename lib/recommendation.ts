@@ -1,4 +1,4 @@
-import { destinations as pocDestinations } from "./mock-data";
+import type { DomainDataAdapter } from "./domain-data";
 import type {
   RecommendationPolicy,
   ScoreComponentId,
@@ -382,11 +382,13 @@ export const provisionalDestinationSource = {
   basisDate: "2026-08-30",
 };
 
-export function destinationsFrom(): DestinationCandidate[] {
-  return pocDestinations.map((destination) => ({
+export function destinationsFrom(
+  data: Pick<DomainDataAdapter, "listDestinations">,
+): DestinationCandidate[] {
+  return data.listDestinations().map((destination) => ({
     id: destination.id,
     name: destination.name,
     region: destination.region,
-    tags: [...destination.tags],
+    tags: destination.tags.map((tag) => tag.tag),
   }));
 }

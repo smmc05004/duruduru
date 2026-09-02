@@ -10,6 +10,7 @@ import {
 } from "@/lib/trip-policy";
 import type { TravelTimeAdapter, TravelTimeEstimate } from "@/lib/travel-time";
 import { provisionalSupportSet } from "@/lib/support-conditions";
+import { pocDataAdapter } from "@/lib/poc-data-adapter";
 import { validateTripConditions } from "@/lib/trip-conditions";
 
 /*
@@ -325,7 +326,7 @@ describe("정책 주입 (DECISIONS 6.1 세 가지 요구)", () => {
 
 describe("목업 목적지 어댑터", () => {
   it("PoC 목업 목적지를 후보 형태로 바꿔 준다", () => {
-    const list = destinationsFrom();
+    const list = destinationsFrom(pocDataAdapter);
     expect(list.map((item) => item.id)).toEqual([
       "gyeongju",
       "gongju",
