@@ -1,4 +1,4 @@
-import { destinations as pocDestinations } from "./mock-data";
+import type { DomainDataAdapter } from "./domain-data";
 import type {
   RecommendationPolicy,
   ScoreComponentId,
@@ -104,7 +104,6 @@ export type RecommendationOutcome = {
   rejected: CandidateEvaluation[];
   /** 동점이 몇 단계에서 갈렸는지 (기록 요구 — DECISIONS 6.1절 3항) */
   tiebreaks: TiebreakRecord[];
-  travelTimeSource: { source: string; basisDate: string; provisional: boolean };
 };
 
 const HOUR_MS = 3_600_000;
@@ -362,11 +361,6 @@ export function evaluateCandidates(
     passed,
     rejected: candidates.filter((candidate) => !candidate.passed),
     tiebreaks,
-    travelTimeSource: {
-      source: input.travelTime.source,
-      basisDate: input.travelTime.basisDate,
-      provisional: input.travelTime.provisional,
-    },
   };
 }
 
@@ -382,11 +376,13 @@ export const provisionalDestinationSource = {
   basisDate: "2026-08-30",
 };
 
-export function destinationsFrom(): DestinationCandidate[] {
-  return pocDestinations.map((destination) => ({
+export function destinationsFrom(
+  data: Pick<DomainDataAdapter, "listDestinations">,
+): DestinationCandidate[] {
+  return data.listDestinations().map((destination) => ({
     id: destination.id,
     name: destination.name,
     region: destination.region,
-    tags: [...destination.tags],
+    tags: destination.tags.map((tag) => tag.tag),
   }));
 }

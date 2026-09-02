@@ -10,6 +10,7 @@ import {
 } from "@/lib/trip-policy";
 import type { TravelTimeAdapter, TravelTimeEstimate } from "@/lib/travel-time";
 import { provisionalSupportSet } from "@/lib/support-conditions";
+import { pocDataAdapter } from "@/lib/poc-data-adapter";
 import { validateTripConditions } from "@/lib/trip-conditions";
 
 /*
@@ -32,9 +33,6 @@ function conditions(startAt: string, returnBy: string, interests: string[]) {
 /** 후보별 편도 이동시간을 그대로 돌려주는 테스트용 어댑터. */
 function adapterOf(oneWayHours: Record<string, number>): TravelTimeAdapter {
   return {
-    provisional: true,
-    source: "테스트 고정값",
-    basisDate: "2026-08-31",
     lookup(_originId, destinationId): TravelTimeEstimate | null {
       const hours = oneWayHours[destinationId];
       if (hours === undefined) return null;
@@ -325,7 +323,7 @@ describe("정책 주입 (DECISIONS 6.1 세 가지 요구)", () => {
 
 describe("목업 목적지 어댑터", () => {
   it("PoC 목업 목적지를 후보 형태로 바꿔 준다", () => {
-    const list = destinationsFrom();
+    const list = destinationsFrom(pocDataAdapter);
     expect(list.map((item) => item.id)).toEqual([
       "gyeongju",
       "gongju",

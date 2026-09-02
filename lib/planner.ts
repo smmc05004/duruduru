@@ -1,4 +1,27 @@
-import type { Attraction, Destination } from "./mock-data";
+/**
+ * 종료된 PoC 일정 화면이 읽는 임시 투영 타입.
+ * 원시 목업 구조가 아니라 E1 데이터 어댑터가 만든 값만 받는다.
+ */
+export type ScheduleAttraction = {
+  id: string;
+  name: string;
+  category: string;
+  open: number;
+  close: number;
+  stayHours: number;
+  closedDays?: number[];
+  description: string;
+};
+
+export type ScheduleDestination = {
+  id: string;
+  name: string;
+  driveHours: number;
+  publicHours: number;
+  tags: string[];
+  attractions: ScheduleAttraction[];
+  festival?: { name: string; start: string; end: string };
+};
 
 export type TripInput = {
   origin: string;
@@ -8,7 +31,7 @@ export type TripInput = {
   interests: string[];
 };
 export type Recommendation = {
-  destination: Destination;
+  destination: ScheduleDestination;
   score: number;
   reason: string;
 };
@@ -36,7 +59,11 @@ const clockFromHours = (value: number) => {
 };
 const dayKey = (date: Date) =>
   `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
-const openingTime = (date: Date, attraction: Attraction, dayOffset = 0) =>
+const openingTime = (
+  date: Date,
+  attraction: ScheduleAttraction,
+  dayOffset = 0,
+) =>
   new Date(
     date.getFullYear(),
     date.getMonth(),
@@ -49,7 +76,7 @@ const addHours = (date: Date, value: number) =>
 
 export function recommendDestinations(
   input: TripInput,
-  data: Destination[],
+  data: ScheduleDestination[],
 ): Recommendation[] {
   const totalHours =
     (new Date(input.end).getTime() - new Date(input.start).getTime()) /
@@ -82,7 +109,7 @@ export function recommendDestinations(
     .sort((a, b) => b.score - a.score);
 }
 
-function isOpen(attraction: Attraction, date: Date) {
+function isOpen(attraction: ScheduleAttraction, date: Date) {
   return (
     !attraction.closedDays?.includes(date.getDay()) &&
     hour(date) >= attraction.open &&
@@ -91,7 +118,7 @@ function isOpen(attraction: Attraction, date: Date) {
 }
 
 export function buildItinerary(
-  destination: Destination,
+  destination: ScheduleDestination,
   input: TripInput,
 ): ScheduleItem[] {
   const start = new Date(input.start);
