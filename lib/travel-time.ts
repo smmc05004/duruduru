@@ -36,13 +36,7 @@ export type TravelTimeAdapter = {
     destinationId: string,
     transport: TransportMode,
   ): TravelTimeEstimate | null;
-  source: string;
-  basisDate: string;
-  provisional: boolean;
 };
-
-const POC_SOURCE = "PoC 목업(lib/mock-data.ts) — 출처·산출 방식 미정";
-const POC_BASIS_DATE = "2026-08-30";
 
 /*
  * PoC 목업은 출발지를 구분하지 않는다(목적지마다 값 하나뿐이다). 그 한계를 감추지 않기 위해
@@ -51,15 +45,7 @@ const POC_BASIS_DATE = "2026-08-30";
 export function travelTimeAdapterFrom(
   data: Pick<DomainDataAdapter, "lookupOriginTravelTime">,
 ): TravelTimeAdapter {
-  const provenance = data.lookupOriginTravelTime(
-    "__metadata__",
-    "gyeongju",
-    "car",
-  )?.provenance;
   return {
-    source: provenance?.source ?? POC_SOURCE,
-    basisDate: provenance?.collectedAt ?? POC_BASIS_DATE,
-    provisional: provenance?.dataStatus !== "normal",
     lookup(originId, destinationId, transport) {
       const record = data.lookupOriginTravelTime(
         originId,
@@ -70,8 +56,7 @@ export function travelTimeAdapterFrom(
       return {
         destinationId,
         oneWayHours: record.oneWayHours,
-        kind:
-          record.provenance.dataStatus === "normal" ? "estimate" : "estimate",
+        kind: "estimate",
         source: record.provenance.source,
         basisDate: record.basisDate,
         provisional: record.provenance.dataStatus !== "normal",

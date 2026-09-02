@@ -33,9 +33,6 @@ function conditions(startAt: string, returnBy: string, interests: string[]) {
 /** 후보별 편도 이동시간을 그대로 돌려주는 테스트용 어댑터. */
 function adapterOf(oneWayHours: Record<string, number>): TravelTimeAdapter {
   return {
-    provisional: true,
-    source: "테스트 고정값",
-    basisDate: "2026-08-31",
     lookup(_originId, destinationId): TravelTimeEstimate | null {
       const hours = oneWayHours[destinationId];
       if (hours === undefined) return null;

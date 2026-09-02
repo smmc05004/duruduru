@@ -33,7 +33,13 @@ describe("PoC 데이터 어댑터", () => {
     expect(
       pocDataAdapter.listPlaces(destination.id)[0].operation,
     ).toMatchObject({
+      closedWeekdays: [],
       provenance: { dataStatus: expectedTemporaryStatus },
+    });
+    expect(
+      pocDataAdapter.listPlaces(destination.id)[1].operation,
+    ).toMatchObject({
+      closedWeekdays: [1],
     });
   });
 
@@ -49,6 +55,15 @@ describe("PoC 데이터 어댑터", () => {
       destinationId: "gyeongju",
       oneWayHours: 3.5,
       method: "poc-mock",
+      provenance: { dataStatus: expectedTemporaryStatus },
+    });
+  });
+
+  it("출발지 기준점도 출처·상태 계약으로 제공한다", () => {
+    expect(pocDataAdapter.listOrigins()[0]).toMatchObject({
+      id: "seoul",
+      supportStatus: "unknown",
+      coordinates: null,
       provenance: { dataStatus: expectedTemporaryStatus },
     });
   });

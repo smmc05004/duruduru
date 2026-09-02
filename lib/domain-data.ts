@@ -31,14 +31,30 @@ export type DestinationRecord = {
   provenance: DataProvenance;
 };
 
+export type OriginRecord = {
+  id: string;
+  name: string;
+  region: string;
+  supportStatus: "supported" | "unsupported" | "unknown";
+  coordinates: Coordinates | null;
+  provenance: DataProvenance;
+};
+
 export type OperatingInterval = { opensAt: string; closesAt: string };
-export type OperationInfo = {
-  placeId: string;
-  weekday: number | null;
-  date: string | null;
+export type OperationDateException = {
+  date: string;
   intervals: OperatingInterval[];
   closed: boolean | null;
-  exception: boolean | null;
+};
+
+export type OperationInfo = {
+  placeId: string;
+  /** 평상시 운영 구간. 알 수 없으면 빈 배열이 아니라 provenance가 missing이어야 한다. */
+  regularIntervals: OperatingInterval[];
+  /** 반복 휴무 요일. 빈 배열은 매주 휴무 없음, null은 알 수 없음이다. */
+  closedWeekdays: number[] | null;
+  /** 날짜별 예외 운영/휴무. */
+  dateExceptions: OperationDateException[];
   provenance: DataProvenance;
 };
 
@@ -120,6 +136,7 @@ export type RestaurantRecord = {
 
 /** E2의 실제 수집 계층이 구현할 조회 경계. */
 export type DomainDataAdapter = {
+  listOrigins(): OriginRecord[];
   listDestinations(): DestinationRecord[];
   listPlaces(destinationId: string): PlaceRecord[];
   lookupOriginTravelTime(

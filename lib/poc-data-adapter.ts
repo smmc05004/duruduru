@@ -3,6 +3,7 @@ import type {
   DestinationRecord,
   DomainDataAdapter,
   FestivalRecord,
+  OriginRecord,
   OperationInfo,
   OriginDestinationTravelTime,
   PlaceRecord,
@@ -11,6 +12,7 @@ import type {
 } from "./domain-data";
 import { destinations as rawDestinations } from "./mock-data";
 import type { ScheduleDestination } from "./planner";
+import { provisionalSupportSet } from "./support-conditions";
 
 export type { DomainDataStatus } from "./domain-data";
 
@@ -27,16 +29,14 @@ const operationOf = (
   closedDays?: number[],
 ): OperationInfo => ({
   placeId,
-  weekday: null,
-  date: null,
-  intervals: [
+  regularIntervals: [
     {
       opensAt: `${String(Math.floor(open)).padStart(2, "0")}:${open % 1 ? "30" : "00"}`,
       closesAt: `${String(Math.floor(close)).padStart(2, "0")}:${close % 1 ? "30" : "00"}`,
     },
   ],
-  closed: closedDays?.length ? null : false,
-  exception: null,
+  closedWeekdays: closedDays ? [...closedDays] : [],
+  dateExceptions: [],
   provenance: POC_PROVENANCE,
 });
 
@@ -107,6 +107,15 @@ function festivalRecords(
 }
 
 export const pocDataAdapter: DomainDataAdapter = {
+  listOrigins: (): OriginRecord[] =>
+    provisionalSupportSet.origins.map((origin) => ({
+      id: origin.id,
+      name: origin.name,
+      region: origin.region,
+      supportStatus: "unknown",
+      coordinates: null,
+      provenance: POC_PROVENANCE,
+    })),
   listDestinations: () => rawDestinations.map(destinationRecord),
   listPlaces(destinationId) {
     const raw = rawDestinations.find((item) => item.id === destinationId);
@@ -143,25 +152,59 @@ export const pocDataAdapter: DomainDataAdapter = {
 export function scheduleDestinationFromPoc(
   destinationId: string,
 ): ScheduleDestination | null {
-  const raw = rawDestinations.find((item) => item.id === destinationId);
-  if (!raw) return null;
+  const destination = pocDataAdapter
+    .listDestinations()
+    .find((item) => item.id === destinationId);
+  if (!destination) return null;
   const places = pocDataAdapter.listPlaces(destinationId);
+  const carTravel = pocDataAdapter.lookupOriginTravelTime(
+    "__poc_schedule__",
+    destinationId,
+    "car",
+  );
+  const publicTravel = pocDataAdapter.lookupOriginTravelTime(
+    "__poc_schedule__",
+    destinationId,
+    "public",
+  );
+  if (carTravel?.oneWayHours === null || publicTravel?.oneWayHours === null)
+    return null;
+  const hoursFrom = (clock: string) => {
+    const [hours, minutes] = clock.split(":").map(Number);
+    return hours + minutes / 60;
+  };
   return {
-    id: raw.id,
-    name: raw.name,
-    driveHours: raw.driveHours,
-    publicHours: raw.publicHours,
-    tags: raw.tags,
-    attractions: places.map((place, index) => ({
-      id: place.id,
-      name: place.name,
-      category: place.category,
-      open: raw.attractions[index].open,
-      close: raw.attractions[index].close,
-      stayHours: place.stayDuration.recommendedHours ?? 0,
-      closedDays: raw.attractions[index].closedDays,
-      description: place.description ?? "",
-    })),
-    festival: raw.festival,
+    id: destination.id,
+    name: destination.name,
+    driveHours: carTravel?.oneWayHours ?? Number.NaN,
+    publicHours: publicTravel?.oneWayHours ?? Number.NaN,
+    tags: destination.tags.map((tag) => tag.tag),
+    attractions: places.flatMap((place) => {
+      const interval = place.operation.regularIntervals[0];
+      const stayHours = place.stayDuration.recommendedHours;
+      if (!interval || stayHours === null || place.description === null)
+        return [];
+      return [
+        {
+          id: place.id,
+          name: place.name,
+          category: place.category,
+          open: hoursFrom(interval.opensAt),
+          close: hoursFrom(interval.closesAt),
+          stayHours,
+          closedDays: place.operation.closedWeekdays ?? undefined,
+          description: place.description,
+        },
+      ];
+    }),
+    festival: (() => {
+      const festival = pocDataAdapter.listFestivals(destinationId)[0];
+      if (!festival || !festival.startsOn || !festival.endsOn) return undefined;
+      return {
+        name: festival.name,
+        start: festival.startsOn,
+        end: festival.endsOn,
+      };
+    })(),
   };
 }
