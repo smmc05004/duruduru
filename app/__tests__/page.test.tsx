@@ -60,7 +60,10 @@ function itineraryWithFixture(
       restaurantAvailable: false,
       returnByChecked: false,
     },
-    notices: [],
+    notices: [
+      "일반 이동·방문시간은 참고 정보이며 실시간 교통 또는 예약 가능 여부를 보증하지 않습니다.",
+      "식사 장소는 직접 확인",
+    ],
     places: [
       {
         id: "fixture-place",
@@ -361,17 +364,20 @@ describe("추천 결과 화면", () => {
     expect(screen.getByText("서울특별시 출발")).toBeInTheDocument();
   });
 
-  it("기본 정적 데이터로 시간 제약을 통과한 추천과 추정 근거를 보인다", async () => {
+  it("기본 정적 데이터로 시간 제약을 통과한 추천과 일반 예상시간 고지를 보인다", async () => {
     render(<TripConditionsPage />);
     await submitTrip("2026-09-12T08:00", "2026-09-13T20:00");
 
     expect(
       await screen.findByText(/다녀올 수 있는 곳 3군데/),
     ).toBeInTheDocument();
-    expect(screen.getAllByText(/이동시간 추정/).length).toBeGreaterThan(0);
     expect(
-      screen.getAllByText(/OSRM 공개 데모 서버 수동 경로 조회/).length,
-    ).toBeGreaterThan(0);
+      screen.getByText(/일반 예상시간으로 만든 참고용 결과예요/),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText(/일반 예상치예요/).length).toBeGreaterThan(0);
+    expect(
+      screen.queryByText(/OSRM 공개 데모 서버 수동 경로 조회/),
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("alert", { name: "추천 데이터 부족" }),
     ).not.toBeInTheDocument();
@@ -394,6 +400,7 @@ describe("추천 결과 화면", () => {
   });
 
   it("통과 후보가 있으면 후보 카드와 근거·신뢰도를 보인다", async () => {
+    const user = userEvent.setup();
     render(<TripConditionsPage loadRecommendations={requestWithFixture} />);
     await submitTrip("2026-09-12T08:00", "2026-09-13T20:00");
 
@@ -414,13 +421,16 @@ describe("추천 결과 화면", () => {
     expect(
       screen.getAllByText(/고른 관심사 중 겹친 개수/).length,
     ).toBeGreaterThan(0);
-    // F-05: 이동시간이 추정·목업임을 표시한다.
+    // F-05: 이동시간이 추정임을 기본 화면에서 알린다.
+    expect(screen.getAllByText(/일반 예상치예요/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/수집 2026-08-30/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/점수 정책/)).not.toBeInTheDocument();
+
+    await user.click(screen.getAllByText("데이터 기준 보기")[0]);
     expect(
-      screen.getAllByText(/이동시간 추정.*PoC 목업/).length,
-    ).toBeGreaterThan(0);
-    // E5: 카드가 계산에 쓴 데이터의 출처·수집 시각·상태를 함께 보존해 표시한다.
-    expect(screen.getAllByText(/수집 2026-08-30/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/상태 추정/).length).toBeGreaterThan(0);
+      screen.getAllByText("이 추천에 사용한 데이터")[0],
+    ).toBeInTheDocument();
+    expect(screen.getAllByText(/수집일 2026.08.30/).length).toBeGreaterThan(0);
   });
 
   it("기본 후보를 고르면 실제 장소 앵커의 참고 계획을 보인다", async () => {
@@ -440,7 +450,7 @@ describe("추천 결과 화면", () => {
     ).toBeInTheDocument();
   });
 
-  it("선택한 후보의 참고 계획은 방문 순서·시간대·근거와 주의문을 보인다", async () => {
+  it("선택한 후보의 참고 계획은 방문 순서·시간대와 단일 데이터 기준 접기를 보인다", async () => {
     render(
       <TripConditionsPage
         loadRecommendations={requestWithFixture}
@@ -454,10 +464,20 @@ describe("추천 결과 화면", () => {
     expect(
       await screen.findByRole("region", { name: "참고용 여행 계획" }),
     ).toHaveTextContent("테스트 유적");
-    expect(screen.getByText(/참고용 계획/)).toBeInTheDocument();
+    expect(screen.getByText(/참고용 계획이에요/)).toBeInTheDocument();
     expect(screen.getByText(/방문 전 최신 운영/)).toBeInTheDocument();
     expect(screen.getByText(/넓은 시간대/)).toBeInTheDocument();
-    expect(screen.getByText(/관심사 근거: 역사/)).toBeInTheDocument();
+    expect(screen.getByText(/관심사 · 역사/)).toBeInTheDocument();
+    expect(screen.queryByText(/관심사 근거 출처/)).not.toBeInTheDocument();
+    expect(
+      screen.getByText("식사 장소는 직접 확인해 주세요."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("계획 데이터 기준 보기")).toBeInTheDocument();
+    await user.click(screen.getByText("계획 데이터 기준 보기"));
+    expect(screen.getByText("이 계획에 사용한 데이터")).toBeInTheDocument();
+    expect(
+      screen.getByText(/실시간 교통 또는 예약 가능 여부를 보증하지 않습니다/),
+    ).toBeInTheDocument();
   });
 
   it("참고 계획 계산 중 로딩과 오류·재시도를 표시한다", async () => {

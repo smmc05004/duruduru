@@ -128,26 +128,58 @@ const dataStatusIcon: Record<DomainDataStatus, ReactNode> = {
  * E4가 남긴 provenance를 그대로 읽는다. 화면이 출처나 상태를 추론하지 않도록
  * 목적지·태그·이동시간의 근거를 분리해 표시한다(F-05).
  */
-function DataEvidence({
+function formatBasisDate(value: string) {
+  const matched = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  return matched ? `${matched[1]}.${matched[2]}.${matched[3]}` : value;
+}
+
+function friendlySource(source: string, kind: "tourism" | "route") {
+  if (kind === "route") return "OpenStreetMap 도로 데이터 기반 일반 예상치";
+  if (source.includes("TourAPI")) return "한국관광공사 TourAPI";
+  return source;
+}
+
+function CandidateDataBasis({
   label,
   source,
   collectedAt,
   dataStatus,
+  kind,
 }: {
   label: string;
   source: string;
   collectedAt: string;
   dataStatus: DomainDataStatus;
+  kind: "tourism" | "route";
 }) {
   return (
     <span
       className={`dd-basis__item dd-data-status dd-data-status--${dataStatus}`}
     >
       {dataStatusIcon[dataStatus]}
-      {label} · 출처 {source} · 수집 {collectedAt || "시각 미기록"} · 상태{" "}
-      {dataStatusLabel[dataStatus]}
+      {label} · {friendlySource(source, kind)} · 수집일{" "}
+      {formatBasisDate(collectedAt || "미기록")} · {dataStatusLabel[dataStatus]}
     </span>
   );
+}
+
+function travelStatusNotice(
+  status: DomainDataStatus | undefined,
+  basisDate: string | undefined,
+) {
+  const basis = formatBasisDate(basisDate ?? "미기록");
+  switch (status) {
+    case "normal":
+      return `이동시간은 도로 경로 데이터로 확인했어요. 기준일 ${basis}`;
+    case "fallback":
+      return `이동시간은 대체 데이터예요. 출발 전 다시 확인해 주세요. 기준일 ${basis}`;
+    case "stale":
+      return `이동시간 기준일이 지났어요. 출발 전 다시 확인해 주세요. 기준일 ${basis}`;
+    case "missing":
+      return "이동시간 데이터를 준비하지 못했어요. 출발 전 확인해 주세요.";
+    default:
+      return `이동시간은 도로 경로를 바탕으로 한 일반 예상치예요. 기준일 ${basis}`;
+  }
 }
 
 /** 근거 문장. 실제로 계산된 항목만 쓴다(F-03 처리 규칙). */
@@ -268,33 +300,17 @@ export function CandidateCard({
             {interestFit?.unavailableReason ?? "관심사 근거 없음"}
           </BasisItem>
         )}
-        {/* F-05 신뢰도 표시 — 계산에 실제로 쓰인 계약 데이터의 provenance를 감추지 않는다. */}
-        <DataEvidence
-          label="목적지"
-          source={candidate.data.destination.source}
-          collectedAt={candidate.data.destination.collectedAt}
-          dataStatus={candidate.data.destination.dataStatus}
-        />
-        <DataEvidence
-          label="관심사 태그"
-          source={candidate.data.tags.provenance.source}
-          collectedAt={candidate.data.tags.provenance.collectedAt}
-          dataStatus={candidate.data.tags.provenance.dataStatus}
-        />
-        {candidate.travel?.provenance ? (
-          <DataEvidence
-            label={`이동시간 추정 (${candidate.travel.basisDate} 기준)`}
-            source={candidate.travel.provenance.source}
-            collectedAt={candidate.travel.provenance.collectedAt}
-            dataStatus={candidate.travel.provenance.dataStatus}
-          />
-        ) : (
-          <BasisItem>
-            이동시간 추정 · {candidate.travel?.source ?? "출처 미기록"} ·{" "}
-            {candidate.travel?.basisDate ?? "기준일 미기록"} 기준 · 상태 미기록
-          </BasisItem>
-        )}
       </div>
+
+      <p
+        className={`dd-travel-status dd-data-status dd-data-status--${candidate.travel?.provenance?.dataStatus ?? "missing"}`}
+      >
+        {dataStatusIcon[candidate.travel?.provenance?.dataStatus ?? "missing"]}
+        {travelStatusNotice(
+          candidate.travel?.provenance?.dataStatus,
+          candidate.travel?.basisDate,
+        )}
+      </p>
 
       <div className="dd-candidate__action">
         <Button
@@ -305,6 +321,36 @@ export function CandidateCard({
           {candidate.name} 일정 보기
         </Button>
       </div>
+
+      <details className="dd-data-basis">
+        <summary>데이터 기준 보기</summary>
+        <div className="dd-data-basis__content">
+          <p className="dd-data-basis__title">이 추천에 사용한 데이터</p>
+          <CandidateDataBasis
+            label="목적지 정보"
+            source={candidate.data.destination.source}
+            collectedAt={candidate.data.destination.collectedAt}
+            dataStatus={candidate.data.destination.dataStatus}
+            kind="tourism"
+          />
+          <CandidateDataBasis
+            label="관심사 정보"
+            source={candidate.data.tags.provenance.source}
+            collectedAt={candidate.data.tags.provenance.collectedAt}
+            dataStatus={candidate.data.tags.provenance.dataStatus}
+            kind="tourism"
+          />
+          {candidate.travel?.provenance ? (
+            <CandidateDataBasis
+              label={`이동시간 · 기준일 ${formatBasisDate(candidate.travel.basisDate)}`}
+              source={candidate.travel.provenance.source}
+              collectedAt={candidate.travel.provenance.collectedAt}
+              dataStatus={candidate.travel.provenance.dataStatus}
+              kind="route"
+            />
+          ) : null}
+        </div>
+      </details>
 
       {selected ? (
         <p className="dd-candidate__selected-note">

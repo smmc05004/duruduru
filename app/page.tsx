@@ -14,6 +14,7 @@ import { SegmentedControl } from "@/components/SegmentedControl";
 import { Select } from "@/components/Select";
 import { CandidateCard } from "@/components/CandidateCard";
 import { formatHoursAndMinutes } from "@/lib/format-duration";
+import type { DataProvenance, DomainDataStatus } from "@/lib/domain-data";
 import type {
   CandidateEvaluation,
   RecommendationOutcome,
@@ -100,6 +101,67 @@ function formatDateTime(value: Date) {
     minute: "2-digit",
     hour12: false,
   }).format(value);
+}
+
+function formatBasisDate(value: string) {
+  const matched = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  return matched ? `${matched[1]}.${matched[2]}.${matched[3]}` : value;
+}
+
+function statusLabel(status: DomainDataStatus) {
+  return {
+    normal: "확인됨",
+    estimate: "추정",
+    fallback: "대체 데이터",
+    stale: "기준일 지남",
+    missing: "정보 없음",
+  }[status];
+}
+
+function friendlyTourismSource(source: string) {
+  return source.includes("TourAPI") ? "한국관광공사 TourAPI" : source;
+}
+
+function destinationName(destinationId: string) {
+  return (
+    {
+      gyeongju: "경주",
+      gongju: "공주",
+      gangneung: "강릉",
+    }[destinationId] ?? destinationId
+  );
+}
+
+function itineraryNoticeForUser(notice: string) {
+  if (notice.includes("실시간 교통") || notice.includes("예약 가능 여부")) {
+    return null;
+  }
+  if (notice.includes("식사 장소")) return "식사 장소는 직접 확인해 주세요.";
+  return null;
+}
+
+function BasisLine({
+  label,
+  provenance,
+  basisDate,
+  route = false,
+}: {
+  label: string;
+  provenance: DataProvenance;
+  basisDate?: string;
+  route?: boolean;
+}) {
+  return (
+    <li className="dd-data-basis__line">
+      {label} ·{" "}
+      {route
+        ? "OpenStreetMap 도로 데이터 기반 일반 예상치"
+        : friendlyTourismSource(provenance.source)}
+      {basisDate ? ` · 기준일 ${formatBasisDate(basisDate)}` : ""} · 수집일{" "}
+      {formatBasisDate(provenance.collectedAt || "미기록")} ·{" "}
+      {statusLabel(provenance.dataStatus)}
+    </li>
+  );
 }
 
 type Phase =
@@ -665,25 +727,24 @@ export default function TripConditionsPage({
         ) : (
           <section aria-label="참고용 여행 계획">
             <p className="dd-notice">
-              참고용 계획 · {itinerary.disclaimer.latestInfoAction}
+              참고용 계획이에요. 일반 예상시간을 바탕으로 했으며, 방문 전 최신
+              운영·휴무·예약 정보를 확인해 주세요.
             </p>
-            <ul className="dd-basis" aria-label="참고 계획 주의사항">
-              {itinerary.notices.map((notice) => (
-                <li className="dd-basis__item" key={notice}>
+            {itinerary.notices
+              .map(itineraryNoticeForUser)
+              .filter((notice) => notice !== null)
+              .map((notice) => (
+                <p className="dd-itinerary__notice" key={notice}>
                   {notice}
-                </li>
+                </p>
               ))}
-            </ul>
             {itinerary.originTravel ? (
-              <p>
-                출발지 이동 근거: 일반 예상{" "}
+              <p className="dd-itinerary__origin-travel">
+                {originName(conditions)}에서{" "}
+                {destinationName(itinerary.destinationId)}까지 일반 예상{" "}
                 {formatHoursAndMinutes(itinerary.originTravel.estimatedHours)} ·
-                방식 {itinerary.originTravel.method} · 출처{" "}
-                {itinerary.originTravel.source} · 기준일{" "}
-                {itinerary.originTravel.basisDate} · 데이터{" "}
-                {itinerary.originTravel.dataVersion} · 정책{" "}
-                {itinerary.originTravel.policyVersion} · 상태{" "}
-                {itinerary.originTravel.dataStatus}
+                기준일 {formatBasisDate(itinerary.originTravel.basisDate)} ·{" "}
+                {statusLabel(itinerary.originTravel.dataStatus)}
               </p>
             ) : null}
             <ol className="dd-candidates">
@@ -693,58 +754,28 @@ export default function TripConditionsPage({
                     {index + 1}. {place.name}
                   </h2>
                   <p>
-                    관심사 근거:{" "}
-                    {place.matchedInterests.join(" · ") || "정보 없음"}
+                    관심사 · {place.matchedInterests.join(" · ") || "정보 없음"}
                   </p>
-                  <p>
-                    관심사 근거 출처: {place.interestEvidenceProvenance.source}{" "}
-                    · 수집 {place.interestEvidenceProvenance.collectedAt} · 상태{" "}
-                    {place.interestEvidenceProvenance.dataStatus}
-                  </p>
-                  {place.interestEvidence.map((evidence) => (
-                    <p key={evidence.tag}>관심사 증거: {evidence.evidence}</p>
-                  ))}
-                  <p>
-                    방문시간:{" "}
+                  <p className="dd-itinerary__time">
+                    방문{" "}
                     {place.visit.kind === "estimate"
-                      ? `${place.visit.estimatedHours}시간`
-                      : place.visit.reason}
-                  </p>
-                  <p>
-                    방문시간 출처: {place.visit.provenance.source} · 수집{" "}
-                    {place.visit.provenance.collectedAt} · 상태{" "}
-                    {place.visit.provenance.dataStatus}
+                      ? `약 ${formatHours(place.visit.estimatedHours)} (예상 시간)`
+                      : "시간 정보 없음"}
                   </p>
                   <p>
                     운영 정보:{" "}
                     {place.operation.kind === "available"
-                      ? "출처 있는 운영 정보"
-                      : place.operation.reason}
+                      ? "운영 정보가 있어요. 방문 전 최신 정보를 확인해 주세요."
+                      : "운영 정보는 아직 확인하지 못했어요. 방문 전 확인해 주세요."}
                   </p>
                   <p>
-                    운영 정보 출처:{" "}
-                    {place.operation.kind === "available"
-                      ? `${place.operation.value.provenance.source} · 수집 ${place.operation.value.provenance.collectedAt} · 상태 ${place.operation.value.provenance.dataStatus}`
-                      : `${place.operation.provenance.source} · 수집 ${place.operation.provenance.collectedAt} · 상태 ${place.operation.provenance.dataStatus}`}
-                  </p>
-                  <p>
-                    이동시간:{" "}
+                    이전 장소에서의 이동:{" "}
                     {place.travelFromPrevious === null
                       ? "첫 방문지"
                       : place.travelFromPrevious.kind === "road-route"
-                        ? `일반 예상 ${formatHoursAndMinutes(place.travelFromPrevious.estimatedHours)} · 출처 ${place.travelFromPrevious.source}`
-                        : place.travelFromPrevious.reason}
+                        ? `일반 예상 ${formatHoursAndMinutes(place.travelFromPrevious.estimatedHours)}`
+                        : "이동시간 정보 없음 — 이 구간은 확정되지 않았어요."}
                   </p>
-                  {place.travelFromPrevious &&
-                  place.travelFromPrevious.kind === "road-route" ? (
-                    <p>
-                      이동 근거: 방식 {place.travelFromPrevious.method} · 기준일{" "}
-                      {place.travelFromPrevious.basisDate} · 데이터{" "}
-                      {place.travelFromPrevious.dataVersion} · 정책{" "}
-                      {place.travelFromPrevious.policyVersion} · 상태{" "}
-                      {place.travelFromPrevious.dataStatus}
-                    </p>
-                  ) : null}
                   <p>
                     넓은 시간대:{" "}
                     {place.broadTimeWindow
@@ -754,6 +785,93 @@ export default function TripConditionsPage({
                 </li>
               ))}
             </ol>
+            <details className="dd-data-basis dd-itinerary__basis">
+              <summary>계획 데이터 기준 보기</summary>
+              <div className="dd-data-basis__content">
+                <p className="dd-data-basis__title">이 계획에 사용한 데이터</p>
+                {itinerary.originTravel ? (
+                  <ul>
+                    <BasisLine
+                      label="출발지 이동"
+                      provenance={{
+                        source: itinerary.originTravel.source,
+                        collectedAt: itinerary.originTravel.basisDate,
+                        dataStatus: itinerary.originTravel.dataStatus,
+                      }}
+                      basisDate={itinerary.originTravel.basisDate}
+                      route
+                    />
+                  </ul>
+                ) : null}
+                <p className="dd-data-basis__group">방문 장소</p>
+                <ul>
+                  {itinerary.places.map((place) => (
+                    <BasisLine
+                      key={`place-${place.id}`}
+                      label={`${place.name} 방문 정보`}
+                      provenance={place.visit.provenance}
+                    />
+                  ))}
+                </ul>
+                <p className="dd-data-basis__group">장소 사이 이동</p>
+                <ul>
+                  {itinerary.places.slice(1).map((place) =>
+                    place.travelFromPrevious?.kind === "road-route" ? (
+                      <BasisLine
+                        key={`travel-${place.id}`}
+                        label={`${place.name} 이동시간`}
+                        provenance={{
+                          source: place.travelFromPrevious.source,
+                          collectedAt: place.travelFromPrevious.basisDate,
+                          dataStatus: place.travelFromPrevious.dataStatus,
+                        }}
+                        basisDate={place.travelFromPrevious.basisDate}
+                        route
+                      />
+                    ) : (
+                      <li
+                        className="dd-data-basis__line"
+                        key={`travel-${place.id}`}
+                      >
+                        {place.name} 이동시간 · 정보 없음
+                      </li>
+                    ),
+                  )}
+                </ul>
+                <p className="dd-data-basis__group">운영 정보</p>
+                <ul>
+                  {itinerary.places.map((place) => (
+                    <BasisLine
+                      key={`operation-${place.id}`}
+                      label={`${place.name} 운영 정보`}
+                      provenance={
+                        place.operation.kind === "available"
+                          ? place.operation.value.provenance
+                          : place.operation.provenance
+                      }
+                    />
+                  ))}
+                </ul>
+                {itinerary.notices.some(
+                  (notice) => itineraryNoticeForUser(notice) === null,
+                ) ? (
+                  <>
+                    <p className="dd-data-basis__group">추가 안내</p>
+                    <ul>
+                      {itinerary.notices
+                        .filter(
+                          (notice) => itineraryNoticeForUser(notice) === null,
+                        )
+                        .map((notice) => (
+                          <li className="dd-data-basis__line" key={notice}>
+                            {notice}
+                          </li>
+                        ))}
+                    </ul>
+                  </>
+                ) : null}
+              </div>
+            </details>
           </section>
         )}
         <div className="dd-result-actions">
@@ -876,6 +994,10 @@ export default function TripConditionsPage({
 
         {phase.kind === "result" && passed.length > 0 ? (
           <>
+            <p className="dd-notice">
+              일반 예상시간으로 만든 참고용 결과예요. 출발 전 최신
+              운영·휴무·예약 정보를 확인해 주세요.
+            </p>
             <div className="dd-list-head">
               <span className="dd-list-head__count">
                 다녀올 수 있는 곳 {passed.length}군데
@@ -944,9 +1066,9 @@ export default function TripConditionsPage({
         <p className="dd-screen__footnote">
           {dataUnavailable
             ? "이동시간 데이터가 없어 가능 여부나 점수를 임의로 계산하지 않았어요."
-            : "이동시간은 평균값 기반 추정치예요. 실시간 교통 상황은 반영하지 않아요. 지금 쓰는 이동시간과 목적지 목록은 확정 데이터가 아니라 임시값이라, 정식 데이터가 붙으면 결과가 달라질 수 있어요. 시간 제약을 통과하지 못한 곳은 아예 보여주지 않아요."}
+            : "시간 제약을 통과하지 못한 곳은 보여주지 않아요."}
           {phase.kind === "result"
-            ? ` (${duration?.label} 기준 최소 ${duration?.minimumLocalStayHours}시간 · 점수 정책 ${phase.outcome.policyVersion})`
+            ? ` (${duration?.label} 기준 최소 ${duration?.minimumLocalStayHours}시간)`
             : ""}
         </p>
       </main>

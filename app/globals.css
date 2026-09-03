@@ -720,6 +720,9 @@ button {
 
 /* F-05 신뢰도: 색뿐 아니라 실선/점선과 아이콘을 함께 바꾼다(DESIGN_TOKENS). */
 .dd-data-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   align-self: flex-start;
   padding: 3px 6px;
   border: 1px solid transparent;
@@ -753,6 +756,98 @@ button {
   background: var(--card-muted);
   border-color: var(--line-dashed);
   border-style: dashed;
+}
+
+.dd-travel-status {
+  margin: 14px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.7;
+}
+
+/* 사용자의 선택 흐름 뒤에만 수집 근거를 둔다. 네이티브 details는 키보드 동작을 보존한다. */
+.dd-data-basis {
+  margin-top: 14px;
+  border-top: 1.5px dashed var(--line-dashed);
+}
+
+.dd-data-basis summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-muted);
+}
+
+.dd-data-basis summary::marker {
+  color: var(--olive-ink);
+}
+
+.dd-data-basis summary:focus-visible {
+  outline: 2px solid var(--olive);
+  outline-offset: 2px;
+}
+
+.dd-data-basis__content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 0 10px;
+}
+
+.dd-data-basis__title,
+.dd-data-basis__group {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-muted);
+}
+
+.dd-data-basis__group:not(:first-child) {
+  margin-top: 7px;
+}
+
+.dd-data-basis__content ul {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.dd-data-basis__line {
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.7;
+  color: var(--ink-faint);
+}
+
+.dd-itinerary__origin-travel {
+  margin: 14px 18px 0;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.7;
+  color: var(--ink-body);
+}
+
+.dd-itinerary__time {
+  font-weight: 700;
+  color: var(--olive-ink);
+}
+
+.dd-itinerary__notice {
+  margin: 8px 18px 0;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.7;
+  color: var(--ink-muted);
+}
+
+.dd-itinerary__basis {
+  margin: 16px 18px 0;
 }
 
 .dd-candidate__action {

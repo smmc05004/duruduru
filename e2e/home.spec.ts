@@ -127,16 +127,21 @@ test("후보 선택 뒤 기본 정적 데이터로 참고 계획을 보인다", 
 
   await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
 
+  await expect(
+    page.getByText(/일반 예상시간으로 만든 참고용 결과예요/),
+  ).toBeVisible();
+
   await page.getByRole("button", { name: "경주 일정 보기" }).click();
   await expect(
     page.getByRole("region", { name: "참고용 여행 계획" }),
-  ).toContainText("출발지 이동 근거: 일반 예상");
+  ).toContainText("서울특별시에서 경주까지 일반 예상");
   await expect(
-    page.getByText(/실시간 교통 또는 예약 가능 여부를 보증하지 않습니다/),
+    page.getByText(/참고용 계획이에요. 일반 예상시간을 바탕으로 했으며/),
   ).toBeVisible();
+  await expect(page.getByText("식사 장소는 직접 확인해 주세요.")).toBeVisible();
 });
 
-test("E2E 성공 fixture는 참고 계획 근거와 다른 후보 선택을 보인다", async ({
+test("결과 화면은 기본 판단 정보와 접을 수 있는 데이터 기준을 보인다", async ({
   page,
 }) => {
   await page.goto("/");
@@ -146,11 +151,11 @@ test("E2E 성공 fixture는 참고 계획 근거와 다른 후보 선택을 보�
   const plan = page.getByRole("region", { name: "참고용 여행 계획" });
   await expect(plan).toContainText("E2E 참고 장소");
   await expect(plan).toContainText("넓은 시간대");
-  await expect(plan).toContainText(
-    "실시간 교통 또는 예약 가능 여부를 보증하지 않습니다",
-  );
-  await expect(plan).toContainText("식사 장소는 직접 확인");
-  await expect(plan).toContainText("관심사 근거 출처: E2E 정적 fixture");
+  await expect(plan).toContainText("참고용 계획이에요");
+  await expect(plan).not.toContainText("관심사 근거 출처");
+  await expect(plan.getByText("계획 데이터 기준 보기")).toBeVisible();
+  await plan.getByText("계획 데이터 기준 보기").click();
+  await expect(plan.getByText("이 계획에 사용한 데이터")).toBeVisible();
   await page.getByRole("button", { name: "다른 후보 선택하기" }).click();
   await expect(
     page.getByRole("button", { name: "경주 일정 보기" }),
