@@ -56,6 +56,7 @@ function destinationRecord(
       evidence: "PoC 목업 태그 — 정식 태그 근거 미확보",
       provenance: POC_PROVENANCE,
     })),
+    tagProvenance: POC_PROVENANCE,
     provenance: POC_PROVENANCE,
   };
 }

@@ -101,6 +101,10 @@ type SupportConditionsState =
 type TripConditionsPageProps = {
   /** 테스트와 이후 데이터 계층 전환에서 지원 조건 실패를 재현하는 읽기 경계 */
   loadConditions?: () => SupportSet;
+  /** 화면은 데이터 계층을 직접 알지 않고 추천 요청 경계만 호출한다. */
+  loadRecommendations?: (
+    conditions: ValidTripConditions,
+  ) => Promise<RecommendationOutcome>;
 };
 
 const spinnerIcon = (
@@ -236,6 +240,7 @@ function ResultHeader({ conditions }: { conditions: ValidTripConditions }) {
 
 export default function TripConditionsPage({
   loadConditions = loadSupportConditions,
+  loadRecommendations = requestRecommendations,
 }: TripConditionsPageProps) {
   const [supportState, setSupportState] = useState<SupportConditionsState>(
     () => {
@@ -273,13 +278,13 @@ export default function TripConditionsPage({
     if (phase.kind !== "calculating") return;
     let cancelled = false;
     const conditions = phase.conditions;
-    requestRecommendations(conditions).then((outcome) => {
+    loadRecommendations(conditions).then((outcome) => {
       if (!cancelled) setPhase({ kind: "result", conditions, outcome });
     });
     return () => {
       cancelled = true;
     };
-  }, [phase]);
+  }, [phase, loadRecommendations]);
 
   /*
    * 항목 하나가 입력 하나에 대응하지 않는다(출발·복귀는 한 카드를 쓴다). 그래서 오류를
@@ -389,7 +394,10 @@ export default function TripConditionsPage({
     // 판정에 실제로 쓰인 여행 유형·최소 체류시간을 결과에서 그대로 읽는다. 화면이 다시 계산하지 않는다.
     const duration = phase.kind === "result" ? phase.outcome.duration : null;
     const passed = phase.kind === "result" ? phase.outcome.passed : [];
-    const noResult = phase.kind === "result" && passed.length === 0;
+    const dataUnavailable =
+      phase.kind === "result" && phase.outcome.kind === "data-unavailable";
+    const noResult =
+      phase.kind === "result" && phase.outcome.kind === "no-results";
 
     return (
       <main className="dd-screen">
@@ -397,9 +405,11 @@ export default function TripConditionsPage({
         <ConditionSummary
           conditions={conditions}
           title={
-            noResult
-              ? "이번 시간에는\n다녀올 수 있는 곳이 없어요"
-              : `${originName(conditions)}에서 출발해서\n다시 돌아올 수 있는 곳`
+            dataUnavailable
+              ? "추천에 필요한 데이터를\n확인하지 못했어요"
+              : noResult
+                ? "이번 시간에는\n다녀올 수 있는 곳이 없어요"
+                : `${originName(conditions)}에서 출발해서\n다시 돌아올 수 있는 곳`
           }
         />
 
@@ -458,6 +468,24 @@ export default function TripConditionsPage({
           </>
         ) : null}
 
+        {dataUnavailable ? (
+          <section
+            className="dd-error-summary"
+            role="alert"
+            aria-label="추천 데이터 부족"
+          >
+            <div>
+              <p className="dd-error-summary__title">
+                이동시간 데이터를 아직 준비하지 못했어요
+              </p>
+              <p className="dd-error-summary__text">
+                시간 조건이 맞지 않는다는 뜻은 아니에요. 확인 가능한 데이터가
+                준비되면 다시 추천할게요.
+              </p>
+            </div>
+          </section>
+        ) : null}
+
         {phase.kind === "result" && passed.length > 0 ? (
           <>
             <div className="dd-list-head">
@@ -483,7 +511,7 @@ export default function TripConditionsPage({
 
         <div className="dd-result-actions">
           <Button
-            variant={noResult ? "primary" : "secondary"}
+            variant={noResult || dataUnavailable ? "primary" : "secondary"}
             onClick={() => setPhase({ kind: "input" })}
           >
             조건 수정하기
@@ -491,10 +519,9 @@ export default function TripConditionsPage({
         </div>
 
         <p className="dd-screen__footnote">
-          이동시간은 평균값 기반 추정치예요. 실시간 교통 상황은 반영하지 않아요.
-          지금 쓰는 이동시간과 목적지 목록은 확정 데이터가 아니라 임시값이라,
-          정식 데이터가 붙으면 결과가 달라질 수 있어요. 시간 제약을 통과하지
-          못한 곳은 아예 보여주지 않아요.
+          {dataUnavailable
+            ? "이동시간 데이터가 없어 가능 여부나 점수를 임의로 계산하지 않았어요."
+            : "이동시간은 평균값 기반 추정치예요. 실시간 교통 상황은 반영하지 않아요. 지금 쓰는 이동시간과 목적지 목록은 확정 데이터가 아니라 임시값이라, 정식 데이터가 붙으면 결과가 달라질 수 있어요. 시간 제약을 통과하지 못한 곳은 아예 보여주지 않아요."}
           {phase.kind === "result"
             ? ` (${duration?.label} 기준 최소 ${duration?.minimumLocalStayHours}시간 · 점수 정책 ${phase.outcome.policyVersion})`
             : ""}

@@ -28,6 +28,8 @@ export type DestinationRecord = {
   coordinates: Coordinates | null;
   summary: string | null;
   tags: DestinationTag[];
+  /** 빈 태그 목록이 실제 무관함인지 아직 미수집인지 구분하는 목록 수준 출처다. */
+  tagProvenance: DataProvenance;
   provenance: DataProvenance;
 };
 
