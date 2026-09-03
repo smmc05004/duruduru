@@ -23,6 +23,8 @@ const coordinateEvidence = {
 const collectionBatch = {
   id: "batch-2026-09-03",
   termsCheckedAt: "2026-09-03",
+  providerTermsUrl: "https://example.test/terms",
+  routeRequestTemplate: "GET /route/v1/driving/{from};{to}",
   callLimitEvidence: "제공자 약관 1절",
   storagePolicyEvidence: "제공자 약관 2절",
   displayPolicyEvidence: "제공자 약관 3절",
@@ -103,6 +105,20 @@ describe("정적 이동시간 데이터 계약", () => {
     );
   });
 
+  it("필수 3×3 대상의 레코드가 하나라도 없으면 검증으로 드러낸다", () => {
+    const incomplete: StaticTravelTimeManifest = {
+      ...staticTravelTimeManifestV1,
+      originDestinationRecords:
+        staticTravelTimeManifestV1.originDestinationRecords.slice(1),
+    };
+
+    expect(validateStaticTravelTimeManifest(incomplete)).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("필수 3×3 이동시간 레코드가 없습니다"),
+      ]),
+    );
+  });
+
   it("같은 3×3 또는 POI 쌍에 서로 다른 수치를 중복 저장하지 않는다", () => {
     const record = {
       originId: "seoul",
@@ -145,10 +161,10 @@ describe("정적 이동시간 데이터 계약", () => {
     );
   });
 
-  it("값이 없는 수집 대상은 임의 예상시간으로 바꾸지 않고 결측으로 조회한다", () => {
+  it("수집하지 않은 쌍은 임의 예상시간으로 바꾸지 않고 결측으로 조회한다", () => {
     const adapter = createStaticTravelTimeAdapter(staticTravelTimeManifestV1);
 
-    expect(adapter.lookupOriginTravelTime("seoul", "gyeongju", "car")).toBe(
+    expect(adapter.lookupOriginTravelTime("unknown", "gyeongju", "car")).toBe(
       null,
     );
     expect(
@@ -160,22 +176,25 @@ describe("정적 이동시간 데이터 계약", () => {
     const manifest: StaticTravelTimeManifest = {
       ...staticTravelTimeManifestV1,
       collectionBatch,
-      originDestinationRecords: [
-        {
-          originId: "seoul",
-          destinationId: "gyeongju",
-          transport: "car",
-          ...collectedRouteFields,
-          distanceKm: 315.2,
-          estimatedHours: 3.75,
-          estimate: true,
-          source: "허용된 사전 도로 경로 수집",
-          basisDate: "2026-09-03",
-          policyVersion: "2026-09-03",
-          reproductionId: "route:seoul-city-hall:gyeongju-city-hall:car",
-          dataStatus: "estimate",
-        },
-      ],
+      originDestinationRecords:
+        staticTravelTimeManifestV1.originDestinationRecords.map((existing) =>
+          existing.originId === "seoul" && existing.destinationId === "gyeongju"
+            ? {
+                originId: "seoul",
+                destinationId: "gyeongju",
+                transport: "car",
+                ...collectedRouteFields,
+                distanceKm: 315.2,
+                estimatedHours: 3.75,
+                estimate: true,
+                source: "허용된 사전 도로 경로 수집",
+                basisDate: "2026-09-03",
+                policyVersion: "2026-09-03",
+                reproductionId: "route:seoul-city-hall:gyeongju-city-hall:car",
+                dataStatus: "estimate",
+              }
+            : existing,
+        ),
       placeTravelTimeRecords: [
         {
           fromPlaceId: "place-a",

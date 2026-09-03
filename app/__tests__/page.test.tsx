@@ -361,27 +361,23 @@ describe("추천 결과 화면", () => {
     expect(screen.getByText("서울특별시 출발")).toBeInTheDocument();
   });
 
-  it("이동시간이 결측이면 시간 부족 결과나 조건 조정 대신 데이터 부족을 알린다", async () => {
+  it("기본 정적 데이터로 시간 제약을 통과한 추천과 추정 근거를 보인다", async () => {
     render(<TripConditionsPage />);
     await submitTrip("2026-09-12T08:00", "2026-09-13T20:00");
 
-    const unavailable = await screen.findByRole("alert", {
-      name: "추천 데이터 부족",
-    });
-    expect(unavailable).toHaveTextContent(
-      "이동시간 데이터를 아직 준비하지 못했어요",
-    );
-    expect(unavailable).toHaveTextContent("추천 데이터 수집 상태");
-    expect(unavailable).toHaveTextContent("상태 결측");
     expect(
-      screen.queryByRole("region", { name: "결과 없음" }),
+      await screen.findByText(/다녀올 수 있는 곳 3군데/),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText(/이동시간 추정/).length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText(/OSRM 공개 데모 서버 수동 경로 조회/).length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.queryByRole("alert", { name: "추천 데이터 부족" }),
     ).not.toBeInTheDocument();
     expect(
       screen.queryByText("더 이른 시간에 출발하기"),
     ).not.toBeInTheDocument();
-    expect(
-      screen.getByText(/가능 여부나 점수를 임의로 계산하지 않았어요/),
-    ).toBeInTheDocument();
   });
 
   it("혼합 결과에서는 실제로 결측된 후보의 출처와 사유만 빠짐없이 보인다", async () => {
@@ -427,8 +423,8 @@ describe("추천 결과 화면", () => {
     expect(screen.getAllByText(/상태 추정/).length).toBeGreaterThan(0);
   });
 
-  it("후보를 고르면 E6의 데이터 부족 참고 계획 상태를 정직하게 보인다", async () => {
-    render(<TripConditionsPage loadRecommendations={requestWithFixture} />);
+  it("기본 후보를 고르면 실제 장소 앵커의 참고 계획을 보인다", async () => {
+    render(<TripConditionsPage />);
     const user = await submitTrip("2026-09-12T08:00", "2026-09-13T20:00");
 
     const button = await screen.findByRole("button", {
@@ -437,7 +433,10 @@ describe("추천 결과 화면", () => {
     await user.click(button);
 
     expect(
-      screen.getByRole("alert", { name: "참고 계획 데이터 부족" }),
+      screen.getByRole("region", { name: "참고용 여행 계획" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: /공산성 광복루/ }),
     ).toBeInTheDocument();
   });
 

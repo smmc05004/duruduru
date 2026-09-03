@@ -285,7 +285,7 @@ describe("E6 참고용 여행 계획", () => {
   });
 
   it.each(["gyeongju", "gongju", "gangneung"])(
-    "실제 %s 장소 앵커에 관심사 근거가 없으면 계획을 만들지 않는다",
+    "실제 %s 장소 앵커와 정적 경로로 참고 계획을 만든다",
     (destinationId) => {
       const result = createReferenceItinerary(
         {
@@ -298,9 +298,14 @@ describe("E6 참고용 여행 계획", () => {
       );
 
       expect(result).toMatchObject({
-        kind: "data-unavailable",
+        kind: "reference-itinerary",
         destinationId,
-        missing: ["interestEvidence"],
+      });
+      if (result.kind !== "reference-itinerary") return;
+      expect(result.places).toHaveLength(2);
+      expect(result.places[1]?.travelFromPrevious).toMatchObject({
+        kind: "road-route",
+        dataStatus: "estimate",
       });
     },
   );

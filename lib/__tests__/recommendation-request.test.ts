@@ -75,25 +75,20 @@ function sourceOf(
 }
 
 describe("E3 조건 → E4 추천 요청 통합", () => {
-  it("기본 요청은 PoC 목업이 아니라 현재 내부 데이터 계약의 결측 상태를 쓴다", async () => {
+  it("기본 요청은 PoC 목업이 아닌 정적 도로 경로·관심사 데이터로 추천한다", async () => {
     const outcome = await requestRecommendations(conditions);
 
-    expect(outcome.kind).toBe("data-unavailable");
-    expect(outcome.candidates.map((candidate) => candidate.id)).toEqual([
-      "gyeongju",
+    expect(outcome.kind).toBe("recommendations");
+    expect(outcome.passed.map((candidate) => candidate.id)).toEqual([
       "gongju",
       "gangneung",
+      "gyeongju",
     ]);
-    expect(outcome.candidates.every((candidate) => !candidate.passed)).toBe(
-      true,
-    );
-    expect(
-      outcome.candidates.every(
-        (candidate) =>
-          "dataStatus" in candidate.data.travel &&
-          candidate.data.travel.dataStatus === "missing",
-      ),
-    ).toBe(true);
+    expect(outcome.passed.every((candidate) => candidate.passed)).toBe(true);
+    expect(outcome.passed[0]?.data.travel).toMatchObject({
+      kind: "estimate",
+      provenance: { dataStatus: "estimate" },
+    });
   });
 
   it("정규화된 도메인 계약의 이동시간·태그·출처 상태와 조건 스냅샷을 결과에 보존한다", () => {

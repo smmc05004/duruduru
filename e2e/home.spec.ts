@@ -121,9 +121,7 @@ test("관심사를 고르지 않으면 제출을 막고 항목 오류를 보인�
   await expect(page.getByText(/다녀올 수 있는 곳 \d+군데/)).toHaveCount(0);
 });
 
-test("후보 선택 뒤 E6 데이터가 부족하면 참고 계획 결측을 보인다", async ({
-  page,
-}) => {
+test("후보 선택 뒤 기본 정적 데이터로 참고 계획을 보인다", async ({ page }) => {
   await page.goto("/");
   await fillConditions(page, "2026-09-12T08:00", "2026-09-13T20:00");
 
@@ -131,9 +129,11 @@ test("후보 선택 뒤 E6 데이터가 부족하면 참고 계획 결측을 보
 
   await page.getByRole("button", { name: "경주 일정 보기" }).click();
   await expect(
-    page.getByRole("alert", { name: "참고 계획 데이터 부족" }),
-  ).toContainText("관심사 근거");
-  await expect(page.getByText("조건 수정하기")).toBeVisible();
+    page.getByRole("region", { name: "참고용 여행 계획" }),
+  ).toContainText("출발지 이동 근거: 일반 예상");
+  await expect(
+    page.getByText(/실시간 교통 또는 예약 가능 여부를 보증하지 않습니다/),
+  ).toBeVisible();
 });
 
 test("E2E 성공 fixture는 참고 계획 근거와 다른 후보 선택을 보인다", async ({

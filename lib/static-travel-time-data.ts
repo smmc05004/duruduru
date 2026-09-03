@@ -1,5 +1,4 @@
 import type {
-  DomainDataAdapter,
   OriginDestinationTravelTime,
   PlaceTravelTime,
 } from "./domain-data";
@@ -66,64 +65,177 @@ const originDestinationTargets = (): OriginDestinationTarget[] =>
     })),
   );
 
-const pendingCoordinateEvidence = (
+const supportCoordinateEvidence = (
   sourceRecordId: string,
+  coordinates: { latitude: number; longitude: number },
 ): CoordinateEvidence => ({
-  kind: "tourapi",
-  source: "지원 조건 기준점 수집 대상",
+  kind: "support-condition",
+  source: "지원 조건 기준점(DECISIONS.md 7.5절 사용자 승인)",
   sourceRecordId,
   collectedAt: "2026-09-03",
   dataVersion: "support-conditions-v1",
   rawAddress: null,
   query: null,
   selectedAddress: null,
-  matchEvidence: "승인된 지원 조건의 기준점",
-  coordinates: null,
-  missingReason: "WGS84 좌표 수집 전",
+  matchEvidence: "승인된 지원 조건의 대표 시청 기준점",
+  coordinates,
+  missingReason: null,
 });
 
-const pendingCollectionBatch: CollectionBatchEvidence = {
-  id: "pending-2026-09-03",
+const osrmManualCollectionBatch: CollectionBatchEvidence = {
+  id: "osrm-manual-2026-09-03",
   termsCheckedAt: "2026-09-03",
-  callLimitEvidence: "경로 제공자 선정 전: 호출 없음",
-  storagePolicyEvidence: "경로 제공자 선정 전: 저장 없음",
-  displayPolicyEvidence: "경로 제공자 선정 전: 표시 없음",
-  redistributionPolicyEvidence: "경로 제공자 선정 전: 재배포 없음",
-  rawResponseRetentionEvidence: "경로 제공자 선정 전: 원시 응답 없음",
+  providerTermsUrl: "https://map.project-osrm.org/about.html",
+  routeRequestTemplate:
+    "GET https://router.project-osrm.org/route/v1/driving/{from.longitude},{from.latitude};{to.longitude},{to.latitude}?overview=false",
+  callLimitEvidence:
+    "OSRM 공개 데모 사용 정책을 확인하고 3×3 및 표시 순서에 필요한 12건만 수동으로 1초 이상 간격을 두고 조회했다. 런타임·대량 배치 호출은 하지 않는다.",
+  storagePolicyEvidence:
+    "도로 경로 거리·시간과 재현 식별자만 정적 매니페스트에 보존하고 원시 응답은 저장하지 않는다.",
+  displayPolicyEvidence:
+    "결과 UI에 일반 예상 이동시간·출처·기준일·추정 상태와 실시간 교통 아님을 표시한다.",
+  redistributionPolicyEvidence:
+    "OpenStreetMap 데이터는 ODbL 조건과 필요한 귀속을 따른다. 이 매니페스트는 계산된 거리·시간만 보존한다.",
+  rawResponseRetentionEvidence: "OSRM 응답 본문은 저장·배포하지 않는다.",
 };
 
-const pendingOriginDestinationRecords =
-  (): StaticOriginDestinationTravelTime[] =>
-    originDestinationTargets().map((target) => ({
-      ...target,
-      distanceKm: null,
-      estimatedHours: null,
-      estimate: true,
-      source: "수집 전",
-      dataset: "수집 대상 매니페스트",
-      basisDate: "2026-09-03",
-      dataVersion: "pending-2026-09-03",
-      policyVersion: "2026-09-03",
-      reproductionId: `missing:${target.originId}:${target.destinationId}:car`,
-      dataStatus: "missing",
-      missingReason: "허용된 도로 경로 수집 전",
-      fromCoordinate: pendingCoordinateEvidence(target.originId),
-      toCoordinate: pendingCoordinateEvidence(target.destinationId),
-    }));
+const supportPoint = (id: string) => {
+  const origin = supportConditionsV1.origins.find((item) => item.id === id);
+  const destination = supportConditionsV1.destinations.find(
+    (item) => item.id === id,
+  );
+  const point = origin?.representativePoint ?? destination?.representativePoint;
+  if (!point) throw new Error(`지원 기준점이 없습니다: ${id}`);
+  return supportCoordinateEvidence(point.id, point);
+};
+
+const originRoute = (
+  originId: string,
+  destinationId: string,
+  distanceKm: number,
+  estimatedHours: number,
+): StaticOriginDestinationTravelTime => {
+  const fromCoordinate = supportPoint(originId);
+  const toCoordinate = supportPoint(destinationId);
+  return {
+    originId,
+    destinationId,
+    transport: "car",
+    distanceKm,
+    estimatedHours,
+    estimate: true,
+    source: "OSRM 공개 데모 서버 수동 경로 조회 (OpenStreetMap 도로 데이터)",
+    dataset: "OSRM car profile / OpenStreetMap",
+    basisDate: "2026-09-03",
+    dataVersion: "osrm-osm-2026-09-03",
+    policyVersion: "2026-09-03",
+    reproductionId: `osrm-v1-driving:${fromCoordinate.coordinates!.longitude},${fromCoordinate.coordinates!.latitude};${toCoordinate.coordinates!.longitude},${toCoordinate.coordinates!.latitude}:overview=false`,
+    dataStatus: "estimate",
+    missingReason: null,
+    fromCoordinate,
+    toCoordinate,
+  };
+};
+
+/** 2026-09-03 소량 수동 조회값. 시간은 분 단위로 반올림했다. */
+const collectedOriginDestinationRecords: StaticOriginDestinationTravelTime[] = [
+  originRoute("seoul", "gyeongju", 331.2, 4 + 10 / 60),
+  originRoute("seoul", "gongju", 138.5, 1 + 50 / 60),
+  originRoute("seoul", "gangneung", 216.2, 2 + 55 / 60),
+  originRoute("daejeon", "gyeongju", 220, 2 + 50 / 60),
+  originRoute("daejeon", "gongju", 33.1, 35 / 60),
+  originRoute("daejeon", "gangneung", 277.4, 3 + 35 / 60),
+  originRoute("busan", "gyeongju", 84.6, 1 + 10 / 60),
+  originRoute("busan", "gongju", 294.1, 3 + 40 / 60),
+  originRoute("busan", "gangneung", 348.3, 5 + 5 / 60),
+];
+
+const tourApiCoordinate = (
+  sourceRecordId: string,
+  latitude: number,
+  longitude: number,
+): CoordinateEvidence => ({
+  kind: "tourapi",
+  source: "한국관광공사 TourAPI KorService2 searchKeyword2 실제 응답",
+  sourceRecordId,
+  collectedAt: "2026-09-03",
+  dataVersion: "tourapi-2026-09-03",
+  rawAddress: null,
+  query: null,
+  selectedAddress: null,
+  matchEvidence: "TourAPI contentId와 원천 WGS84 좌표 일치",
+  coordinates: { latitude, longitude },
+  missingReason: null,
+});
+
+const placePoints = {
+  "tourapi:place:126166": tourApiCoordinate(
+    "126166",
+    35.7923023161,
+    129.3317253913,
+  ),
+  "tourapi:place:126207": tourApiCoordinate(
+    "126207",
+    35.8343303427,
+    129.2185345378,
+  ),
+  "tourapi:place:3038480": tourApiCoordinate("3038480", 36.460302, 127.129498),
+  "tourapi:place:3038487": tourApiCoordinate("3038487", 36.462237, 127.125634),
+  "tourapi:place:125769": tourApiCoordinate(
+    "125769",
+    37.7072681694,
+    128.8918046506,
+  ),
+  "tourapi:place:125790": tourApiCoordinate(
+    "125790",
+    37.7955136762197,
+    128.896483966593,
+  ),
+} as const;
+
+const placeRoute = (
+  fromPlaceId: keyof typeof placePoints,
+  toPlaceId: keyof typeof placePoints,
+  distanceKm: number,
+  estimatedHours: number,
+): StaticPlaceTravelTime => ({
+  fromPlaceId,
+  toPlaceId,
+  transport: "car",
+  distanceKm,
+  estimatedHours,
+  estimate: true,
+  source: "OSRM 공개 데모 서버 수동 경로 조회 (OpenStreetMap 도로 데이터)",
+  dataset: "OSRM car profile / OpenStreetMap",
+  basisDate: "2026-09-03",
+  dataVersion: "osrm-osm-2026-09-03",
+  policyVersion: "2026-09-03",
+  reproductionId: `osrm-v1-driving:${placePoints[fromPlaceId].coordinates!.longitude},${placePoints[fromPlaceId].coordinates!.latitude};${placePoints[toPlaceId].coordinates!.longitude},${placePoints[toPlaceId].coordinates!.latitude}:overview=false`,
+  dataStatus: "estimate",
+  missingReason: null,
+  fromCoordinate: placePoints[fromPlaceId],
+  toCoordinate: placePoints[toPlaceId],
+});
+
+const collectedPlaceTravelTimeRecords: StaticPlaceTravelTime[] = [
+  placeRoute("tourapi:place:126166", "tourapi:place:126207", 16.96, 19 / 60),
+  placeRoute("tourapi:place:3038480", "tourapi:place:3038487", 0.643, 1 / 60),
+  placeRoute("tourapi:place:125769", "tourapi:place:125790", 11.75, 18 / 60),
+];
 
 /**
  * E4/E6 정적 이동시간 수집 매니페스트.
  *
- * 숫자가 없다는 것은 아직 허용된 출처·재현 방법이 확보되지 않았다는 뜻이다. 이 파일은
- * 수집 대상을 보존하지만 PoC 값이나 임의 추정값을 넣어 결측을 감추지 않는다.
+ * 공개 OSRM 서버의 소량 수동 조회로 수집한 3×3 값과, 참고 계획 표시에 필요한 장소 쌍을
+ * 보존한다. 앱은 이 정적 값만 읽고 외부 요청을 하지 않는다.
  */
 export const staticTravelTimeManifestV1: StaticTravelTimeManifest = {
   version: "2026-09-03",
   policyVersion: "2026-09-03",
-  collectionBatch: pendingCollectionBatch,
+  collectionBatch: osrmManualCollectionBatch,
   originDestinationTargets: originDestinationTargets(),
-  originDestinationRecords: pendingOriginDestinationRecords(),
-  placeTravelTimeRecords: [],
+  originDestinationRecords: collectedOriginDestinationRecords,
+  placeTravelTimeRecords: collectedPlaceTravelTimeRecords,
 };
 
 const hasText = (value: string) => value.trim().length > 0;
@@ -224,6 +336,11 @@ export function validateStaticTravelTimeManifest(
       }),
     );
   }
+  for (const expected of originDestinationTargets()) {
+    const key = `${expected.originId}:${expected.destinationId}:${expected.transport}`;
+    if (!originRecordKeys.has(key))
+      issues.push(`필수 3×3 이동시간 레코드가 없습니다: ${key}`);
+  }
   const placeRecordKeys = new Set<string>();
   for (const record of manifest.placeTravelTimeRecords) {
     const key = `${record.fromPlaceId}:${record.toPlaceId}:${record.transport}`;
@@ -261,13 +378,13 @@ export function validateStaticTravelTimeManifest(
   return issues;
 }
 
-type ProvenancedOriginTravelTime = OriginDestinationTravelTime & {
+export type ProvenancedOriginTravelTime = OriginDestinationTravelTime & {
   dataVersion: string;
   policyVersion: string;
   reproductionId: string;
 };
 
-type ProvenancedPlaceTravelTime = PlaceTravelTime & {
+export type ProvenancedPlaceTravelTime = PlaceTravelTime & {
   distanceKm: number;
   dataVersion: string;
   policyVersion: string;
@@ -278,9 +395,22 @@ type ProvenancedPlaceTravelTime = PlaceTravelTime & {
  * 런타임 경로 요청을 하지 않는 정적 내부 데이터 어댑터다.
  * 유효하지 않은 매니페스트는 데이터 준비 오류이므로 호출 전에 명시적으로 중단한다.
  */
+export type StaticTravelTimeAdapter = {
+  lookupOriginTravelTime(
+    originId: string,
+    destinationId: string,
+    transport: TransportMode,
+  ): ProvenancedOriginTravelTime | null;
+  lookupPlaceTravelTime(
+    fromPlaceId: string,
+    toPlaceId: string,
+    transport: TransportMode,
+  ): ProvenancedPlaceTravelTime | null;
+};
+
 export function createStaticTravelTimeAdapter(
   manifest: StaticTravelTimeManifest,
-): Pick<DomainDataAdapter, "lookupOriginTravelTime" | "lookupPlaceTravelTime"> {
+): StaticTravelTimeAdapter {
   const issues = validateStaticTravelTimeManifest(manifest);
   if (issues.length)
     throw new Error(`정적 이동시간 매니페스트 오류: ${issues.join(" ")}`);

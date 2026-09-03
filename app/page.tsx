@@ -25,7 +25,10 @@ import {
   type ReferenceItineraryResult,
   type ReferenceItineraryUnavailable,
 } from "@/lib/reference-itinerary";
-import { referenceItineraryDataSource } from "@/lib/reference-itinerary-data";
+import {
+  lookupReferenceOriginTravel,
+  referenceItineraryDataSource,
+} from "@/lib/reference-itinerary-data";
 import { evaluateRecommendationRequest } from "@/lib/recommendation-request";
 import { pocDataAdapter } from "@/lib/poc-data-adapter";
 import { recommendationPolicyV1 } from "@/lib/trip-policy";
@@ -674,8 +677,8 @@ export default function TripConditionsPage({
             {itinerary.originTravel ? (
               <p>
                 출발지 이동 근거: 일반 예상{" "}
-                {itinerary.originTravel.estimatedHours}시간 · 방식{" "}
-                {itinerary.originTravel.method} · 출처{" "}
+                {formatHoursAndMinutes(itinerary.originTravel.estimatedHours)} ·
+                방식 {itinerary.originTravel.method} · 출처{" "}
                 {itinerary.originTravel.source} · 기준일{" "}
                 {itinerary.originTravel.basisDate} · 데이터{" "}
                 {itinerary.originTravel.dataVersion} · 정책{" "}
@@ -729,7 +732,7 @@ export default function TripConditionsPage({
                     {place.travelFromPrevious === null
                       ? "첫 방문지"
                       : place.travelFromPrevious.kind === "road-route"
-                        ? `일반 예상 ${place.travelFromPrevious.estimatedHours}시간 · 출처 ${place.travelFromPrevious.source}`
+                        ? `일반 예상 ${formatHoursAndMinutes(place.travelFromPrevious.estimatedHours)} · 출처 ${place.travelFromPrevious.source}`
                         : place.travelFromPrevious.reason}
                   </p>
                   {place.travelFromPrevious &&
@@ -889,9 +892,10 @@ export default function TripConditionsPage({
                   selected={selectedId === candidate.id}
                   onSelect={() => {
                     setSelectedId(candidate.id);
-                    // E4의 현재 TravelTimeEstimate는 E6 정적 도로 경로 계약의 모든
-                    // provenance 필드를 갖지 않는다. 누락값을 변환·발명하지 않는다.
-                    const originTravel = null;
+                    const originTravel = lookupReferenceOriginTravel(
+                      conditions.originId,
+                      candidate.id,
+                    );
                     const input = {
                       destinationId: candidate.id,
                       interests: conditions.interests,
