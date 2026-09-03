@@ -121,7 +121,7 @@ test("관심사를 고르지 않으면 제출을 막고 항목 오류를 보인�
   await expect(page.getByText(/다녀올 수 있는 곳 \d+군데/)).toHaveCount(0);
 });
 
-test("실측 이동시간이 없으면 후보를 지어내지 않고 결측 결과를 유지한다", async ({
+test("후보 선택 뒤 E6 데이터가 부족하면 참고 계획 결측을 보인다", async ({
   page,
 }) => {
   await page.goto("/");
@@ -129,22 +129,30 @@ test("실측 이동시간이 없으면 후보를 지어내지 않고 결측 결�
 
   await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
 
-  // E4의 기본 데이터 계층은 E2 실측 이동시간을 아직 갖지 않는다. 조건 요약은 남고,
-  // PoC 후보나 시간 부족 안내로 대체하지 않는다. E5는 실제 결측 provenance를 함께 보인다.
+  await page.getByRole("button", { name: "경주 일정 보기" }).click();
   await expect(
-    page.getByRole("region", { name: "제출한 여행 조건" }),
+    page.getByRole("alert", { name: "참고 계획 데이터 부족" }),
+  ).toContainText("관심사 근거");
+  await expect(page.getByText("조건 수정하기")).toBeVisible();
+});
+
+test("E2E 성공 fixture는 참고 계획 근거와 다른 후보 선택을 보인다", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await fillConditions(page, "2026-09-12T08:00", "2026-09-13T20:00");
+  await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
+  await page.getByRole("button", { name: "공주 일정 보기" }).click();
+  const plan = page.getByRole("region", { name: "참고용 여행 계획" });
+  await expect(plan).toContainText("E2E 참고 장소");
+  await expect(plan).toContainText("넓은 시간대");
+  await expect(plan).toContainText(
+    "실시간 교통 또는 예약 가능 여부를 보증하지 않습니다",
+  );
+  await expect(plan).toContainText("식사 장소는 직접 확인");
+  await expect(plan).toContainText("관심사 근거 출처: E2E 정적 fixture");
+  await page.getByRole("button", { name: "다른 후보 선택하기" }).click();
+  await expect(
+    page.getByRole("button", { name: "경주 일정 보기" }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("alert", { name: "추천 데이터 부족" }),
-  ).toContainText("이동시간 데이터를 아직 준비하지 못했어요");
-  await expect(
-    page.getByRole("alert", { name: "추천 데이터 부족" }),
-  ).toContainText("추천 데이터 수집 상태");
-  await expect(
-    page.getByRole("alert", { name: "추천 데이터 부족" }),
-  ).toContainText("상태 결측");
-  await expect(page.getByRole("region", { name: "결과 없음" })).toHaveCount(0);
-  await expect(page.getByText("더 이른 시간에 출발하기")).toHaveCount(0);
-  await expect(page.getByText(/다녀올 수 있는 곳 \d+군데/)).toHaveCount(0);
-  await expect(page.getByRole("heading", { level: 2 })).toHaveCount(0);
 });

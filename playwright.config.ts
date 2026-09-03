@@ -9,8 +9,10 @@ export default defineConfig({
     trace: "on-first-retry",
   },
   webServer: {
-    command: "npm run dev -- --hostname 127.0.0.1",
+    command: "E2E_FIXTURE=1 npm run dev -- --hostname 127.0.0.1",
     url: "http://127.0.0.1:3000",
-    reuseExistingServer: !process.env.CI,
+    // E2E_FIXTURE=1 결과 계약과 다른 기존 dev 서버를 재사용하면 success 시나리오가
+    // data-unavailable로 바뀔 수 있다. fixture 검증은 항상 전용 서버에서 한다.
+    reuseExistingServer: false,
   },
 });

@@ -48,7 +48,7 @@ export type ReferenceItineraryDataSource = {
   lookupTravel(fromPlaceId: string, toPlaceId: string): ReferenceTravel | null;
 };
 
-type ReferenceItineraryInput = {
+export type ReferenceItineraryInput = {
   destinationId: string;
   interests: string[];
   /** F-01에서 검증돼 선택 목적지까지 이어진 조건 요약. */
