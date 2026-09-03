@@ -718,6 +718,43 @@ button {
   flex-shrink: 0;
 }
 
+/* F-05 신뢰도: 색뿐 아니라 실선/점선과 아이콘을 함께 바꾼다(DESIGN_TOKENS). */
+.dd-data-status {
+  align-self: flex-start;
+  padding: 3px 6px;
+  border: 1px solid transparent;
+}
+
+.dd-data-status--normal {
+  color: var(--olive-ink);
+  background: var(--olive-soft);
+  border-color: var(--olive-ink);
+  font-weight: 600;
+}
+
+.dd-data-status--estimate {
+  color: var(--mustard-ink);
+  background: var(--mustard-soft);
+  border-color: var(--mustard-ink);
+  font-weight: 700;
+}
+
+.dd-data-status--fallback,
+.dd-data-status--stale {
+  color: var(--mustard-ink);
+  background: var(--mustard-soft);
+  border-color: var(--mustard-ink);
+  border-style: dashed;
+  font-weight: 700;
+}
+
+.dd-data-status--missing {
+  color: var(--ink-faint);
+  background: var(--card-muted);
+  border-color: var(--line-dashed);
+  border-style: dashed;
+}
+
 .dd-candidate__action {
   margin-top: 16px;
 }

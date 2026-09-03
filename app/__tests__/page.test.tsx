@@ -2,7 +2,10 @@ import { describe, expect, it } from "@jest/globals";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import TripConditionsPage from "../page";
-import { evaluateRecommendationRequest } from "@/lib/recommendation-request";
+import {
+  evaluateRecommendationRequest,
+  type RecommendationDataSource,
+} from "@/lib/recommendation-request";
 import { pocDataAdapter } from "@/lib/poc-data-adapter";
 import { recommendationPolicyV1 } from "@/lib/trip-policy";
 import { supportConditionsV1, type SupportSet } from "@/lib/support-conditions";
@@ -31,6 +34,26 @@ function requestWithFixture(conditions: ValidTripConditions) {
       pocDataAdapter,
       recommendationPolicyV1,
     ),
+  );
+}
+
+/** 첫 후보는 시간 제약 탈락, 공주만 이동시간 결측인 E4 혼합 결과를 만든다. */
+function requestWithMixedData(conditions: ValidTripConditions) {
+  const source: RecommendationDataSource = {
+    listDestinations: () => pocDataAdapter.listDestinations(),
+    lookupOriginTravelTime: (originId, destinationId, transport) => {
+      if (destinationId === "gongju") return null;
+      const travel = pocDataAdapter.lookupOriginTravelTime(
+        originId,
+        destinationId,
+        transport,
+      );
+      return travel ? { ...travel, oneWayHours: 20 } : null;
+    },
+  };
+
+  return Promise.resolve(
+    evaluateRecommendationRequest(conditions, source, recommendationPolicyV1),
   );
 }
 
@@ -284,6 +307,8 @@ describe("추천 결과 화면", () => {
     expect(unavailable).toHaveTextContent(
       "이동시간 데이터를 아직 준비하지 못했어요",
     );
+    expect(unavailable).toHaveTextContent("추천 데이터 수집 상태");
+    expect(unavailable).toHaveTextContent("상태 결측");
     expect(
       screen.queryByRole("region", { name: "결과 없음" }),
     ).not.toBeInTheDocument();
@@ -293,6 +318,19 @@ describe("추천 결과 화면", () => {
     expect(
       screen.getByText(/가능 여부나 점수를 임의로 계산하지 않았어요/),
     ).toBeInTheDocument();
+  });
+
+  it("혼합 결과에서는 실제로 결측된 후보의 출처와 사유만 빠짐없이 보인다", async () => {
+    render(<TripConditionsPage loadRecommendations={requestWithMixedData} />);
+    await submitTrip("2026-09-12T08:00", "2026-09-13T20:00");
+
+    const unavailable = await screen.findByRole("alert", {
+      name: "추천 데이터 부족",
+    });
+    expect(unavailable).toHaveTextContent("공주");
+    expect(unavailable).toHaveTextContent("이동시간 · 출처 미기록");
+    expect(unavailable).toHaveTextContent("상태 결측");
+    expect(unavailable).not.toHaveTextContent("상태 추정");
   });
 
   it("통과 후보가 있으면 후보 카드와 근거·신뢰도를 보인다", async () => {
@@ -318,8 +356,11 @@ describe("추천 결과 화면", () => {
     ).toBeGreaterThan(0);
     // F-05: 이동시간이 추정·목업임을 표시한다.
     expect(
-      screen.getAllByText(/이동시간 추정 · PoC 목업/).length,
+      screen.getAllByText(/이동시간 추정.*PoC 목업/).length,
     ).toBeGreaterThan(0);
+    // E5: 카드가 계산에 쓴 데이터의 출처·수집 시각·상태를 함께 보존해 표시한다.
+    expect(screen.getAllByText(/수집 2026-08-30/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/상태 추정/).length).toBeGreaterThan(0);
   });
 
   it("후보를 고르면 선택 상태로 남고, 일정 결과가 아직 없다는 것을 알린다", async () => {

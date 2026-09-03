@@ -130,13 +130,19 @@ test("실측 이동시간이 없으면 후보를 지어내지 않고 결측 결�
   await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
 
   // E4의 기본 데이터 계층은 E2 실측 이동시간을 아직 갖지 않는다. 조건 요약은 남고,
-  // PoC 후보나 시간 부족 안내로 대체하지 않는다. 상세 provenance 표시는 E5 범위다.
+  // PoC 후보나 시간 부족 안내로 대체하지 않는다. E5는 실제 결측 provenance를 함께 보인다.
   await expect(
     page.getByRole("region", { name: "제출한 여행 조건" }),
   ).toBeVisible();
   await expect(
     page.getByRole("alert", { name: "추천 데이터 부족" }),
   ).toContainText("이동시간 데이터를 아직 준비하지 못했어요");
+  await expect(
+    page.getByRole("alert", { name: "추천 데이터 부족" }),
+  ).toContainText("추천 데이터 수집 상태");
+  await expect(
+    page.getByRole("alert", { name: "추천 데이터 부족" }),
+  ).toContainText("상태 결측");
   await expect(page.getByRole("region", { name: "결과 없음" })).toHaveCount(0);
   await expect(page.getByText("더 이른 시간에 출발하기")).toHaveCount(0);
   await expect(page.getByText(/다녀올 수 있는 곳 \d+군데/)).toHaveCount(0);
