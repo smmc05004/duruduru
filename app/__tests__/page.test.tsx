@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
+import type { ComponentProps } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import TripConditionsPage from "../page";
@@ -10,6 +11,7 @@ import { pocDataAdapter } from "@/lib/poc-data-adapter";
 import { recommendationPolicyV1 } from "@/lib/trip-policy";
 import { supportConditionsV1, type SupportSet } from "@/lib/support-conditions";
 import type { ValidTripConditions } from "@/lib/trip-conditions";
+import type { ReferenceItineraryResult } from "@/lib/reference-itinerary";
 
 /*
  * 조건 입력 화면의 표시·전환만 확인한다. 검증 규칙 자체는
@@ -35,6 +37,68 @@ function requestWithFixture(conditions: ValidTripConditions) {
       recommendationPolicyV1,
     ),
   );
+}
+
+function itineraryWithFixture(
+  input: Parameters<
+    NonNullable<ComponentProps<typeof TripConditionsPage>["loadItinerary"]>
+  >[0],
+) {
+  return Promise.resolve({
+    kind: "reference-itinerary",
+    destinationId: input.destinationId,
+    conditions: input.conditions,
+    originTravel: null,
+    policyVersion: "2026-09-03",
+    ordering: "matched-interest-evidence-desc:id-asc",
+    disclaimer: {
+      label: "참고용 계획",
+      latestInfoAction: "방문 전 최신 운영·휴무·예약 정보를 확인",
+    },
+    guarantees: {
+      operationChecked: false,
+      restaurantAvailable: false,
+      returnByChecked: false,
+    },
+    notices: [],
+    places: [
+      {
+        id: "fixture-place",
+        name: "테스트 유적",
+        category: "관광지",
+        matchedInterests: ["역사"],
+        interestEvidence: [],
+        interestEvidenceProvenance: {
+          source: "테스트",
+          collectedAt: "2026-09-03",
+          dataStatus: "normal",
+        },
+        visit: {
+          kind: "estimate",
+          estimatedHours: 1.5,
+          provenance: {
+            source: "테스트",
+            collectedAt: "2026-09-03",
+            dataStatus: "estimate",
+          },
+        },
+        broadTimeWindow: {
+          startsAt: new Date("2026-09-12T10:00:00+09:00"),
+          endsAt: new Date("2026-09-12T11:30:00+09:00"),
+        },
+        operation: {
+          kind: "missing",
+          reason: "운영 정보 없음",
+          provenance: {
+            source: "테스트",
+            collectedAt: "2026-09-03",
+            dataStatus: "missing",
+          },
+        },
+        travelFromPrevious: null,
+      },
+    ],
+  } satisfies ReferenceItineraryResult);
 }
 
 /** 첫 후보는 시간 제약 탈락, 공주만 이동시간 결측인 E4 혼합 결과를 만든다. */
@@ -363,7 +427,7 @@ describe("추천 결과 화면", () => {
     expect(screen.getAllByText(/상태 추정/).length).toBeGreaterThan(0);
   });
 
-  it("후보를 고르면 선택 상태로 남고, 일정 결과가 아직 없다는 것을 알린다", async () => {
+  it("후보를 고르면 E6의 데이터 부족 참고 계획 상태를 정직하게 보인다", async () => {
     render(<TripConditionsPage loadRecommendations={requestWithFixture} />);
     const user = await submitTrip("2026-09-12T08:00", "2026-09-13T20:00");
 
@@ -372,10 +436,58 @@ describe("추천 결과 화면", () => {
     });
     await user.click(button);
 
-    expect(button).toHaveAttribute("aria-pressed", "true");
     expect(
-      screen.getByText(/일정 결과 화면은 아직 준비 중/),
+      screen.getByRole("alert", { name: "참고 계획 데이터 부족" }),
     ).toBeInTheDocument();
+  });
+
+  it("선택한 후보의 참고 계획은 방문 순서·시간대·근거와 주의문을 보인다", async () => {
+    render(
+      <TripConditionsPage
+        loadRecommendations={requestWithFixture}
+        loadItinerary={itineraryWithFixture}
+      />,
+    );
+    const user = await submitTrip("2026-09-12T08:00", "2026-09-13T20:00");
+    await user.click(
+      await screen.findByRole("button", { name: "공주 일정 보기" }),
+    );
+    expect(
+      await screen.findByRole("region", { name: "참고용 여행 계획" }),
+    ).toHaveTextContent("테스트 유적");
+    expect(screen.getByText(/참고용 계획/)).toBeInTheDocument();
+    expect(screen.getByText(/방문 전 최신 운영/)).toBeInTheDocument();
+    expect(screen.getByText(/넓은 시간대/)).toBeInTheDocument();
+    expect(screen.getByText(/관심사 근거: 역사/)).toBeInTheDocument();
+  });
+
+  it("참고 계획 계산 중 로딩과 오류·재시도를 표시한다", async () => {
+    let rejectRequest: ((error: Error) => void) | undefined;
+    const loadItinerary = () =>
+      new Promise<never>((_, reject) => {
+        rejectRequest = reject;
+      });
+    render(
+      <TripConditionsPage
+        loadRecommendations={requestWithFixture}
+        loadItinerary={loadItinerary}
+      />,
+    );
+    const user = await submitTrip("2026-09-12T08:00", "2026-09-13T20:00");
+    await user.click(
+      await screen.findByRole("button", { name: "공주 일정 보기" }),
+    );
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "참고 계획을 준비하고 있어요",
+    );
+    rejectRequest?.(new Error("fixture failure"));
+    expect(
+      await screen.findByRole("alert", { name: "참고 계획 생성 오류" }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "다시 시도하기" }));
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "참고 계획을 준비하고 있어요",
+    );
   });
 
   it("모든 후보가 탈락하면 결과 없음을 정상 상태로 보이고 조정 행동을 안내한다", async () => {

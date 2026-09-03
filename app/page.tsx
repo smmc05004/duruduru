@@ -20,6 +20,16 @@ import type {
 } from "@/lib/recommendation";
 import { requestRecommendations } from "@/lib/recommendation-request";
 import {
+  createReferenceItinerary,
+  type ReferenceItineraryInput,
+  type ReferenceItineraryResult,
+  type ReferenceItineraryUnavailable,
+} from "@/lib/reference-itinerary";
+import { referenceItineraryDataSource } from "@/lib/reference-itinerary-data";
+import { evaluateRecommendationRequest } from "@/lib/recommendation-request";
+import { pocDataAdapter } from "@/lib/poc-data-adapter";
+import { recommendationPolicyV1 } from "@/lib/trip-policy";
+import {
   interestTags,
   loadSupportConditions,
   type SupportSet,
@@ -96,6 +106,24 @@ type Phase =
       kind: "result";
       conditions: ValidTripConditions;
       outcome: RecommendationOutcome;
+    }
+  | {
+      kind: "itinerary";
+      conditions: ValidTripConditions;
+      itinerary: ReferenceItineraryResult | ReferenceItineraryUnavailable;
+      outcome: RecommendationOutcome;
+    }
+  | {
+      kind: "itinerary-calculating";
+      conditions: ValidTripConditions;
+      input: ReferenceItineraryInput;
+      outcome: RecommendationOutcome;
+    }
+  | {
+      kind: "itinerary-error";
+      conditions: ValidTripConditions;
+      input: ReferenceItineraryInput;
+      outcome: RecommendationOutcome;
     };
 
 type SupportConditionsState =
@@ -108,6 +136,9 @@ type TripConditionsPageProps = {
   loadRecommendations?: (
     conditions: ValidTripConditions,
   ) => Promise<RecommendationOutcome>;
+  loadItinerary?: (
+    input: ReferenceItineraryInput,
+  ) => Promise<ReferenceItineraryResult | ReferenceItineraryUnavailable>;
 };
 
 const spinnerIcon = (
@@ -141,6 +172,75 @@ const missingDataIcon = (
     />
   </svg>
 );
+
+const e2eFixtureEnabled = process.env.NEXT_PUBLIC_E2E_FIXTURE === "1";
+
+function e2eItinerary(
+  input: ReferenceItineraryInput,
+): ReferenceItineraryResult {
+  const provenance = {
+    source: "E2E 정적 fixture",
+    collectedAt: "2026-09-03",
+    dataStatus: "estimate" as const,
+  };
+  return {
+    kind: "reference-itinerary",
+    destinationId: input.destinationId,
+    conditions: input.conditions,
+    originTravel: {
+      kind: "road-route",
+      originId: "e2e-origin",
+      destinationId: input.destinationId,
+      distanceKm: 1,
+      estimatedHours: 1,
+      method: "E2E 정적 도로 경로",
+      source: "E2E 정적 fixture",
+      basisDate: "2026-09-03",
+      dataVersion: "2026-09-03",
+      policyVersion: "2026-09-03",
+      reproductionId: "e2e",
+      dataStatus: "estimate",
+    },
+    policyVersion: "2026-09-03",
+    ordering: "matched-interest-evidence-desc:id-asc",
+    disclaimer: {
+      label: "참고용 계획",
+      latestInfoAction: "방문 전 최신 운영·휴무·예약 정보를 확인",
+    },
+    guarantees: {
+      operationChecked: false,
+      restaurantAvailable: false,
+      returnByChecked: false,
+    },
+    notices: [
+      "일반 이동·방문시간은 참고 정보이며 실시간 교통 또는 예약 가능 여부를 보증하지 않습니다.",
+      "식사 장소는 직접 확인",
+    ],
+    places: [
+      {
+        id: "e2e-place",
+        name: "E2E 참고 장소",
+        category: "관광지",
+        matchedInterests: [input.interests[0] ?? "역사"],
+        interestEvidence: [
+          {
+            tag: input.interests[0] ?? "역사",
+            evidence: "E2E 관심사 근거",
+            provenance,
+          },
+        ],
+        interestEvidenceProvenance: provenance,
+        visit: { kind: "estimate", estimatedHours: 1, provenance },
+        broadTimeWindow: {
+          startsAt: new Date(input.conditions.startAt.getTime() + 3_600_000),
+          endsAt: new Date(input.conditions.startAt.getTime() + 7_200_000),
+        },
+        operation: { kind: "missing", reason: "운영 정보 없음", provenance },
+        travelFromPrevious: null,
+      },
+    ],
+  };
+}
 
 const emptyIllustration = (
   <svg
@@ -295,7 +395,20 @@ function DataUnavailableEvidence({
 
 export default function TripConditionsPage({
   loadConditions = loadSupportConditions,
-  loadRecommendations = requestRecommendations,
+  loadRecommendations = e2eFixtureEnabled
+    ? (conditions) =>
+        Promise.resolve(
+          evaluateRecommendationRequest(
+            conditions,
+            pocDataAdapter,
+            recommendationPolicyV1,
+          ),
+        )
+    : requestRecommendations,
+  loadItinerary = async (input) =>
+    e2eFixtureEnabled && input.destinationId === "gongju"
+      ? e2eItinerary(input)
+      : createReferenceItinerary(input, referenceItineraryDataSource),
 }: TripConditionsPageProps) {
   const [supportState, setSupportState] = useState<SupportConditionsState>(
     () => {
@@ -444,6 +557,222 @@ export default function TripConditionsPage({
   }));
   const transportHint = "현재는 자차 여행만 지원해요.";
 
+  if (
+    phase.kind === "itinerary-calculating" ||
+    phase.kind === "itinerary-error"
+  ) {
+    const retry = () => {
+      setPhase({
+        kind: "itinerary-calculating",
+        conditions: phase.conditions,
+        input: phase.input,
+        outcome: phase.outcome,
+      });
+      void loadItinerary(phase.input)
+        .then((itinerary) =>
+          setPhase({
+            kind: "itinerary",
+            conditions: phase.conditions,
+            itinerary,
+            outcome: phase.outcome,
+          }),
+        )
+        .catch(() =>
+          setPhase({
+            kind: "itinerary-error",
+            conditions: phase.conditions,
+            input: phase.input,
+            outcome: phase.outcome,
+          }),
+        );
+    };
+    if (phase.kind === "itinerary-calculating") {
+      return (
+        <main className="dd-screen">
+          <ResultHeader conditions={phase.conditions} />
+          <div className="dd-calculating" role="status">
+            {spinnerIcon}
+            <p>참고 계획을 준비하고 있어요</p>
+          </div>
+        </main>
+      );
+    }
+    return (
+      <main className="dd-screen">
+        <ResultHeader conditions={phase.conditions} />
+        <section
+          className="dd-error-summary"
+          role="alert"
+          aria-label="참고 계획 생성 오류"
+        >
+          <p className="dd-error-summary__title">
+            참고 계획을 준비하지 못했어요
+          </p>
+          <p className="dd-error-summary__text">
+            임의 일정으로 바꾸지 않았어요. 다시 시도해 주세요.
+          </p>
+        </section>
+        <div className="dd-result-actions">
+          <Button variant="primary" onClick={retry}>
+            다시 시도하기
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() =>
+              setPhase({
+                kind: "result",
+                conditions: phase.conditions,
+                outcome: phase.outcome,
+              })
+            }
+          >
+            추천으로 돌아가기
+          </Button>
+        </div>
+      </main>
+    );
+  }
+
+  if (phase.kind === "itinerary") {
+    const { itinerary, conditions } = phase;
+    return (
+      <main className="dd-screen">
+        <ResultHeader conditions={conditions} />
+        <ConditionSummary conditions={conditions} title="참고용 여행 계획" />
+        {itinerary.kind === "data-unavailable" ? (
+          <section
+            className="dd-error-summary"
+            role="alert"
+            aria-label="참고 계획 데이터 부족"
+          >
+            <p className="dd-error-summary__title">
+              참고 계획에 필요한 데이터를 확인하지 못했어요
+            </p>
+            <p className="dd-error-summary__text">
+              {itinerary.reason} 방문 전 최신 운영·휴무·예약 정보를 확인해
+              주세요.
+            </p>
+            <p className="dd-error-summary__text">
+              부족한 항목:{" "}
+              {itinerary.missing
+                .map((item) => (item === "places" ? "장소" : "관심사 근거"))
+                .join(" · ")}
+            </p>
+          </section>
+        ) : (
+          <section aria-label="참고용 여행 계획">
+            <p className="dd-notice">
+              참고용 계획 · {itinerary.disclaimer.latestInfoAction}
+            </p>
+            <ul className="dd-basis" aria-label="참고 계획 주의사항">
+              {itinerary.notices.map((notice) => (
+                <li className="dd-basis__item" key={notice}>
+                  {notice}
+                </li>
+              ))}
+            </ul>
+            {itinerary.originTravel ? (
+              <p>
+                출발지 이동 근거: 일반 예상{" "}
+                {itinerary.originTravel.estimatedHours}시간 · 방식{" "}
+                {itinerary.originTravel.method} · 출처{" "}
+                {itinerary.originTravel.source} · 기준일{" "}
+                {itinerary.originTravel.basisDate} · 데이터{" "}
+                {itinerary.originTravel.dataVersion} · 정책{" "}
+                {itinerary.originTravel.policyVersion} · 상태{" "}
+                {itinerary.originTravel.dataStatus}
+              </p>
+            ) : null}
+            <ol className="dd-candidates">
+              {itinerary.places.map((place, index) => (
+                <li className="dd-candidate" key={place.id}>
+                  <h2>
+                    {index + 1}. {place.name}
+                  </h2>
+                  <p>
+                    관심사 근거:{" "}
+                    {place.matchedInterests.join(" · ") || "정보 없음"}
+                  </p>
+                  <p>
+                    관심사 근거 출처: {place.interestEvidenceProvenance.source}{" "}
+                    · 수집 {place.interestEvidenceProvenance.collectedAt} · 상태{" "}
+                    {place.interestEvidenceProvenance.dataStatus}
+                  </p>
+                  {place.interestEvidence.map((evidence) => (
+                    <p key={evidence.tag}>관심사 증거: {evidence.evidence}</p>
+                  ))}
+                  <p>
+                    방문시간:{" "}
+                    {place.visit.kind === "estimate"
+                      ? `${place.visit.estimatedHours}시간`
+                      : place.visit.reason}
+                  </p>
+                  <p>
+                    방문시간 출처: {place.visit.provenance.source} · 수집{" "}
+                    {place.visit.provenance.collectedAt} · 상태{" "}
+                    {place.visit.provenance.dataStatus}
+                  </p>
+                  <p>
+                    운영 정보:{" "}
+                    {place.operation.kind === "available"
+                      ? "출처 있는 운영 정보"
+                      : place.operation.reason}
+                  </p>
+                  <p>
+                    운영 정보 출처:{" "}
+                    {place.operation.kind === "available"
+                      ? `${place.operation.value.provenance.source} · 수집 ${place.operation.value.provenance.collectedAt} · 상태 ${place.operation.value.provenance.dataStatus}`
+                      : `${place.operation.provenance.source} · 수집 ${place.operation.provenance.collectedAt} · 상태 ${place.operation.provenance.dataStatus}`}
+                  </p>
+                  <p>
+                    이동시간:{" "}
+                    {place.travelFromPrevious === null
+                      ? "첫 방문지"
+                      : place.travelFromPrevious.kind === "road-route"
+                        ? `일반 예상 ${place.travelFromPrevious.estimatedHours}시간 · 출처 ${place.travelFromPrevious.source}`
+                        : place.travelFromPrevious.reason}
+                  </p>
+                  {place.travelFromPrevious &&
+                  place.travelFromPrevious.kind === "road-route" ? (
+                    <p>
+                      이동 근거: 방식 {place.travelFromPrevious.method} · 기준일{" "}
+                      {place.travelFromPrevious.basisDate} · 데이터{" "}
+                      {place.travelFromPrevious.dataVersion} · 정책{" "}
+                      {place.travelFromPrevious.policyVersion} · 상태{" "}
+                      {place.travelFromPrevious.dataStatus}
+                    </p>
+                  ) : null}
+                  <p>
+                    넓은 시간대:{" "}
+                    {place.broadTimeWindow
+                      ? `${formatDateTime(place.broadTimeWindow.startsAt)} ~ ${formatDateTime(place.broadTimeWindow.endsAt)}`
+                      : "넓은 시간대 정보 없음"}
+                  </p>
+                </li>
+              ))}
+            </ol>
+          </section>
+        )}
+        <div className="dd-result-actions">
+          <Button
+            variant="secondary"
+            onClick={() => setPhase({ kind: "input" })}
+          >
+            조건 수정하기
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() =>
+              setPhase({ kind: "result", conditions, outcome: phase.outcome })
+            }
+          >
+            다른 후보 선택하기
+          </Button>
+        </div>
+      </main>
+    );
+  }
+
   if (phase.kind !== "input") {
     const { conditions } = phase;
     // 판정에 실제로 쓰인 여행 유형·최소 체류시간을 결과에서 그대로 읽는다. 화면이 다시 계산하지 않는다.
@@ -558,7 +887,41 @@ export default function TripConditionsPage({
                   selectedInterestCount={conditions.interests.length}
                   best={index === 0}
                   selected={selectedId === candidate.id}
-                  onSelect={() => setSelectedId(candidate.id)}
+                  onSelect={() => {
+                    setSelectedId(candidate.id);
+                    // E4의 현재 TravelTimeEstimate는 E6 정적 도로 경로 계약의 모든
+                    // provenance 필드를 갖지 않는다. 누락값을 변환·발명하지 않는다.
+                    const originTravel = null;
+                    const input = {
+                      destinationId: candidate.id,
+                      interests: conditions.interests,
+                      conditions,
+                      originTravel,
+                    };
+                    setPhase({
+                      kind: "itinerary-calculating",
+                      conditions,
+                      input,
+                      outcome: phase.outcome,
+                    });
+                    void loadItinerary(input)
+                      .then((itinerary) =>
+                        setPhase({
+                          kind: "itinerary",
+                          conditions,
+                          itinerary,
+                          outcome: phase.outcome,
+                        }),
+                      )
+                      .catch(() =>
+                        setPhase({
+                          kind: "itinerary-error",
+                          conditions,
+                          input,
+                          outcome: phase.outcome,
+                        }),
+                      );
+                  }}
                 />
               ))}
             </ul>
