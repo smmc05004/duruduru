@@ -16,6 +16,8 @@
 
 토큰 값은 `docs/design/DESIGN_TOKENS.md`에 있다.
 
+추천·참고 계획 결과에서 사용자용 판단 정보와 선택형 데이터 근거를 나누는 규칙은 `docs/design/RESULT_INFORMATION_HIERARCHY.md`에 있다.
+
 ### 왜 H인가
 
 C(여행 수첩)의 분위기가 제품 성격에 가장 맞았다. 목적지를 정하지 못한 사람에게 필요한 것은 정밀한 계기판보다 "같이 골라주는" 인상이다.
