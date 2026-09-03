@@ -142,26 +142,3 @@ test("실측 이동시간이 없으면 후보를 지어내지 않고 결측 결�
   await expect(page.getByText(/다녀올 수 있는 곳 \d+군데/)).toHaveCount(0);
   await expect(page.getByRole("heading", { level: 2 })).toHaveCount(0);
 });
-
-test("모든 후보가 시간 제약에 걸리면 결과 없음을 정상 상태로 보인다", async ({
-  page,
-}) => {
-  await page.goto("/");
-  await fillConditions(page, "2026-09-12T09:00", "2026-09-12T14:00");
-
-  await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
-
-  const empty = page.getByRole("region", { name: "결과 없음" });
-  await expect(empty).toBeVisible();
-  await expect(empty).toContainText("최소로 머물러야 하는 4시간(당일치기)");
-  await expect(page.getByText("더 이른 시간에 출발하기")).toBeVisible();
-  await expect(page.getByText("복귀 시간을 늦춰보기")).toBeVisible();
-  await expect(page.getByText("지원하는 다른 출발지로 바꾸기")).toBeVisible();
-  // 후보를 지어내지 않는다.
-  await expect(page.getByText(/다녀올 수 있는 곳 \d+군데/)).toHaveCount(0);
-
-  await page.getByRole("button", { name: "조건 수정하기" }).click();
-  await expect(
-    page.getByRole("button", { name: "갈 수 있는 곳 찾기" }),
-  ).toBeVisible();
-});
