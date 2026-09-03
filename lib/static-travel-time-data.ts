@@ -3,23 +3,33 @@ import type {
   OriginDestinationTravelTime,
   PlaceTravelTime,
 } from "./domain-data";
+import {
+  validateRouteCollectionManifest,
+  type CollectionBatchEvidence,
+  type CoordinateEvidence,
+} from "./route-collection";
 import { supportConditionsV1, type TransportMode } from "./support-conditions";
 
 /** 사전 수집된 도로 경로 값에만 허용하는 신뢰도 상태다. */
-export type StaticTravelTimeStatus = "estimate";
+export type StaticTravelTimeStatus = "estimate" | "missing";
 
 export type StaticTravelTimeRecord = {
   transport: TransportMode;
-  distanceKm: number;
-  estimatedHours: number;
+  distanceKm: number | null;
+  estimatedHours: number | null;
   /** 정적 일반 이동시간은 실시간 교통값이 아니므로 항상 추정값이다. */
   estimate: true;
   source: string;
+  dataset: string;
   basisDate: string;
+  dataVersion: string;
   policyVersion: string;
   /** 제공자 요청/내보내기/수동 수집을 다시 찾을 수 있는 공개 식별자다. */
   reproductionId: string;
   dataStatus: StaticTravelTimeStatus;
+  missingReason: string | null;
+  fromCoordinate: CoordinateEvidence;
+  toCoordinate: CoordinateEvidence;
 };
 
 export type StaticOriginDestinationTravelTime = StaticTravelTimeRecord & {
@@ -41,6 +51,7 @@ export type OriginDestinationTarget = {
 export type StaticTravelTimeManifest = {
   version: string;
   policyVersion: string;
+  collectionBatch: CollectionBatchEvidence | null;
   originDestinationTargets: OriginDestinationTarget[];
   originDestinationRecords: StaticOriginDestinationTravelTime[];
   placeTravelTimeRecords: StaticPlaceTravelTime[];
@@ -55,6 +66,51 @@ const originDestinationTargets = (): OriginDestinationTarget[] =>
     })),
   );
 
+const pendingCoordinateEvidence = (
+  sourceRecordId: string,
+): CoordinateEvidence => ({
+  kind: "tourapi",
+  source: "지원 조건 기준점 수집 대상",
+  sourceRecordId,
+  collectedAt: "2026-09-03",
+  dataVersion: "support-conditions-v1",
+  rawAddress: null,
+  query: null,
+  selectedAddress: null,
+  matchEvidence: "승인된 지원 조건의 기준점",
+  coordinates: null,
+  missingReason: "WGS84 좌표 수집 전",
+});
+
+const pendingCollectionBatch: CollectionBatchEvidence = {
+  id: "pending-2026-09-03",
+  termsCheckedAt: "2026-09-03",
+  callLimitEvidence: "경로 제공자 선정 전: 호출 없음",
+  storagePolicyEvidence: "경로 제공자 선정 전: 저장 없음",
+  displayPolicyEvidence: "경로 제공자 선정 전: 표시 없음",
+  redistributionPolicyEvidence: "경로 제공자 선정 전: 재배포 없음",
+  rawResponseRetentionEvidence: "경로 제공자 선정 전: 원시 응답 없음",
+};
+
+const pendingOriginDestinationRecords =
+  (): StaticOriginDestinationTravelTime[] =>
+    originDestinationTargets().map((target) => ({
+      ...target,
+      distanceKm: null,
+      estimatedHours: null,
+      estimate: true,
+      source: "수집 전",
+      dataset: "수집 대상 매니페스트",
+      basisDate: "2026-09-03",
+      dataVersion: "pending-2026-09-03",
+      policyVersion: "2026-09-03",
+      reproductionId: `missing:${target.originId}:${target.destinationId}:car`,
+      dataStatus: "missing",
+      missingReason: "허용된 도로 경로 수집 전",
+      fromCoordinate: pendingCoordinateEvidence(target.originId),
+      toCoordinate: pendingCoordinateEvidence(target.destinationId),
+    }));
+
 /**
  * E4/E6 정적 이동시간 수집 매니페스트.
  *
@@ -64,8 +120,9 @@ const originDestinationTargets = (): OriginDestinationTarget[] =>
 export const staticTravelTimeManifestV1: StaticTravelTimeManifest = {
   version: "2026-09-03",
   policyVersion: "2026-09-03",
+  collectionBatch: pendingCollectionBatch,
   originDestinationTargets: originDestinationTargets(),
-  originDestinationRecords: [],
+  originDestinationRecords: pendingOriginDestinationRecords(),
   placeTravelTimeRecords: [],
 };
 
@@ -77,14 +134,28 @@ function validateRecord(
   label: string,
 ): string[] {
   const issues: string[] = [];
-  if (!(Number.isFinite(record.distanceKm) && record.distanceKm > 0))
+  if (record.transport !== "car")
+    issues.push(`${label}.transport는 car여야 합니다.`);
+  if (
+    record.dataStatus === "estimate" &&
+    !(Number.isFinite(record.distanceKm) && (record.distanceKm ?? 0) > 0)
+  )
     issues.push(`${label}.distanceKm은 0보다 큰 유한 수여야 합니다.`);
-  if (!(Number.isFinite(record.estimatedHours) && record.estimatedHours > 0))
+  if (
+    record.dataStatus === "estimate" &&
+    !(
+      Number.isFinite(record.estimatedHours) && (record.estimatedHours ?? 0) > 0
+    )
+  )
     issues.push(`${label}.estimatedHours는 0보다 큰 유한 수여야 합니다.`);
   if (!record.estimate)
     issues.push(`${label}.estimate는 정적 일반 이동시간의 true여야 합니다.`);
-  if (record.dataStatus !== "estimate")
-    issues.push(`${label}.dataStatus는 estimate여야 합니다.`);
+  if (record.dataStatus === "missing") {
+    if (record.distanceKm !== null || record.estimatedHours !== null)
+      issues.push(`${label}.missing 레코드는 거리·시간이 null이어야 합니다.`);
+    if (!hasText(record.missingReason ?? ""))
+      issues.push(`${label}.missingReason이 필요합니다.`);
+  }
   if (!hasText(record.source)) issues.push(`${label}.source가 필요합니다.`);
   if (!hasIsoDate(record.basisDate))
     issues.push(`${label}.basisDate는 YYYY-MM-DD여야 합니다.`);
@@ -126,6 +197,32 @@ export function validateStaticTravelTimeManifest(
     if (!targetKeys.has(key))
       issues.push(`3×3 수집 대상에 없는 이동시간 레코드: ${key}`);
     issues.push(...validateRecord(record, `originDestinationRecords(${key})`));
+    issues.push(
+      ...validateRouteCollectionManifest({
+        version: manifest.version,
+        policyVersion: manifest.policyVersion,
+        collectionBatch: manifest.collectionBatch,
+        routes: [
+          {
+            fromId: record.originId,
+            toId: record.destinationId,
+            from: record.fromCoordinate,
+            to: record.toCoordinate,
+            transport: "car",
+            distanceKm: record.distanceKm,
+            estimatedHours: record.estimatedHours,
+            dataStatus: record.dataStatus,
+            estimate: record.estimate,
+            reproductionId: record.reproductionId,
+            provider: record.source,
+            dataset: record.dataset,
+            basisDate: record.basisDate,
+            dataVersion: record.dataVersion,
+            missingReason: record.missingReason,
+          },
+        ],
+      }),
+    );
   }
   const placeRecordKeys = new Set<string>();
   for (const record of manifest.placeTravelTimeRecords) {
@@ -134,6 +231,32 @@ export function validateStaticTravelTimeManifest(
       issues.push(`중복된 place 이동시간 레코드: ${key}`);
     placeRecordKeys.add(key);
     issues.push(...validateRecord(record, `placeTravelTimeRecords(${key})`));
+    issues.push(
+      ...validateRouteCollectionManifest({
+        version: manifest.version,
+        policyVersion: manifest.policyVersion,
+        collectionBatch: manifest.collectionBatch,
+        routes: [
+          {
+            fromId: record.fromPlaceId,
+            toId: record.toPlaceId,
+            from: record.fromCoordinate,
+            to: record.toCoordinate,
+            transport: "car",
+            distanceKm: record.distanceKm,
+            estimatedHours: record.estimatedHours,
+            dataStatus: record.dataStatus,
+            estimate: record.estimate,
+            reproductionId: record.reproductionId,
+            provider: record.source,
+            dataset: record.dataset,
+            basisDate: record.basisDate,
+            dataVersion: record.dataVersion,
+            missingReason: record.missingReason,
+          },
+        ],
+      }),
+    );
   }
   return issues;
 }
@@ -171,22 +294,23 @@ export function createStaticTravelTimeAdapter(
           item.transport === transport,
       );
       if (!record) return null;
+      if (record.dataStatus === "missing") return null;
       const result: ProvenancedOriginTravelTime = {
         originId: record.originId,
         destinationId: record.destinationId,
         transport: record.transport,
-        oneWayHours: record.estimatedHours,
-        distanceKm: record.distanceKm,
+        oneWayHours: record.estimatedHours!,
+        distanceKm: record.distanceKm!,
         method: "정적 사전 수집 도로 경로",
         basisDate: record.basisDate,
-        dataVersion: manifest.version,
+        dataVersion: record.dataVersion,
         policyVersion: record.policyVersion,
         reproductionId: record.reproductionId,
         provenance: {
           source: record.source,
           collectedAt: record.basisDate,
           dataStatus: record.dataStatus,
-          dataVersion: manifest.version,
+          dataVersion: record.dataVersion,
         },
       };
       return result;
@@ -199,22 +323,23 @@ export function createStaticTravelTimeAdapter(
           item.transport === transport,
       );
       if (!record) return null;
+      if (record.dataStatus === "missing") return null;
       const result: ProvenancedPlaceTravelTime = {
         fromPlaceId: record.fromPlaceId,
         toPlaceId: record.toPlaceId,
         transport: record.transport,
-        estimatedHours: record.estimatedHours,
-        distanceKm: record.distanceKm,
+        estimatedHours: record.estimatedHours!,
+        distanceKm: record.distanceKm!,
         method: "정적 사전 수집 도로 경로",
         basisDate: record.basisDate,
-        dataVersion: manifest.version,
+        dataVersion: record.dataVersion,
         policyVersion: record.policyVersion,
         reproductionId: record.reproductionId,
         provenance: {
           source: record.source,
           collectedAt: record.basisDate,
           dataStatus: record.dataStatus,
-          dataVersion: manifest.version,
+          dataVersion: record.dataVersion,
         },
       };
       return result;
