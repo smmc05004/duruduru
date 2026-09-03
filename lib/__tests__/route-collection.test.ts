@@ -19,6 +19,8 @@ const point = {
 const collectionBatch = {
   id: "batch-2026-09-03",
   termsCheckedAt: "2026-09-03",
+  providerTermsUrl: "https://example.test/terms",
+  routeRequestTemplate: "GET /route/v1/driving/{from};{to}",
   callLimitEvidence: "제공자 약관 1절",
   storagePolicyEvidence: "제공자 약관 2절",
   displayPolicyEvidence: "제공자 약관 3절",

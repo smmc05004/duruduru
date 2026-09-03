@@ -13,7 +13,7 @@ export function validateOfflineGeocodeRequest(r: OfflineGeocodeRequest) {
     : [];
 }
 export type CoordinateEvidence = {
-  kind: "tourapi" | "offline-geocode";
+  kind: "tourapi" | "offline-geocode" | "support-condition";
   source: string;
   sourceRecordId: string | null;
   collectedAt: string;
@@ -29,6 +29,8 @@ export type CoordinateEvidence = {
 export type CollectionBatchEvidence = {
   id: string;
   termsCheckedAt: string;
+  providerTermsUrl: string;
+  routeRequestTemplate: string;
   callLimitEvidence: string;
   storagePolicyEvidence: string;
   displayPolicyEvidence: string;
@@ -82,6 +84,8 @@ const validCollectionBatch = (batch: CollectionBatchEvidence | null) =>
   !!batch &&
   hasText(batch.id) &&
   validDate(batch.termsCheckedAt) &&
+  hasText(batch.providerTermsUrl) &&
+  hasText(batch.routeRequestTemplate) &&
   hasText(batch.callLimitEvidence) &&
   hasText(batch.storagePolicyEvidence) &&
   hasText(batch.displayPolicyEvidence) &&
