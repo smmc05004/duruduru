@@ -9,6 +9,8 @@ export type DataProvenance = {
   /** 수집 또는 갱신 시각. PoC는 기준일을 보존한다. */
   collectedAt: string;
   dataStatus: DomainDataStatus;
+  /** 수집 데이터셋 버전. 값이 없는 기존/결측 데이터와 호환을 위해 선택값이다. */
+  dataVersion?: string;
 };
 
 export type Coordinates = { latitude: number; longitude: number };
