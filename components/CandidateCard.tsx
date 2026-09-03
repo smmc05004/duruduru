@@ -5,6 +5,7 @@ import {
   formatHoursAndMinutes,
   formatPercent,
 } from "@/lib/format-duration";
+import type { DomainDataStatus } from "@/lib/domain-data";
 import type { CandidateEvaluation } from "@/lib/recommendation";
 
 /*
@@ -35,6 +36,116 @@ function BasisItem({ children }: { children: ReactNode }) {
     <span className="dd-basis__item">
       {checkIcon}
       {children}
+    </span>
+  );
+}
+
+const dataStatusLabel: Record<DomainDataStatus, string> = {
+  normal: "정상",
+  estimate: "추정",
+  fallback: "대체값",
+  missing: "결측",
+  stale: "오래됨",
+};
+
+const dataStatusIcon: Record<DomainDataStatus, ReactNode> = {
+  normal: checkIcon,
+  estimate: (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 20 20"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M2.5 7.5c2-3 4 3 6 0s4-3 6 0 2 3 3.5 0"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+      <path
+        d="M2.5 12.5c2-3 4 3 6 0s4-3 6 0 2 3 3.5 0"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  ),
+  fallback: (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 20 20"
+      fill="none"
+      aria-hidden="true"
+    >
+      <circle cx="10" cy="10" r="6.5" stroke="currentColor" strokeWidth="1.8" />
+      <path
+        d="M10 6.2v4l2.7 1.8"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  ),
+  stale: (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 20 20"
+      fill="none"
+      aria-hidden="true"
+    >
+      <circle cx="10" cy="10" r="6.5" stroke="currentColor" strokeWidth="1.8" />
+      <path
+        d="M10 6.2v4l2.7 1.8"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  ),
+  missing: (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 20 20"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M5 10h10"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  ),
+};
+
+/**
+ * E4가 남긴 provenance를 그대로 읽는다. 화면이 출처나 상태를 추론하지 않도록
+ * 목적지·태그·이동시간의 근거를 분리해 표시한다(F-05).
+ */
+function DataEvidence({
+  label,
+  source,
+  collectedAt,
+  dataStatus,
+}: {
+  label: string;
+  source: string;
+  collectedAt: string;
+  dataStatus: DomainDataStatus;
+}) {
+  return (
+    <span
+      className={`dd-basis__item dd-data-status dd-data-status--${dataStatus}`}
+    >
+      {dataStatusIcon[dataStatus]}
+      {label} · 출처 {source} · 수집 {collectedAt || "시각 미기록"} · 상태{" "}
+      {dataStatusLabel[dataStatus]}
     </span>
   );
 }
@@ -157,11 +268,32 @@ export function CandidateCard({
             {interestFit?.unavailableReason ?? "관심사 근거 없음"}
           </BasisItem>
         )}
-        {/* F-05 신뢰도 표시 — 이동시간이 추정치이고 목업이라는 사실을 감추지 않는다. */}
-        <BasisItem>
-          이동시간 추정 · {candidate.travel?.source} ·{" "}
-          {candidate.travel?.basisDate} 기준
-        </BasisItem>
+        {/* F-05 신뢰도 표시 — 계산에 실제로 쓰인 계약 데이터의 provenance를 감추지 않는다. */}
+        <DataEvidence
+          label="목적지"
+          source={candidate.data.destination.source}
+          collectedAt={candidate.data.destination.collectedAt}
+          dataStatus={candidate.data.destination.dataStatus}
+        />
+        <DataEvidence
+          label="관심사 태그"
+          source={candidate.data.tags.provenance.source}
+          collectedAt={candidate.data.tags.provenance.collectedAt}
+          dataStatus={candidate.data.tags.provenance.dataStatus}
+        />
+        {candidate.travel?.provenance ? (
+          <DataEvidence
+            label={`이동시간 추정 (${candidate.travel.basisDate} 기준)`}
+            source={candidate.travel.provenance.source}
+            collectedAt={candidate.travel.provenance.collectedAt}
+            dataStatus={candidate.travel.provenance.dataStatus}
+          />
+        ) : (
+          <BasisItem>
+            이동시간 추정 · {candidate.travel?.source ?? "출처 미기록"} ·{" "}
+            {candidate.travel?.basisDate ?? "기준일 미기록"} 기준 · 상태 미기록
+          </BasisItem>
+        )}
       </div>
 
       <div className="dd-candidate__action">

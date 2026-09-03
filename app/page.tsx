@@ -14,7 +14,10 @@ import { SegmentedControl } from "@/components/SegmentedControl";
 import { Select } from "@/components/Select";
 import { CandidateCard } from "@/components/CandidateCard";
 import { formatHoursAndMinutes } from "@/lib/format-duration";
-import type { RecommendationOutcome } from "@/lib/recommendation";
+import type {
+  CandidateEvaluation,
+  RecommendationOutcome,
+} from "@/lib/recommendation";
 import { requestRecommendations } from "@/lib/recommendation-request";
 import {
   interestTags,
@@ -119,6 +122,23 @@ const spinnerIcon = (
     aria-hidden="true"
   >
     <path d="M10 2.8a7.2 7.2 0 1 1-6.9 5.1" />
+  </svg>
+);
+
+const missingDataIcon = (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 20 20"
+    fill="none"
+    aria-hidden="true"
+  >
+    <path
+      d="M5 10h10"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+    />
   </svg>
 );
 
@@ -235,6 +255,41 @@ function ResultHeader({ conditions }: { conditions: ValidTripConditions }) {
         {formatHoursAndMinutes(conditions.availableHours)}
       </span>
     </div>
+  );
+}
+
+/** 데이터 부족 결과에 남은 E4 근거를 요약해, 시간 제약 결과로 오해하지 않게 한다. */
+function DataUnavailableEvidence({
+  candidates,
+}: {
+  candidates: CandidateEvaluation[];
+}) {
+  const missingTravelCandidates = candidates.filter(
+    (candidate) => "dataStatus" in candidate.data.travel,
+  );
+  if (missingTravelCandidates.length === 0) return null;
+
+  return (
+    <>
+      <p className="dd-error-summary__text">추천 데이터 수집 상태</p>
+      <ul className="dd-basis" aria-label="추천 데이터 수집 상태">
+        {missingTravelCandidates.map((candidate) => {
+          const travel = candidate.data.travel;
+          if (!("dataStatus" in travel)) return null;
+
+          return (
+            <li
+              className="dd-basis__item dd-data-status dd-data-status--missing"
+              key={candidate.id}
+            >
+              {missingDataIcon}
+              {candidate.name} · 이동시간 · 출처 미기록 · 수집 시각 미기록 ·
+              상태 결측 · 사유 · {travel.reason}
+            </li>
+          );
+        })}
+      </ul>
+    </>
   );
 }
 
@@ -482,6 +537,7 @@ export default function TripConditionsPage({
                 시간 조건이 맞지 않는다는 뜻은 아니에요. 확인 가능한 데이터가
                 준비되면 다시 추천할게요.
               </p>
+              <DataUnavailableEvidence candidates={phase.outcome.candidates} />
             </div>
           </section>
         ) : null}
