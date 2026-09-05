@@ -1,7 +1,7 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 /**
- * 버튼. 변형과 상태를 props로 받는다(docs/design/DESIGN_TOKENS.md 버튼 표).
+ * 버튼. 변형과 상태를 props로 받는다.
  *
  * 비활성은 네이티브 `disabled`로 표현한다. 별도 변형을 만들면 실제로 눌리는 버튼과
  * 눌리는 것처럼 보이는 버튼이 갈린다.

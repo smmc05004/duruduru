@@ -3,24 +3,21 @@
 기능 구현의 기준은 다음 문서를 함께 따른다.
 
 - `docs/agent/TECH_STACK.md`
-- `docs/product/PRD.md`
-- `docs/product/FUNCTIONAL_SPEC.md`
-- `docs/product/DECISIONS.md`
-- `docs/product/FOOD_DATA_STRATEGY.md`
-- `docs/product/FOOD_DATA_NEXT_STEPS.md`
+- `docs/product/TRAVEL_RECOMMENDATION.md`
+- `docs/product/DISTANCE_CALCULATION.md`
 
 이 프로젝트에서 제품 범위, 우선순위, 데이터 신뢰도 또는 사용자 흐름에 영향을 주는 작업을 시작하기 전에 다음 문서를 읽는다.
 
 1. `.agents/pm/AGENT.md` — 지속되는 PM 역할과 권한
-2. `docs/product/PRD.md` — 합의된 제품 정의와 MVP 요구사항
-3. `docs/product/DECISIONS.md` — 확정·보류된 제품 결정
+2. `docs/product/TRAVEL_RECOMMENDATION.md` — 추천·일정 생성 규칙
+3. `docs/product/DISTANCE_CALCULATION.md` — 좌표·도로 경로 거리·일반 예상시간 규칙
 
 ## 기본 원칙
 
 - DURUDURU의 핵심은 **사용 가능한 시간으로 목적지부터 추천**하는 경험이다.
 - 핵심 추천과 일정 생성은 LLM이 아니라 공공데이터와 규칙/점수 기반 엔진으로 구현한다.
 - 스탬프, 친구, 랭킹, 방문 인증은 현 MVP 범위에 포함하지 않는다.
-- 구현 전에 PM 문서의 범위와 충돌 여부를 확인한다. 새 제품 판단이 필요하면 먼저 `docs/product/DECISIONS.md`에 제안 또는 결정을 기록한다.
+- 구현 전에 두 제품 문서의 범위와 충돌 여부를 확인한다. 새 제품 판단이 필요하면 해당 문서를 먼저 갱신하거나 사용자에게 결정받는다.
 - 문서와 코드가 충돌하면 코드를 임의로 확장하지 말고 문서를 갱신하거나 사용자와 결정한다.
 
 ## 개발 브랜치 규칙

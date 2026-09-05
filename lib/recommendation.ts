@@ -319,7 +319,7 @@ function evaluateOne(
   );
   if (!weightSet) {
     throw new Error(
-      `사용 가능한 구성요소 조합(${usableIds.join(", ") || "없음"})에 대응하는 가중치 집합이 정책에 없습니다. 임의로 재정규화하지 않습니다(docs/product/DECISIONS.md 6.1절).`,
+      `사용 가능한 구성요소 조합(${usableIds.join(", ") || "없음"})에 대응하는 가중치 집합이 정책에 없습니다. 임의로 재정규화하지 않습니다.`,
     );
   }
 
@@ -375,7 +375,7 @@ export function evaluateCandidates(
 ): RecommendationOutcome {
   if (!policy) {
     throw new Error(
-      "점수 정책이 주입되지 않았습니다. 임의 기본값으로 대체하지 않습니다(docs/product/DECISIONS.md 6.1절).",
+      "점수 정책이 주입되지 않았습니다. 임의 기본값으로 대체하지 않습니다.",
     );
   }
 

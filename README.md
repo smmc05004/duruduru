@@ -8,9 +8,8 @@
 
 현재는 기능 구현을 진행하는 MVP 단계입니다. 제품 정의와 결정, 기능 명세는 아래 문서를 기준으로 합니다.
 
-- [제품 요구사항](docs/product/PRD.md)
-- [기능 명세](docs/product/FUNCTIONAL_SPEC.md)
-- [제품 결정](docs/product/DECISIONS.md)
+- [여행 장소 추천 방법](docs/product/TRAVEL_RECOMMENDATION.md)
+- [거리 계산 방법](docs/product/DISTANCE_CALCULATION.md)
 
 ## 주요 사용자 흐름
 
@@ -38,8 +37,7 @@ app/                       # App Router 화면
 lib/                       # 추천·일정 도메인 로직과 데이터
 e2e/                       # Playwright 화면 점검
 scripts/                   # 점검·작업 사이클 스크립트
-docs/product/              # 제품 요구사항·결정·계획
-docs/design/               # 디자인 방향과 토큰
+docs/product/              # 여행 장소 추천·거리 계산 방법
 docs/agent/                # 에이전트 공통 규칙
 .env.local.example         # TourAPI 점검용 환경변수 예시
 ```

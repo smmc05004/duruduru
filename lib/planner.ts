@@ -168,7 +168,7 @@ export function buildItinerary(
     // 검사하지 않는다. 그래서 복귀 직전에 시작만 걸치는 항목이 일정에 남을 수 있다.
     // FUNCTIONAL_SPEC.md의 F-04는 "마지막 항목 종료 + 목적지→출발지 이동 + 복귀 버퍼는
     // 복귀 가능 일시 이하"를 요구하지만, 그 검사에 필요한 최소 현지 체류시간과 복귀 버퍼
-    // 기준이 docs/product/DECISIONS.md에서 미확정이다. 기준을 임의로 정하면 그 상수가
+    // 기준은 docs/product/TRAVEL_RECOMMENDATION.md의 라이브 추천 규칙으로 대체될 예정이다. 임의로 정하면 그 상수가
     // 사실상 제품 결정이 되므로 지금 고치지 않는다. 정책이 확정되면 F-04 규칙대로 구현한다.
     if (cursor > end || !isOpen(attraction, cursor)) continue;
     items.push({

@@ -5,7 +5,7 @@ import type { TransportMode } from "./support-conditions";
  * 출발지→목적지 이동시간 어댑터.
  *
  * ⚠ 이 값은 **PoC 목업이며 정식 정책으로 승격하지 않는다.**
- *   docs/product/DECISIONS.md 1절 표의 `장소 간 이동시간 산출 방식`이 `제안` 상태이고,
+ *   docs/product/DISTANCE_CALCULATION.md의 도로 경로 계산 방식을 구현하기 전까지,
  *   같은 표의 "PoC의 목업 값·숫자는 정식 정책으로 승격하지 않는다"가 이 값을 직접 가리킨다.
  *   5.4절도 "출발지→목적지 이동시간의 출처·산출 방식(미정)"을 F-02의 남은 데이터 차단으로 적었다.
  *
