@@ -25,7 +25,7 @@ MVP의 1차 원천은 한국교통연구원 국가교통DB(KTDB)의 `2025-TRNT-R
 ## 현재 사전 산출물
 
 - 생성 도구: `scripts/build-ktdb-travel-times.mjs`
-- 입력: KTDB 원본 `2024_JUNKUK_도로.in`, `전국지역간 존체계(2024).xlsx` (원본은 저장소에 복제하지 않는다.)
+- 입력: KTDB 원본 2024_JUNKUK_도로.in과 전국지역간 존체계(2024).xlsx (원본은 저장소에 복제하지 않는다.)
 - 결과: `data/ktdb/interregional-travel-times-2024.json`
 - 범위: 252개 존, 63,504개 출발·도착 쌍
 
