@@ -38,6 +38,10 @@
 - 구현 결과의 독립 검토는 `.agents/reviewer/AGENT.md`의 reviewer agent가 담당한다. reviewer agent는 구현을 맡은 세션·에이전트와 분리해 새 컨텍스트에서 실행한다.
 - 화면 설계와 디자인 토큰·공통 컴포넌트는 `.agents/designer/AGENT.md`의 designer agent가 담당한다. 확정된 디자인 방향은 `docs/design/DESIGN_DIRECTION.md`, 토큰은 `docs/design/DESIGN_TOKENS.md`에 있다.
 
+## MVP 기능 구현 간소화 규칙
+
+기능형 MVP를 완성하는 동안에는 구현 속도를 우선한다. 독립 reviewer agent, 리뷰 그래프, `npm run cycle` 기록, Jest·빌드·lint·타입 검사·Playwright E2E 같은 자동 검증 절차를 모두 생략한다. 구현자는 기능을 구현해 커밋·PR을 만들고, 사용자가 직접 화면을 확인한다. 이 예외는 MVP 기능 구현에만 적용하며, 제품 범위를 바꾸는 결정은 PM 문서에 계속 기록한다.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know
