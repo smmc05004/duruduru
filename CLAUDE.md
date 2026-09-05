@@ -3,10 +3,12 @@
 이 파일은 Claude Code 전용 진입점이다. 제품·기술·작업 규칙의 단일 출처는 저장소 안의 공통 문서이며, 이 파일에 규칙을 복제하지 않는다.
 
 @AGENTS.md
-@docs/agent/SOURCE_ORDER.md
-@docs/agent/WORKFLOW.md
-@docs/agent/WORK_CYCLE.md
 @docs/agent/TECH_STACK.md
+@docs/development/IMPLEMENTATION_PLAN.md
+@docs/development/MVP_IMPLEMENTATION_PLAN.md
+@docs/product/PRD.md
+@docs/product/TRAVEL_RECOMMENDATION.md
+@docs/product/DISTANCE_CALCULATION.md
 
 ## Claude Code 전용 규칙
 
