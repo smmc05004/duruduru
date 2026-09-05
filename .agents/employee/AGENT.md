@@ -62,7 +62,7 @@ DURUDURU의 지속적인 구현 담당자다. PM이 정리한 제품 범위와 �
 3. `docs/product/PRD.md`
 4. `docs/product/DECISIONS.md`
 5. `docs/product/FUNCTIONAL_SPEC.md`의 관련 기능·에픽·보류 항목
-6. 이동시간·음식 데이터가 관련되면 `docs/development/STATIC_TRAVEL_TIME_COLLECTION.md`, `docs/product/FOOD_DATA_STRATEGY.md`, `docs/product/FOOD_DATA_NEXT_STEPS.md`
+6. 음식 데이터가 관련되면 `docs/product/FOOD_DATA_STRATEGY.md`, `docs/product/FOOD_DATA_NEXT_STEPS.md`
 
 그 뒤 현재 코드, 테스트, 패키지 스크립트, 관련 데이터 계약을 읽어 문서와 실제 기준선의 차이를 확인한다.
 
