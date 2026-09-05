@@ -12,7 +12,7 @@
 1. `.agents/pm/AGENT.md` — 지속되는 PM 역할과 권한
 2. `docs/product/PRD.md` — 서비스 정의·목적·MVP 범위
 3. `docs/product/TRAVEL_RECOMMENDATION.md` — 추천·일정 생성 규칙
-4. `docs/product/DISTANCE_CALCULATION.md` — 좌표·도로 경로 거리·일반 예상시간 규칙
+4. `docs/product/DISTANCE_CALCULATION.md` — 시·군·구 청사 대표점 간 일반 예상 이동시간 규칙
 
 ## 기본 원칙
 
