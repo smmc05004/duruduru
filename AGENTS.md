@@ -7,6 +7,7 @@
 - `docs/product/TRAVEL_RECOMMENDATION.md`
 - `docs/product/DISTANCE_CALCULATION.md`
 - `docs/product/API_FETCH_FLOW.md`
+- `docs/product/FOOD_DATA_POLICY.md`
 
 이 프로젝트에서 제품 범위, 우선순위, 데이터 신뢰도 또는 사용자 흐름에 영향을 주는 작업을 시작하기 전에 다음 문서를 읽는다.
 

@@ -9,6 +9,7 @@
 @docs/product/TRAVEL_RECOMMENDATION.md
 @docs/product/DISTANCE_CALCULATION.md
 @docs/product/API_FETCH_FLOW.md
+@docs/product/FOOD_DATA_POLICY.md
 
 ## Claude Code 전용 규칙
 
