@@ -1,1270 +1,305 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useState } from "react";
 import { Button } from "@/components/Button";
 import { Chip } from "@/components/Chip";
-import {
-  FieldCard,
-  fieldErrorId,
-  fieldHintId,
-  type FieldCardError,
-} from "@/components/FieldCard";
+import { FieldCard } from "@/components/FieldCard";
 import { InputField } from "@/components/InputField";
-import { SegmentedControl } from "@/components/SegmentedControl";
 import { Select } from "@/components/Select";
-import { CandidateCard } from "@/components/CandidateCard";
 import { formatHoursAndMinutes } from "@/lib/format-duration";
-import type { DataProvenance, DomainDataStatus } from "@/lib/domain-data";
+import { originRegions } from "@/lib/region-config";
 import type {
-  CandidateEvaluation,
-  RecommendationOutcome,
-} from "@/lib/recommendation";
-import { requestRecommendations } from "@/lib/recommendation-request";
-import {
-  createReferenceItinerary,
-  type ReferenceItineraryInput,
-  type ReferenceItineraryResult,
-  type ReferenceItineraryUnavailable,
-} from "@/lib/reference-itinerary";
-import {
-  lookupReferenceOriginTravel,
-  referenceItineraryDataSource,
-} from "@/lib/reference-itinerary-data";
-import { evaluateRecommendationRequest } from "@/lib/recommendation-request";
-import { pocDataAdapter } from "@/lib/poc-data-adapter";
-import { recommendationPolicyV1 } from "@/lib/trip-policy";
-import {
-  interestTags,
-  loadSupportConditions,
-  type SupportSet,
-} from "@/lib/support-conditions";
-import {
-  errorsByField,
-  validateTripConditions,
-  type TripConditionsDraft,
-  type TripConditionsField,
-  type ValidTripConditions,
-} from "@/lib/trip-conditions";
+  PlannerCandidate,
+  SearchRequest,
+  SearchResponse,
+} from "@/lib/trip-planner-contract";
+import { interestTags } from "@/lib/support-conditions";
 
-/*
- * F-01 조건 입력 → F-02·F-03 추천 계산·추천 결과·결과 없음 화면.
- * 시안: design/screens/Input.dc.html, InputError.dc.html, Loading.dc.html, Main.dc.html,
- *       NoResult.dc.html.
- *
- * 규칙은 이 컴포넌트에 없다. lib/trip-conditions.ts가 검증하고 lib/recommendation.ts가
- * 판정·점수를 낸다. 화면은 그 결과와 근거만 표시한다.
- *
- * 범위 밖: 일정 결과 화면(F-04). 그래서 목적지 선택은 "선택 상태"까지만 간다.
- */
+type View = "form" | "loading" | "candidates" | "itinerary" | "error";
 
-function emptyDraft(support?: SupportSet): TripConditionsDraft {
-  return {
-    // 출발지·일시는 기본값을 넣지 않는다. 임의 기본값은 사용자가 고르지 않은 조건을
-    // 고른 것처럼 만들고, 검증이 통과하는 이유를 감춘다.
-    originId: "",
-    startAt: "",
-    returnBy: "",
-    // 이동수단은 지원 목록에서 유일하게 정식 지원되는 값을 초기 선택으로 둔다(시안과 같다).
-    transport: support?.transports[0]?.id ?? "",
-    interests: [],
-  };
-}
-
-const carIcon = (
-  <svg
-    width="18"
-    height="18"
-    viewBox="0 0 20 20"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.6"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-  >
-    <path d="M3 12.5h14M4.5 12.5V9.2l1.8-3.4h7.4l1.8 3.4v3.3" />
-    <circle cx="6.6" cy="14.4" r="1.4" />
-    <circle cx="13.4" cy="14.4" r="1.4" />
-  </svg>
-);
-
-function formatHours(value: number) {
-  return Number.isInteger(value) ? `${value}시간` : `${value.toFixed(1)}시간`;
-}
-
-function formatDateTime(value: Date) {
-  return new Intl.DateTimeFormat("ko-KR", {
-    timeZone: "Asia/Seoul",
-    month: "numeric",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(value);
-}
-
-function formatBasisDate(value: string) {
-  const matched = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
-  return matched ? `${matched[1]}.${matched[2]}.${matched[3]}` : value;
-}
-
-function statusLabel(status: DomainDataStatus) {
-  return {
-    normal: "확인됨",
-    estimate: "추정",
-    fallback: "대체 데이터",
-    stale: "기준일 지남",
-    missing: "정보 없음",
-  }[status];
-}
-
-function friendlyTourismSource(source: string) {
-  return source.includes("TourAPI") ? "한국관광공사 TourAPI" : source;
-}
-
-function destinationName(destinationId: string) {
-  return (
-    {
-      gyeongju: "경주",
-      gongju: "공주",
-      gangneung: "강릉",
-    }[destinationId] ?? destinationId
-  );
-}
-
-function itineraryNoticeForUser(notice: string) {
-  if (notice.includes("실시간 교통") || notice.includes("예약 가능 여부")) {
-    return null;
-  }
-  if (notice.includes("식사 장소")) return "식사 장소는 직접 확인해 주세요.";
-  return null;
-}
-
-function BasisLine({
-  label,
-  provenance,
-  basisDate,
-  route = false,
-}: {
-  label: string;
-  provenance: DataProvenance;
-  basisDate?: string;
-  route?: boolean;
-}) {
-  return (
-    <li className="dd-data-basis__line">
-      {label} ·{" "}
-      {route
-        ? "OpenStreetMap 도로 데이터 기반 일반 예상치"
-        : friendlyTourismSource(provenance.source)}
-      {basisDate ? ` · 기준일 ${formatBasisDate(basisDate)}` : ""} · 수집일{" "}
-      {formatBasisDate(provenance.collectedAt || "미기록")} ·{" "}
-      {statusLabel(provenance.dataStatus)}
-    </li>
-  );
-}
-
-type Phase =
-  | { kind: "input" }
-  | { kind: "calculating"; conditions: ValidTripConditions }
-  | {
-      kind: "result";
-      conditions: ValidTripConditions;
-      outcome: RecommendationOutcome;
-    }
-  | {
-      kind: "itinerary";
-      conditions: ValidTripConditions;
-      itinerary: ReferenceItineraryResult | ReferenceItineraryUnavailable;
-      outcome: RecommendationOutcome;
-    }
-  | {
-      kind: "itinerary-calculating";
-      conditions: ValidTripConditions;
-      input: ReferenceItineraryInput;
-      outcome: RecommendationOutcome;
-    }
-  | {
-      kind: "itinerary-error";
-      conditions: ValidTripConditions;
-      input: ReferenceItineraryInput;
-      outcome: RecommendationOutcome;
-    };
-
-type SupportConditionsState =
-  { kind: "ready"; support: SupportSet } | { kind: "error" };
-
-type TripConditionsPageProps = {
-  /** 테스트와 이후 데이터 계층 전환에서 지원 조건 실패를 재현하는 읽기 경계 */
-  loadConditions?: () => SupportSet;
-  /** 화면은 데이터 계층을 직접 알지 않고 추천 요청 경계만 호출한다. */
-  loadRecommendations?: (
-    conditions: ValidTripConditions,
-  ) => Promise<RecommendationOutcome>;
-  loadItinerary?: (
-    input: ReferenceItineraryInput,
-  ) => Promise<ReferenceItineraryResult | ReferenceItineraryUnavailable>;
+const initialRequest: SearchRequest = {
+  originId: "",
+  startAt: "",
+  returnBy: "",
+  transport: "car",
+  interests: [],
 };
 
-const spinnerIcon = (
-  <svg
-    width="20"
-    height="20"
-    viewBox="0 0 20 20"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.9"
-    strokeLinecap="round"
-    aria-hidden="true"
-  >
-    <path d="M10 2.8a7.2 7.2 0 1 1-6.9 5.1" />
-  </svg>
-);
+const formatMinutes = (minutes: number) => formatHoursAndMinutes(minutes / 60);
 
-const missingDataIcon = (
-  <svg
-    width="14"
-    height="14"
-    viewBox="0 0 20 20"
-    fill="none"
-    aria-hidden="true"
-  >
-    <path
-      d="M5 10h10"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-    />
-  </svg>
-);
+export default function TripConditionsPage() {
+  const [request, setRequest] = useState<SearchRequest>(initialRequest);
+  const [view, setView] = useState<View>("form");
+  const [message, setMessage] = useState("");
+  const [candidates, setCandidates] = useState<PlannerCandidate[]>([]);
+  const [selected, setSelected] = useState<PlannerCandidate | null>(null);
 
-const e2eFixtureEnabled = process.env.NEXT_PUBLIC_E2E_FIXTURE === "1";
-
-function e2eItinerary(
-  input: ReferenceItineraryInput,
-): ReferenceItineraryResult {
-  const provenance = {
-    source: "E2E 정적 fixture",
-    collectedAt: "2026-09-03",
-    dataStatus: "estimate" as const,
-  };
-  return {
-    kind: "reference-itinerary",
-    destinationId: input.destinationId,
-    conditions: input.conditions,
-    originTravel: {
-      kind: "road-route",
-      originId: "e2e-origin",
-      destinationId: input.destinationId,
-      distanceKm: 1,
-      estimatedHours: 1,
-      method: "E2E 정적 도로 경로",
-      source: "E2E 정적 fixture",
-      basisDate: "2026-09-03",
-      dataVersion: "2026-09-03",
-      policyVersion: "2026-09-03",
-      reproductionId: "e2e",
-      dataStatus: "estimate",
-    },
-    policyVersion: "2026-09-03",
-    ordering: "matched-interest-evidence-desc:id-asc",
-    disclaimer: {
-      label: "참고용 계획",
-      latestInfoAction: "방문 전 최신 운영·휴무·예약 정보를 확인",
-    },
-    guarantees: {
-      operationChecked: false,
-      restaurantAvailable: false,
-      returnByChecked: false,
-    },
-    notices: [
-      "일반 이동·방문시간은 참고 정보이며 실시간 교통 또는 예약 가능 여부를 보증하지 않습니다.",
-      "식사 장소는 직접 확인",
-    ],
-    places: [
-      {
-        id: "e2e-place",
-        name: "E2E 참고 장소",
-        category: "관광지",
-        matchedInterests: [input.interests[0] ?? "역사"],
-        interestEvidence: [
-          {
-            tag: input.interests[0] ?? "역사",
-            evidence: "E2E 관심사 근거",
-            provenance,
-          },
-        ],
-        interestEvidenceProvenance: provenance,
-        visit: { kind: "estimate", estimatedHours: 1, provenance },
-        broadTimeWindow: {
-          startsAt: new Date(input.conditions.startAt.getTime() + 3_600_000),
-          endsAt: new Date(input.conditions.startAt.getTime() + 7_200_000),
-        },
-        operation: { kind: "missing", reason: "운영 정보 없음", provenance },
-        travelFromPrevious: null,
-      },
-    ],
-  };
-}
-
-const emptyIllustration = (
-  <svg
-    width="96"
-    height="72"
-    viewBox="0 0 120 90"
-    fill="none"
-    stroke="var(--line-dashed)"
-    strokeWidth="2.4"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-  >
-    <path d="M12 22l32-10 32 10 32-10v56l-32 10-32-10-32 10z" />
-    <path d="M44 12v56M76 22v56" />
-    <path d="M52 44h16M60 36v16" stroke="var(--track-move)" />
-  </svg>
-);
-
-const earlierIcon = (
-  <svg
-    width="20"
-    height="20"
-    viewBox="0 0 20 20"
-    fill="none"
-    stroke="var(--olive-ink)"
-    strokeWidth="1.8"
-    strokeLinecap="round"
-    aria-hidden="true"
-  >
-    <circle cx="10" cy="10" r="7.2" />
-    <path d="M10 6.2V10l-2.6 1.8" />
-  </svg>
-);
-
-const laterIcon = (
-  <svg
-    width="20"
-    height="20"
-    viewBox="0 0 20 20"
-    fill="none"
-    stroke="var(--olive-ink)"
-    strokeWidth="1.8"
-    strokeLinecap="round"
-    aria-hidden="true"
-  >
-    <circle cx="10" cy="10" r="7.2" />
-    <path d="M10 6.2V10l2.6 1.8" />
-  </svg>
-);
-
-const placeIcon = (
-  <svg
-    width="20"
-    height="20"
-    viewBox="0 0 20 20"
-    fill="none"
-    stroke="var(--olive-ink)"
-    strokeWidth="1.8"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-  >
-    <path d="M10 17.2s5.6-5 5.6-9.2A5.6 5.6 0 0 0 4.4 8c0 4.2 5.6 9.2 5.6 9.2z" />
-    <circle cx="10" cy="8" r="2" />
-  </svg>
-);
-
-/** 조건 요약. 계산 중·결과·결과 없음 세 상태가 같은 요약을 유지한다(4장). */
-function originName(conditions: ValidTripConditions) {
-  return conditions.origin.name;
-}
-
-function ConditionSummary({
-  conditions,
-  title,
-}: {
-  conditions: ValidTripConditions;
-  title: string;
-}) {
-  return (
-    <section className="dd-summary-card" aria-label="제출한 여행 조건">
-      <p className="dd-summary-card__title">{title}</p>
-      <div className="dd-summary-card__chips">
-        <span className="dd-pill">{originName(conditions)} 출발</span>
-        <span className="dd-pill">
-          {formatDateTime(conditions.startAt)} 출발
-        </span>
-        <span className="dd-pill">
-          {formatDateTime(conditions.returnBy)} 복귀
-        </span>
-        <span className="dd-pill">{conditions.transportName}</span>
-        <span className="dd-pill">{conditions.tripType.label}</span>
-        <span className="dd-pill">
-          {conditions.timeZone} · 지원 조건 {conditions.supportVersion}
-        </span>
-        {conditions.interests.map((interest) => (
-          <span key={interest} className="dd-pill--interest">
-            {interest}
-          </span>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function ResultHeader({ conditions }: { conditions: ValidTripConditions }) {
-  return (
-    <div className="dd-screen__header">
-      <span className="dd-screen__logo">두루두루</span>
-      <span className="dd-badge-hours">
-        {formatHoursAndMinutes(conditions.availableHours)}
-      </span>
-    </div>
-  );
-}
-
-/** 데이터 부족 결과에 남은 E4 근거를 요약해, 시간 제약 결과로 오해하지 않게 한다. */
-function DataUnavailableEvidence({
-  candidates,
-}: {
-  candidates: CandidateEvaluation[];
-}) {
-  const missingTravelCandidates = candidates.filter(
-    (candidate) => "dataStatus" in candidate.data.travel,
-  );
-  if (missingTravelCandidates.length === 0) return null;
-
-  return (
-    <>
-      <p className="dd-error-summary__text">추천 데이터 수집 상태</p>
-      <ul className="dd-basis" aria-label="추천 데이터 수집 상태">
-        {missingTravelCandidates.map((candidate) => {
-          const travel = candidate.data.travel;
-          if (!("dataStatus" in travel)) return null;
-
-          return (
-            <li
-              className="dd-basis__item dd-data-status dd-data-status--missing"
-              key={candidate.id}
-            >
-              {missingDataIcon}
-              {candidate.name} · 이동시간 · 출처 미기록 · 수집 시각 미기록 ·
-              상태 결측 · 사유 · {travel.reason}
-            </li>
-          );
-        })}
-      </ul>
-    </>
-  );
-}
-
-export default function TripConditionsPage({
-  loadConditions = loadSupportConditions,
-  loadRecommendations = e2eFixtureEnabled
-    ? (conditions) =>
-        Promise.resolve(
-          evaluateRecommendationRequest(
-            conditions,
-            pocDataAdapter,
-            recommendationPolicyV1,
-          ),
-        )
-    : requestRecommendations,
-  loadItinerary = async (input) =>
-    e2eFixtureEnabled && input.destinationId === "gongju"
-      ? e2eItinerary(input)
-      : createReferenceItinerary(input, referenceItineraryDataSource),
-}: TripConditionsPageProps) {
-  const [supportState, setSupportState] = useState<SupportConditionsState>(
-    () => {
-      try {
-        return { kind: "ready", support: loadConditions() };
-      } catch {
-        return { kind: "error" };
-      }
-    },
-  );
-  const [draft, setDraft] = useState<TripConditionsDraft>(() =>
-    emptyDraft(
-      supportState.kind === "ready" ? supportState.support : undefined,
-    ),
-  );
-  const [attempted, setAttempted] = useState(false);
-  const [phase, setPhase] = useState<Phase>({ kind: "input" });
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-
-  const support = supportState.kind === "ready" ? supportState.support : null;
-  const result = useMemo(
-    () => (support ? validateTripConditions(draft, support) : null),
-    [draft, support],
-  );
-  const fieldErrors =
-    !result || result.ok || !attempted ? {} : errorsByField(result.errors);
-  const errorCount =
-    !result || result.ok || !attempted ? 0 : result.errors.length;
-
-  /*
-   * 계산은 비동기 경계 뒤에 있다(lib/recommendation-request.ts). 조건이 바뀌면 이전 결과는
-   * 새 조건의 결과로 오인되지 않게 버려진다(4장 — 조건 수정 시 기존 추천 무효화).
-   */
-  useEffect(() => {
-    if (phase.kind !== "calculating") return;
-    let cancelled = false;
-    const conditions = phase.conditions;
-    loadRecommendations(conditions).then((outcome) => {
-      if (!cancelled) setPhase({ kind: "result", conditions, outcome });
+  const update = (patch: Partial<SearchRequest>) =>
+    setRequest((current) => ({ ...current, ...patch }));
+  const toggleInterest = (interest: string) =>
+    update({
+      interests: request.interests.includes(interest)
+        ? request.interests.filter((item) => item !== interest)
+        : [...request.interests, interest],
     });
-    return () => {
-      cancelled = true;
-    };
-  }, [phase, loadRecommendations]);
 
-  /*
-   * 항목 하나가 입력 하나에 대응하지 않는다(출발·복귀는 한 카드를 쓴다). 그래서 오류를
-   * 카드 단위로 고르지 않고 입력 단위로 모아 넘긴다. 요약 배너가 세는 개수와 화면에
-   * 보이는 메시지 수가 어긋나면 사용자는 무엇을 더 고쳐야 하는지 알 수 없다.
-   */
-  function cardErrors(
-    ...fields: [TripConditionsField, string][]
-  ): FieldCardError[] {
-    return fields
-      .filter(([field]) => fieldErrors[field])
-      .map(([field, inputId]) => ({
-        inputId,
-        message: fieldErrors[field] as string,
-      }));
-  }
-
-  /** 오류가 있으면 오류 텍스트를, 없으면 안내 문구를 가리킨다. */
-  function describedBy(
-    field: TripConditionsField,
-    inputId: string,
-    hasHint = false,
-  ) {
-    if (fieldErrors[field]) return fieldErrorId(inputId);
-    return hasHint ? fieldHintId(inputId) : undefined;
-  }
-
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
-    setAttempted(true);
-    if (!result || !result.ok) {
-      // 검증을 통과하지 못한 조건은 추천 엔진으로 넘어가지 않는다(F-01 수용 기준).
-      setPhase({ kind: "input" });
+    if (
+      !request.originId ||
+      !request.startAt ||
+      !request.returnBy ||
+      !request.interests.length
+    ) {
+      setMessage("출발지, 출발·복귀 일시, 관심사를 모두 입력해 주세요.");
+      setView("error");
       return;
     }
-    setSelectedId(null);
-    setPhase({ kind: "calculating", conditions: result.conditions });
-  }
-
-  function update(patch: Partial<TripConditionsDraft>) {
-    setDraft((current) => ({ ...current, ...patch }));
-    setPhase({ kind: "input" });
-    setSelectedId(null);
-  }
-
-  function toggleInterest(tag: string) {
-    update({
-      interests: draft.interests.includes(tag)
-        ? draft.interests.filter((item) => item !== tag)
-        : [...draft.interests, tag],
-    });
-  }
-
-  const availableHours = result?.ok ? result.conditions.availableHours : null;
-
-  if (supportState.kind === "error") {
-    return (
-      <main className="dd-screen">
-        <div className="dd-screen__header">
-          <span className="dd-screen__logo">두루두루</span>
-        </div>
-        <section
-          className="dd-error-summary"
-          role="alert"
-          aria-label="지원 조건 오류"
-        >
-          <div>
-            <p className="dd-error-summary__title">
-              여행 조건을 불러오지 못했어요
-            </p>
-            <p className="dd-error-summary__text">
-              임의 조건으로 추천하지 않았어요. 다시 시도해 주세요.
-            </p>
-          </div>
-        </section>
-        <div className="dd-screen__actions">
-          <Button
-            type="button"
-            variant="primary"
-            onClick={() => {
-              try {
-                const nextSupport = loadConditions();
-                setDraft(emptyDraft(nextSupport));
-                setSupportState({ kind: "ready", support: nextSupport });
-              } catch {
-                setSupportState({ kind: "error" });
-              }
-            }}
-          >
-            다시 시도하기
-          </Button>
-        </div>
-      </main>
-    );
-  }
-
-  const loadedSupport = supportState.support;
-  const transportOptions = loadedSupport.transports.map((transport) => ({
-    value: transport.id,
-    label: transport.name,
-    icon: transport.id === "car" ? carIcon : undefined,
-  }));
-  const transportHint = "현재는 자차 여행만 지원해요.";
-
-  if (
-    phase.kind === "itinerary-calculating" ||
-    phase.kind === "itinerary-error"
-  ) {
-    const retry = () => {
-      setPhase({
-        kind: "itinerary-calculating",
-        conditions: phase.conditions,
-        input: phase.input,
-        outcome: phase.outcome,
-      });
-      void loadItinerary(phase.input)
-        .then((itinerary) =>
-          setPhase({
-            kind: "itinerary",
-            conditions: phase.conditions,
-            itinerary,
-            outcome: phase.outcome,
-          }),
-        )
-        .catch(() =>
-          setPhase({
-            kind: "itinerary-error",
-            conditions: phase.conditions,
-            input: phase.input,
-            outcome: phase.outcome,
-          }),
-        );
-    };
-    if (phase.kind === "itinerary-calculating") {
-      return (
-        <main className="dd-screen">
-          <ResultHeader conditions={phase.conditions} />
-          <div className="dd-calculating" role="status">
-            {spinnerIcon}
-            <p>참고 계획을 준비하고 있어요</p>
-          </div>
-        </main>
-      );
+    if (new Date(request.returnBy) <= new Date(request.startAt)) {
+      setMessage("복귀 시각은 출발 시각 이후여야 해요.");
+      setView("error");
+      return;
     }
+    setView("loading");
+    try {
+      const response = await fetch("/api/trip-search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request),
+      });
+      const result = (await response.json()) as SearchResponse;
+      if (result.kind !== "success") {
+        setMessage(result.message);
+        setView("error");
+        return;
+      }
+      setCandidates(result.candidates);
+      setView("candidates");
+    } catch {
+      setMessage("검색을 시작하지 못했어요. 잠시 후 다시 시도해 주세요.");
+      setView("error");
+    }
+  }
+
+  if (view === "loading") {
     return (
       <main className="dd-screen">
-        <ResultHeader conditions={phase.conditions} />
-        <section
-          className="dd-error-summary"
-          role="alert"
-          aria-label="참고 계획 생성 오류"
-        >
-          <p className="dd-error-summary__title">
-            참고 계획을 준비하지 못했어요
+        <Header />
+        <section className="dd-calculating" role="status">
+          <p>최신 관광지와 음식점 정보를 확인하고 있어요</p>
+          <p>
+            관광지 조건을 먼저 확인한 뒤, 가능한 지역에만 식사 정보를 연결해요.
           </p>
+        </section>
+      </main>
+    );
+  }
+
+  if (view === "error") {
+    return (
+      <main className="dd-screen">
+        <Header />
+        <section className="dd-error-summary" role="alert">
+          <p className="dd-error-summary__title">
+            지금은 계획을 만들 수 없어요
+          </p>
+          <p className="dd-error-summary__text">{message}</p>
           <p className="dd-error-summary__text">
-            임의 일정으로 바꾸지 않았어요. 다시 시도해 주세요.
+            임의 관광지·음식점·이동시간으로 대신 추천하지 않았어요.
           </p>
         </section>
         <div className="dd-result-actions">
-          <Button variant="primary" onClick={retry}>
-            다시 시도하기
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={() =>
-              setPhase({
-                kind: "result",
-                conditions: phase.conditions,
-                outcome: phase.outcome,
-              })
-            }
-          >
-            추천으로 돌아가기
+          <Button variant="primary" onClick={() => setView("form")}>
+            조건 수정하기
           </Button>
         </div>
       </main>
     );
   }
 
-  if (phase.kind === "itinerary") {
-    const { itinerary, conditions } = phase;
+  if (view === "itinerary" && selected) {
+    const origin = originRegions.find((item) => item.id === request.originId);
     return (
       <main className="dd-screen">
-        <ResultHeader conditions={conditions} />
-        <ConditionSummary conditions={conditions} title="참고용 여행 계획" />
-        {itinerary.kind === "data-unavailable" ? (
-          <section
-            className="dd-error-summary"
-            role="alert"
-            aria-label="참고 계획 데이터 부족"
-          >
-            <p className="dd-error-summary__title">
-              참고 계획에 필요한 데이터를 확인하지 못했어요
-            </p>
-            <p className="dd-error-summary__text">
-              {itinerary.reason} 방문 전 최신 운영·휴무·예약 정보를 확인해
-              주세요.
-            </p>
-            <p className="dd-error-summary__text">
-              부족한 항목:{" "}
-              {itinerary.missing
-                .map((item) => (item === "places" ? "장소" : "관심사 근거"))
-                .join(" · ")}
-            </p>
-          </section>
-        ) : (
-          <section aria-label="참고용 여행 계획">
-            <p className="dd-notice">
-              참고용 계획이에요. 일반 예상시간을 바탕으로 했으며, 방문 전 최신
-              운영·휴무·예약 정보를 확인해 주세요.
-            </p>
-            {itinerary.notices
-              .map(itineraryNoticeForUser)
-              .filter((notice) => notice !== null)
-              .map((notice) => (
-                <p className="dd-itinerary__notice" key={notice}>
-                  {notice}
-                </p>
-              ))}
-            {itinerary.originTravel ? (
-              <p className="dd-itinerary__origin-travel">
-                {originName(conditions)}에서{" "}
-                {destinationName(itinerary.destinationId)}까지 일반 예상{" "}
-                {formatHoursAndMinutes(itinerary.originTravel.estimatedHours)} ·
-                기준일 {formatBasisDate(itinerary.originTravel.basisDate)} ·{" "}
-                {statusLabel(itinerary.originTravel.dataStatus)}
-              </p>
-            ) : null}
-            <ol className="dd-candidates">
-              {itinerary.places.map((place, index) => (
-                <li className="dd-candidate" key={place.id}>
-                  <h2>
-                    {index + 1}. {place.name}
-                  </h2>
-                  <p>
-                    관심사 · {place.matchedInterests.join(" · ") || "정보 없음"}
-                  </p>
-                  <p className="dd-itinerary__time">
-                    방문{" "}
-                    {place.visit.kind === "estimate"
-                      ? `약 ${formatHours(place.visit.estimatedHours)} (예상 시간)`
-                      : "시간 정보 없음"}
-                  </p>
-                  <p>
-                    운영 정보:{" "}
-                    {place.operation.kind === "available"
-                      ? "운영 정보가 있어요. 방문 전 최신 정보를 확인해 주세요."
-                      : "운영 정보는 아직 확인하지 못했어요. 방문 전 확인해 주세요."}
-                  </p>
-                  <p>
-                    이전 장소에서의 이동:{" "}
-                    {place.travelFromPrevious === null
-                      ? "첫 방문지"
-                      : place.travelFromPrevious.kind === "road-route"
-                        ? `일반 예상 ${formatHoursAndMinutes(place.travelFromPrevious.estimatedHours)}`
-                        : "이동시간 정보 없음 — 이 구간은 확정되지 않았어요."}
-                  </p>
-                  <p>
-                    넓은 시간대:{" "}
-                    {place.broadTimeWindow
-                      ? `${formatDateTime(place.broadTimeWindow.startsAt)} ~ ${formatDateTime(place.broadTimeWindow.endsAt)}`
-                      : "넓은 시간대 정보 없음"}
-                  </p>
-                </li>
-              ))}
-            </ol>
-            <details className="dd-data-basis dd-itinerary__basis">
-              <summary>계획 데이터 기준 보기</summary>
-              <div className="dd-data-basis__content">
-                <p className="dd-data-basis__title">이 계획에 사용한 데이터</p>
-                {itinerary.originTravel ? (
-                  <ul>
-                    <BasisLine
-                      label="출발지 이동"
-                      provenance={{
-                        source: itinerary.originTravel.source,
-                        collectedAt: itinerary.originTravel.basisDate,
-                        dataStatus: itinerary.originTravel.dataStatus,
-                      }}
-                      basisDate={itinerary.originTravel.basisDate}
-                      route
-                    />
-                  </ul>
-                ) : null}
-                <p className="dd-data-basis__group">방문 장소</p>
-                <ul>
-                  {itinerary.places.map((place) => (
-                    <BasisLine
-                      key={`place-${place.id}`}
-                      label={`${place.name} 방문 정보`}
-                      provenance={place.visit.provenance}
-                    />
-                  ))}
-                </ul>
-                <p className="dd-data-basis__group">장소 사이 이동</p>
-                <ul>
-                  {itinerary.places.slice(1).map((place) =>
-                    place.travelFromPrevious?.kind === "road-route" ? (
-                      <BasisLine
-                        key={`travel-${place.id}`}
-                        label={`${place.name} 이동시간`}
-                        provenance={{
-                          source: place.travelFromPrevious.source,
-                          collectedAt: place.travelFromPrevious.basisDate,
-                          dataStatus: place.travelFromPrevious.dataStatus,
-                        }}
-                        basisDate={place.travelFromPrevious.basisDate}
-                        route
-                      />
-                    ) : (
-                      <li
-                        className="dd-data-basis__line"
-                        key={`travel-${place.id}`}
-                      >
-                        {place.name} 이동시간 · 정보 없음
-                      </li>
-                    ),
-                  )}
-                </ul>
-                <p className="dd-data-basis__group">운영 정보</p>
-                <ul>
-                  {itinerary.places.map((place) => (
-                    <BasisLine
-                      key={`operation-${place.id}`}
-                      label={`${place.name} 운영 정보`}
-                      provenance={
-                        place.operation.kind === "available"
-                          ? place.operation.value.provenance
-                          : place.operation.provenance
-                      }
-                    />
-                  ))}
-                </ul>
-                {itinerary.notices.some(
-                  (notice) => itineraryNoticeForUser(notice) === null,
-                ) ? (
-                  <>
-                    <p className="dd-data-basis__group">추가 안내</p>
-                    <ul>
-                      {itinerary.notices
-                        .filter(
-                          (notice) => itineraryNoticeForUser(notice) === null,
-                        )
-                        .map((notice) => (
-                          <li className="dd-data-basis__line" key={notice}>
-                            {notice}
-                          </li>
-                        ))}
-                    </ul>
-                  </>
-                ) : null}
-              </div>
-            </details>
-          </section>
-        )}
-        <div className="dd-result-actions">
-          <Button
-            variant="secondary"
-            onClick={() => setPhase({ kind: "input" })}
-          >
-            조건 수정하기
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={() =>
-              setPhase({ kind: "result", conditions, outcome: phase.outcome })
-            }
-          >
-            다른 후보 선택하기
-          </Button>
-        </div>
-      </main>
-    );
-  }
-
-  if (phase.kind !== "input") {
-    const { conditions } = phase;
-    // 판정에 실제로 쓰인 여행 유형·최소 체류시간을 결과에서 그대로 읽는다. 화면이 다시 계산하지 않는다.
-    const duration = phase.kind === "result" ? phase.outcome.duration : null;
-    const passed = phase.kind === "result" ? phase.outcome.passed : [];
-    const dataUnavailable =
-      phase.kind === "result" && phase.outcome.kind === "data-unavailable";
-    const noResult =
-      phase.kind === "result" && phase.outcome.kind === "no-results";
-
-    return (
-      <main className="dd-screen">
-        <ResultHeader conditions={conditions} />
-        <ConditionSummary
-          conditions={conditions}
-          title={
-            dataUnavailable
-              ? "추천에 필요한 데이터를\n확인하지 못했어요"
-              : noResult
-                ? "이번 시간에는\n다녀올 수 있는 곳이 없어요"
-                : `${originName(conditions)}에서 출발해서\n다시 돌아올 수 있는 곳`
-          }
-        />
-
-        {phase.kind === "calculating" ? (
-          <>
-            <div className="dd-calculating" role="status">
-              {spinnerIcon}
-              <p>시간 안에 다녀올 수 있는 곳을 계산하고 있어요</p>
-            </div>
-            <div className="dd-candidates" aria-hidden="true">
-              {[0, 1].map((index) => (
-                <div className="dd-skeleton-card" key={index}>
-                  <div className="dd-skeleton-card__head">
-                    <div className="dd-skeleton dd-skeleton--title" />
-                    <div className="dd-skeleton dd-skeleton--region" />
-                  </div>
-                  <div className="dd-skeleton dd-skeleton--bar" />
-                  <div className="dd-skeleton dd-skeleton--line" />
-                  <div className="dd-skeleton dd-skeleton--line-short" />
-                </div>
-              ))}
-            </div>
-          </>
-        ) : null}
-
-        {noResult ? (
-          <>
-            {/* 오류가 아니라 정상 결과다(4장). 장애 화면과 달리 경고색·재시도 버튼을 쓰지 않는다. */}
-            <section className="dd-empty" aria-label="결과 없음">
-              {emptyIllustration}
-              <p className="dd-empty__title">
-                쓸 수 있는 시간이{" "}
-                {formatHoursAndMinutes(conditions.availableHours)}라, 왕복
-                이동과 최소로 머물러야 하는 {duration?.minimumLocalStayHours}
-                시간({duration?.label})을 함께 넣을 수 있는 곳이 없었어요.
-              </p>
-              <p className="dd-empty__note">
-                억지로 채우지 않고 그대로 알려드려요. 아래처럼 조건을 조금만
-                바꾸면 다시 찾아볼 수 있어요.
-              </p>
-            </section>
-            <ul className="dd-suggestions">
-              <li className="dd-suggestions__item">
-                {earlierIcon}
-                <span>더 이른 시간에 출발하기</span>
-              </li>
-              <li className="dd-suggestions__item">
-                {laterIcon}
-                <span>복귀 시간을 늦춰보기</span>
-              </li>
-              <li className="dd-suggestions__item">
-                {placeIcon}
-                <span>지원하는 다른 출발지로 바꾸기</span>
-              </li>
-            </ul>
-          </>
-        ) : null}
-
-        {dataUnavailable ? (
-          <section
-            className="dd-error-summary"
-            role="alert"
-            aria-label="추천 데이터 부족"
-          >
-            <div>
-              <p className="dd-error-summary__title">
-                이동시간 데이터를 아직 준비하지 못했어요
-              </p>
-              <p className="dd-error-summary__text">
-                시간 조건이 맞지 않는다는 뜻은 아니에요. 확인 가능한 데이터가
-                준비되면 다시 추천할게요.
-              </p>
-              <DataUnavailableEvidence candidates={phase.outcome.candidates} />
-            </div>
-          </section>
-        ) : null}
-
-        {phase.kind === "result" && passed.length > 0 ? (
-          <>
-            <p className="dd-notice">
-              일반 예상시간으로 만든 참고용 결과예요. 출발 전 최신
-              운영·휴무·예약 정보를 확인해 주세요.
-            </p>
-            <div className="dd-list-head">
-              <span className="dd-list-head__count">
-                다녀올 수 있는 곳 {passed.length}군데
-              </span>
-              <span className="dd-list-head__order">시간 적합순</span>
-            </div>
-            <ul className="dd-candidates">
-              {passed.map((candidate, index) => (
-                <CandidateCard
-                  key={candidate.id}
-                  candidate={candidate}
-                  selectedInterestCount={conditions.interests.length}
-                  best={index === 0}
-                  selected={selectedId === candidate.id}
-                  onSelect={() => {
-                    setSelectedId(candidate.id);
-                    const originTravel = lookupReferenceOriginTravel(
-                      conditions.originId,
-                      candidate.id,
-                    );
-                    const input = {
-                      destinationId: candidate.id,
-                      interests: conditions.interests,
-                      conditions,
-                      originTravel,
-                    };
-                    setPhase({
-                      kind: "itinerary-calculating",
-                      conditions,
-                      input,
-                      outcome: phase.outcome,
-                    });
-                    void loadItinerary(input)
-                      .then((itinerary) =>
-                        setPhase({
-                          kind: "itinerary",
-                          conditions,
-                          itinerary,
-                          outcome: phase.outcome,
-                        }),
-                      )
-                      .catch(() =>
-                        setPhase({
-                          kind: "itinerary-error",
-                          conditions,
-                          input,
-                          outcome: phase.outcome,
-                        }),
-                      );
-                  }}
-                />
-              ))}
-            </ul>
-          </>
-        ) : null}
-
-        <div className="dd-result-actions">
-          <Button
-            variant={noResult || dataUnavailable ? "primary" : "secondary"}
-            onClick={() => setPhase({ kind: "input" })}
-          >
-            조건 수정하기
-          </Button>
-        </div>
-
-        <p className="dd-screen__footnote">
-          {dataUnavailable
-            ? "이동시간 데이터가 없어 가능 여부나 점수를 임의로 계산하지 않았어요."
-            : "시간 제약을 통과하지 못한 곳은 보여주지 않아요."}
-          {phase.kind === "result"
-            ? ` (${duration?.label} 기준 최소 ${duration?.minimumLocalStayHours}시간)`
-            : ""}
+        <Header />
+        <section className="dd-summary-card">
+          <p className="dd-summary-card__title">
+            {selected.name} 참고용 여행 계획
+          </p>
+          <div className="dd-summary-card__chips">
+            <span className="dd-pill">{origin?.name ?? "출발지"} 출발</span>
+            <span className="dd-pill">
+              편도 일반 예상 {formatMinutes(selected.oneWayMinutes)}
+            </span>
+            <span className="dd-pill">내부 장소 이동시간은 반영하지 않음</span>
+          </div>
+        </section>
+        <p className="dd-notice">
+          관광지와 식사는 각각 1시간으로 배치한 참고 계획이에요. 방문 전
+          운영·휴무를 다시 확인해 주세요.
         </p>
+        {([1, 2] as const).map((day) => (
+          <section
+            className="dd-itinerary-day"
+            key={day}
+            aria-label={`${day}일차 일정`}
+          >
+            <h2>{day}일차</h2>
+            <ol className="dd-candidates">
+              {selected.itinerary
+                .filter((item) => item.day === day)
+                .map((item) => (
+                  <li
+                    className="dd-candidate"
+                    key={`${day}-${item.id}-${item.startsAt}`}
+                  >
+                    <p className="dd-itinerary__time">
+                      {item.startsAt} ~ {item.endsAt}
+                    </p>
+                    <h3>
+                      {item.category} · {item.name}
+                    </h3>
+                    {item.menu ? <p>추천 메뉴: {item.menu}</p> : null}
+                    {item.tags.length ? (
+                      <p>관심사: {item.tags.join(" · ")}</p>
+                    ) : null}
+                  </li>
+                ))}
+            </ol>
+          </section>
+        ))}
+        <div className="dd-result-actions">
+          <Button variant="secondary" onClick={() => setView("candidates")}>
+            다른 지역 보기
+          </Button>
+          <Button variant="secondary" onClick={() => setView("form")}>
+            조건 수정하기
+          </Button>
+        </div>
+      </main>
+    );
+  }
+
+  if (view === "candidates") {
+    const origin = originRegions.find((item) => item.id === request.originId);
+    return (
+      <main className="dd-screen">
+        <Header />
+        <section className="dd-summary-card">
+          <p className="dd-summary-card__title">
+            {origin?.name ?? "출발지"}에서 갈 수 있는 곳
+          </p>
+          <p>관광지 조건을 통과한 지역에만 최신 음식점 정보를 연결했어요.</p>
+        </section>
+        <ol className="dd-candidates">
+          {candidates.map((candidate) => (
+            <li className="dd-candidate" key={candidate.id}>
+              <h2>{candidate.name}</h2>
+              <p>
+                {candidate.region} · 편도 일반 예상{" "}
+                {formatMinutes(candidate.oneWayMinutes)} · 현지 이용 가능{" "}
+                {formatMinutes(candidate.localMinutes)}
+              </p>
+              <p>
+                관심사 {candidate.matchedInterests.join(" · ")} · 관광지{" "}
+                {candidate.attractions.length}곳 · 점심 {candidate.lunch.name} ·
+                저녁 {candidate.dinner.name}
+              </p>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setSelected(candidate);
+                  setView("itinerary");
+                }}
+              >
+                {candidate.name} 일정 보기
+              </Button>
+            </li>
+          ))}
+        </ol>
+        <div className="dd-result-actions">
+          <Button variant="secondary" onClick={() => setView("form")}>
+            조건 수정하기
+          </Button>
+        </div>
       </main>
     );
   }
 
   return (
     <main className="dd-screen">
-      <div className="dd-screen__header">
-        <span className="dd-screen__logo">두루두루</span>
-        <span className="dd-screen__data-basis">
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 20 20"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-            aria-hidden="true"
-          >
-            <circle cx="10" cy="10" r="7.2" />
-            <path d="M10 6.2V10l2.6 1.8" />
-          </svg>
-          지원 조건 {loadedSupport.basisDate} 기준
-        </span>
-      </div>
-
+      <Header />
       <h1 className="dd-screen__title">
-        쓸 수 있는 시간을
-        <br />
-        알려주면 갈 곳부터 골라줄게요
+        쓸 수 있는 시간을 알려주면
+        <br />갈 곳부터 골라줄게요
       </h1>
-
-      {errorCount > 0 ? (
-        <div className="dd-error-summary" role="alert">
-          <svg
-            className="dd-error-summary__icon"
-            width="20"
-            height="20"
-            viewBox="0 0 20 20"
-            fill="none"
-            stroke="var(--alert)"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M10 3.2l7 12.4H3z" />
-            <path d="M10 7.8v3.4M10 13.6v.2" />
-          </svg>
-          <div>
-            <p className="dd-error-summary__title">
-              고쳐야 할 항목이 {errorCount}개 있어요
-            </p>
-            <p className="dd-error-summary__text">
-              아래 표시된 곳을 고치면 바로 찾아볼 수 있어요.
-            </p>
-          </div>
-        </div>
-      ) : null}
-
       <form onSubmit={submit}>
         <div className="dd-screen__fields">
-          <FieldCard
-            label="어디서 출발해요?"
-            htmlFor="origin"
-            hint="승인된 도시 대표 기준점에서 출발해요."
-            hintFor="origin"
-            errors={cardErrors(["originId", "origin"])}
-          >
+          <FieldCard label="어디서 출발해요?" htmlFor="origin">
             <Select
               id="origin"
-              options={loadedSupport.origins.map((origin) => ({
-                value: origin.id,
-                label: origin.name,
-              }))}
+              value={request.originId}
               placeholder="출발지를 골라 주세요"
-              value={draft.originId}
-              invalid={Boolean(fieldErrors.originId)}
-              aria-describedby={describedBy("originId", "origin", true)}
+              options={originRegions.map((region) => ({
+                value: region.id,
+                label: region.name,
+              }))}
               onChange={(event) => update({ originId: event.target.value })}
             />
           </FieldCard>
-
-          <FieldCard
-            label="언제 나가서 언제까지 돌아와요?"
-            errors={cardErrors(
-              ["startAt", "start-at"],
-              ["returnBy", "return-by"],
-            )}
-          >
+          <FieldCard label="언제 나가서 언제까지 돌아와요?">
             <div className="dd-datetime-pair">
               <InputField
                 id="start-at"
                 type="datetime-local"
                 prefix="출발"
-                aria-label="출발 일시"
-                value={draft.startAt}
-                invalid={Boolean(fieldErrors.startAt)}
-                aria-describedby={describedBy("startAt", "start-at")}
+                value={request.startAt}
                 onChange={(event) => update({ startAt: event.target.value })}
               />
               <InputField
                 id="return-by"
                 type="datetime-local"
-                prefix="복귀 가능"
-                aria-label="복귀 가능 일시"
-                value={draft.returnBy}
-                invalid={Boolean(fieldErrors.returnBy)}
-                aria-describedby={describedBy("returnBy", "return-by")}
+                prefix="복귀"
+                value={request.returnBy}
                 onChange={(event) => update({ returnBy: event.target.value })}
               />
             </div>
-            {availableHours !== null ? (
-              <div className="dd-notice">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 20 20"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.7"
-                  strokeLinecap="round"
-                  aria-hidden="true"
-                >
-                  <circle cx="10" cy="10" r="7.2" />
-                  <path d="M10 6.4v.2M10 9.2v4.4" />
-                </svg>
-                <span>쓸 수 있는 시간 {formatHours(availableHours)}</span>
-              </div>
-            ) : null}
           </FieldCard>
-
           <FieldCard
-            label="무엇으로 이동해요?"
-            hint={transportHint}
-            hintFor="transport"
-            errors={cardErrors(["transport", "transport"])}
-          >
-            <SegmentedControl
-              label="이동수단"
-              options={transportOptions}
-              value={draft.transport}
-              invalid={Boolean(fieldErrors.transport)}
-              describedBy={describedBy(
-                "transport",
-                "transport",
-                Boolean(transportHint),
-              )}
-              onChange={(value) => update({ transport: value })}
-            />
-          </FieldCard>
-
-          {/* 관심사는 1개 이상 필수다(2026-08-31 확정 — DECISIONS.md 7.3절). */}
-          <FieldCard
-            label="어떤 걸 좋아해요?"
+            label="무엇을 좋아해요?"
             labelAside="· 하나 이상 골라 주세요"
-            errors={cardErrors(["interests", "interests"])}
           >
-            <div
-              className="dd-chip-group"
-              role="group"
-              aria-label="관심사"
-              aria-describedby={
-                fieldErrors.interests ? fieldErrorId("interests") : undefined
-              }
-            >
-              {interestTags.map((tag) => (
+            <div className="dd-chip-group" role="group" aria-label="관심사">
+              {interestTags.map((interest) => (
                 <Chip
-                  key={tag}
+                  key={interest}
                   variant="selectable"
-                  label={tag}
-                  selected={draft.interests.includes(tag)}
-                  onToggle={() => toggleInterest(tag)}
+                  label={interest}
+                  selected={request.interests.includes(interest)}
+                  onToggle={() => toggleInterest(interest)}
                 />
               ))}
             </div>
           </FieldCard>
         </div>
-
         <div className="dd-screen__actions">
-          <Button type="submit" variant="primary" disabled={errorCount > 0}>
+          <Button type="submit" variant="primary">
             갈 수 있는 곳 찾기
           </Button>
-          {errorCount > 0 ? (
-            <p className="dd-button-note">
-              고쳐야 할 항목이 남아 있어 아직 찾을 수 없어요
-            </p>
-          ) : null}
         </div>
       </form>
-
       <p className="dd-screen__footnote">
-        이동시간은 평균값 기반 추정치예요. 실시간 교통 상황은 반영하지 않아요.
+        지역 간 이동시간은 KTDB 2024 도로 네트워크의 일반 예상시간이며, 실시간
+        교통은 반영하지 않아요.
       </p>
     </main>
+  );
+}
+
+function Header() {
+  return (
+    <div className="dd-screen__header">
+      <span className="dd-screen__logo">두루두루</span>
+    </div>
   );
 }
