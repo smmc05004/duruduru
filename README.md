@@ -6,8 +6,9 @@
 
 ## 현재 상태
 
-현재는 기능 구현을 진행하는 MVP 단계입니다. 제품 정의와 결정, 기능 명세는 아래 문서를 기준으로 합니다.
+현재는 기능 구현을 진행하는 MVP 단계입니다. 서비스 정의와 기능 요구사항은 아래 문서를 기준으로 합니다.
 
+- [제품 요구사항](docs/product/PRD.md)
 - [여행 장소 추천 방법](docs/product/TRAVEL_RECOMMENDATION.md)
 - [거리 계산 방법](docs/product/DISTANCE_CALCULATION.md)
 
