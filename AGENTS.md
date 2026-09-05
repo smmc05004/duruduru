@@ -6,7 +6,6 @@
 - `docs/product/PRD.md`
 - `docs/product/FUNCTIONAL_SPEC.md`
 - `docs/product/DECISIONS.md`
-- `docs/development/STATIC_TRAVEL_TIME_COLLECTION.md` — API·좌표·거리/시간 산출 근거
 - `docs/product/FOOD_DATA_STRATEGY.md`
 - `docs/product/FOOD_DATA_NEXT_STEPS.md`
 

@@ -11,7 +11,6 @@
 - [제품 요구사항](docs/product/PRD.md)
 - [기능 명세](docs/product/FUNCTIONAL_SPEC.md)
 - [제품 결정](docs/product/DECISIONS.md)
-- [이동시간 데이터 수집·계산](docs/development/STATIC_TRAVEL_TIME_COLLECTION.md)
 
 ## 주요 사용자 흐름
 
