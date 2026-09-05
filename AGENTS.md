@@ -8,13 +8,14 @@
 - `docs/product/DISTANCE_CALCULATION.md`
 - `docs/product/API_FETCH_FLOW.md`
 - `docs/product/FOOD_DATA_POLICY.md`
+- `docs/product/INTERREGIONAL_TRAVEL_TIME.md`
 
 이 프로젝트에서 제품 범위, 우선순위, 데이터 신뢰도 또는 사용자 흐름에 영향을 주는 작업을 시작하기 전에 다음 문서를 읽는다.
 
 1. `.agents/pm/AGENT.md` — 지속되는 PM 역할과 권한
 2. `docs/product/PRD.md` — 서비스 정의·목적·MVP 범위
 3. `docs/product/TRAVEL_RECOMMENDATION.md` — 추천·일정 생성 규칙
-4. `docs/product/DISTANCE_CALCULATION.md` — 시·군·구 청사 대표점 간 일반 예상 이동시간 규칙
+4. `docs/product/DISTANCE_CALCULATION.md` — 국가교통DB 기반 지역 간 일반 예상 이동시간 규칙
 
 ## 기본 원칙
 
