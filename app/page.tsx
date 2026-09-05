@@ -5,6 +5,7 @@ import { Button } from "@/components/Button";
 import { Chip } from "@/components/Chip";
 import { FieldCard } from "@/components/FieldCard";
 import { InputField } from "@/components/InputField";
+import { SegmentedControl } from "@/components/SegmentedControl";
 import { Select } from "@/components/Select";
 import { formatHoursAndMinutes } from "@/lib/format-duration";
 import { originRegions } from "@/lib/region-config";
@@ -14,6 +15,13 @@ import type {
   SearchResponse,
 } from "@/lib/trip-planner-contract";
 import { interestTags } from "@/lib/support-conditions";
+import type { RecommendationOutcome } from "@/lib/recommendation";
+import type {
+  ReferenceItineraryInput,
+  ReferenceItineraryResult,
+  ReferenceItineraryUnavailable,
+} from "@/lib/reference-itinerary";
+import type { SupportSet } from "@/lib/support-conditions";
 
 type View = "form" | "loading" | "candidates" | "itinerary" | "error";
 
@@ -27,7 +35,29 @@ const initialRequest: SearchRequest = {
 
 const formatMinutes = (minutes: number) => formatHoursAndMinutes(minutes / 60);
 
-export default function TripConditionsPage() {
+/**
+ * 이전 화면의 주입 경계는 테스트·호환성 목적으로 유지한다. 실제 MVP 검색은 서버 Route
+ * Handler만 사용하며 정적 어댑터로 돌아가지 않는다.
+ */
+type TripConditionsPageProps = {
+  loadConditions?: () => SupportSet;
+  loadRecommendations?: (
+    conditions: import("@/lib/trip-conditions").ValidTripConditions,
+  ) => Promise<RecommendationOutcome>;
+  loadItinerary?: (
+    input: ReferenceItineraryInput,
+  ) => Promise<ReferenceItineraryResult | ReferenceItineraryUnavailable>;
+};
+
+export default function TripConditionsPage({
+  loadConditions,
+  loadRecommendations,
+  loadItinerary,
+}: TripConditionsPageProps) {
+  // 정적 PoC 주입값을 실행 경로에 다시 연결하지 않는다.
+  void loadConditions;
+  void loadRecommendations;
+  void loadItinerary;
   const [request, setRequest] = useState<SearchRequest>(initialRequest);
   const [view, setView] = useState<View>("form");
   const [message, setMessage] = useState("");
@@ -253,6 +283,7 @@ export default function TripConditionsPage() {
                 id="start-at"
                 type="datetime-local"
                 prefix="출발"
+                aria-label="출발 일시"
                 value={request.startAt}
                 onChange={(event) => update({ startAt: event.target.value })}
               />
@@ -260,10 +291,22 @@ export default function TripConditionsPage() {
                 id="return-by"
                 type="datetime-local"
                 prefix="복귀"
+                aria-label="복귀 가능 일시"
                 value={request.returnBy}
                 onChange={(event) => update({ returnBy: event.target.value })}
               />
             </div>
+          </FieldCard>
+          <FieldCard
+            label="무엇으로 이동해요?"
+            hint="현재는 자차 여행만 지원해요."
+          >
+            <SegmentedControl
+              label="이동수단"
+              options={[{ value: "car", label: "자차" }]}
+              value="car"
+              onChange={() => undefined}
+            />
           </FieldCard>
           <FieldCard
             label="무엇을 좋아해요?"

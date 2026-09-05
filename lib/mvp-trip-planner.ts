@@ -1,17 +1,9 @@
 import travelTimeTable from "@/data/ktdb/interregional-travel-times-2024.json";
-import {
-  destinationRegions,
-  supportedRegions,
-  type RegionConfig,
-} from "@/lib/region-config";
+import { supportedRegions } from "@/lib/region-config";
 import type {
   ItineraryItem,
-  PlannerCandidate,
   PlannerPlace,
-  SearchFailure,
   SearchRequest,
-  SearchResponse,
-  SearchSuccess,
 } from "@/lib/trip-planner-contract";
 
 export type {
