@@ -8,6 +8,9 @@
 @docs/product/PRD.md
 @docs/product/TRAVEL_RECOMMENDATION.md
 @docs/product/DISTANCE_CALCULATION.md
+@docs/product/API_FETCH_FLOW.md
+@docs/product/FOOD_DATA_POLICY.md
+@docs/product/INTERREGIONAL_TRAVEL_TIME.md
 
 ## Claude Code 전용 규칙
 
