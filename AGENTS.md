@@ -29,6 +29,7 @@
 - 작업 시작 전에는 `main`을 최신 상태로 맞춘 뒤 분기한다. 작업 브랜치에서는 논리적으로 독립적인 단위마다 한글 커밋 메시지로 커밋한다.
 - 작업이 끝나면 PR에서 변경 범위, 검증 결과, 제품 문서 확인 여부를 점검한 뒤에만 `main`으로 병합한다. 병합된 작업 브랜치는 삭제한다.
 - `main`에는 force push하지 않는다. 작업 브랜치의 이력 정리가 필요할 때만, 원격 상태를 확인한 후 `--force-with-lease`를 사용한다.
+- 상세 브랜치 절차와 병합 방식은 `docs/development/BRANCH_WORKFLOW.md`를 따른다.
 
 ## MVP 구현 방식
 
@@ -39,6 +40,8 @@
 
 - 제품 범위와 의사결정은 `.agents/pm/AGENT.md`의 PM 에이전트가 관리한다.
 - 구현 작업의 계획·수행·PR 준비는 `.agents/employee/AGENT.md`의 employee agent가 담당한다.
+- 화면 설계와 디자인 토큰·공통 컴포넌트는 `.agents/designer/AGENT.md`의 designer agent가 담당한다.
+- 구현 결과의 독립 검토는 `.agents/reviewer/AGENT.md`의 reviewer agent가 담당한다. 단, 현재 MVP 구현에서는 독립 리뷰를 생략한다.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

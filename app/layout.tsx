@@ -4,7 +4,7 @@ import "./globals.css";
 import "./tokens.css";
 
 /*
- * 현재 화면의 서체 설정.
+ * 확정 방향 H의 서체(docs/design/DESIGN_TOKENS.md 타이포그래피 표).
  *
  * `@import url(...)`(PoC가 쓰는 방식) 대신 next/font/google을 쓴 근거:
  * `node_modules/next/dist/docs/01-app/01-getting-started/13-fonts.md`가 Google Font를 자동으로
