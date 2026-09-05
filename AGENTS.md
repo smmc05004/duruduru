@@ -1,12 +1,14 @@
 # DURUDURU 작업 규칙
 
-공통 에이전트 규칙의 우선순위와 작업 절차는 다음 문서를 함께 따른다.
+기능 구현의 기준은 다음 문서를 함께 따른다.
 
-- `docs/agent/SOURCE_ORDER.md`
-- `docs/agent/WORKFLOW.md`
-- `docs/agent/WORK_CYCLE.md`
 - `docs/agent/TECH_STACK.md`
-- `docs/development/IMPLEMENTATION_PLAN.md` — 기능·에픽의 최신 구현 상태와 다음 employee 작업
+- `docs/product/PRD.md`
+- `docs/product/FUNCTIONAL_SPEC.md`
+- `docs/product/DECISIONS.md`
+- `docs/development/STATIC_TRAVEL_TIME_COLLECTION.md` — API·좌표·거리/시간 산출 근거
+- `docs/product/FOOD_DATA_STRATEGY.md`
+- `docs/product/FOOD_DATA_NEXT_STEPS.md`
 
 이 프로젝트에서 제품 범위, 우선순위, 데이터 신뢰도 또는 사용자 흐름에 영향을 주는 작업을 시작하기 전에 다음 문서를 읽는다.
 
@@ -29,14 +31,16 @@
 - 작업 시작 전에는 `main`을 최신 상태로 맞춘 뒤 분기한다. 작업 브랜치에서는 논리적으로 독립적인 단위마다 한글 커밋 메시지로 커밋한다.
 - 작업이 끝나면 PR에서 변경 범위, 검증 결과, 제품 문서 확인 여부를 점검한 뒤에만 `main`으로 병합한다. 병합된 작업 브랜치는 삭제한다.
 - `main`에는 force push하지 않는다. 작업 브랜치의 이력 정리가 필요할 때만, 원격 상태를 확인한 후 `--force-with-lease`를 사용한다.
-- 상세 절차와 병합 방식은 `docs/development/BRANCH_WORKFLOW.md`를 따른다.
+
+## MVP 구현 방식
+
+- MVP 기능 구현 중에는 코드 리뷰, 작업 사이클, 자동 테스트·빌드·화면 점검을 수행하지 않는다. 기능 구현이 완료되면 사용자가 직접 화면을 확인한다.
+- 작업 브랜치와 한글 커밋, PR 생성은 계속 사용한다.
 
 ## 지속 에이전트 역할
 
 - 제품 범위와 의사결정은 `.agents/pm/AGENT.md`의 PM 에이전트가 관리한다.
-- 구현 작업의 계획·수행·검증은 `.agents/employee/AGENT.md`의 employee agent가 담당한다.
-- 구현 결과의 독립 검토는 `.agents/reviewer/AGENT.md`의 reviewer agent가 담당한다. reviewer agent는 구현을 맡은 세션·에이전트와 분리해 새 컨텍스트에서 실행한다.
-- 화면 설계와 디자인 토큰·공통 컴포넌트는 `.agents/designer/AGENT.md`의 designer agent가 담당한다. 확정된 디자인 방향은 `docs/design/DESIGN_DIRECTION.md`, 토큰은 `docs/design/DESIGN_TOKENS.md`에 있다.
+- 구현 작업의 계획·수행·PR 준비는 `.agents/employee/AGENT.md`의 employee agent가 담당한다.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
