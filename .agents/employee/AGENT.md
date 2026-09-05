@@ -17,15 +17,14 @@ DURUDURU의 지속적인 구현 담당자다. PM이 정리한 제품 범위와 �
 - 서버 상태의 요청·캐싱·재시도·로딩/오류 관리는 **TanStack Query**를 사용하고, HTTP 요청 클라이언트는 **Axios**를 사용한다.
 - 클라이언트 전용 UI 상태와 사용자 조작 상태는 **Zustand**를 사용한다. 서버에서 온 데이터의 원본을 전역 상태에 중복 저장하지 않는다.
 - 스타일링은 **Tailwind CSS**를 기본으로 사용한다. 컴포넌트별 스타일은 Tailwind 유틸리티와 프로젝트 공통 토큰을 우선한다.
-- 테스트는 **TDD**를 기본 작업 방식으로 삼는다. 도메인 규칙·컴포넌트·통합 수준의 기본 검증은 **Jest**로 작성하고, 실제 브라우저 화면과 핵심 사용자 흐름 점검은 **Playwright**로 수행한다.
+- Jest와 Playwright는 제품 고도화 단계의 기본 검증 도구다. 현재 MVP 기능 구현에서는 사용자의 결정에 따라 자동 검증을 실행하지 않는다.
 
 ### 현재 코드 기준선
 
 - 현재 저장소는 **Next.js 16 App Router**, **React 19**, **TypeScript 6** 기반이다.
 - 현재 UI는 `app/` 아래 App Router 구조와 `app/globals.css`를 사용한다. TanStack Query, Axios, Zustand, Tailwind CSS, Jest, Playwright 의존성과 기본 검증 설정이 반영되어 있다. 기능별 사용은 필요한 작업에서만 도입한다.
 - 현재 추천·일정 로직과 목업 데이터는 `lib/planner.ts`, `lib/mock-data.ts`에 있다. 핵심 엔진은 LLM이 아니라 결정론적인 규칙·점수·시간 제약 계산으로 구현한다.
-- 품질 검증은 `npm run verify`로 실행한다. 이 명령은 하네스 검사, lint, 타입 검사, Jest, 프로덕션 빌드를 순서대로 수행한다. 브라우저 핵심 흐름은 `npm run test:e2e`로 별도 실행한다.
-- 작업 게이트는 `npm run cycle`로 추적한다. `docs/agent/WORK_CYCLE.md`의 그래프에서 선행 노드와 근거를 확인한다.
+- 품질 검증 명령은 `npm run verify`, `npm run test:e2e`로 제공되지만, 현재 MVP 기능 구현에서는 실행하지 않는다. 완료 뒤 화면 확인은 사용자가 직접 수행한다.
 - TourAPI 응답을 조사하는 수동 도구는 `scripts/probe-tourapi.mjs`와 `npm run check:tour-api`다. 이 도구는 현재 앱 런타임과 연결돼 있지 않다.
 - 패키지 관리자는 npm이며, 의존성 설치에는 lockfile 기준의 `npm ci`를 우선 사용한다.
 
@@ -62,9 +61,8 @@ DURUDURU의 지속적인 구현 담당자다. PM이 정리한 제품 범위와 �
 2. `.agents/pm/AGENT.md`
 3. `docs/product/PRD.md`
 4. `docs/product/DECISIONS.md`
-5. `docs/product/PRODUCT_PLAN.md`
-6. `docs/product/FUNCTIONAL_SPEC.md`의 관련 기능·에픽·보류 항목
-7. `docs/development/BRANCH_WORKFLOW.md`
+5. `docs/product/FUNCTIONAL_SPEC.md`의 관련 기능·에픽·보류 항목
+6. 이동시간·음식 데이터가 관련되면 `docs/development/STATIC_TRAVEL_TIME_COLLECTION.md`, `docs/product/FOOD_DATA_STRATEGY.md`, `docs/product/FOOD_DATA_NEXT_STEPS.md`
 
 그 뒤 현재 코드, 테스트, 패키지 스크립트, 관련 데이터 계약을 읽어 문서와 실제 기준선의 차이를 확인한다.
 
@@ -74,7 +72,7 @@ DURUDURU의 지속적인 구현 담당자다. PM이 정리한 제품 범위와 �
 - 하나의 목적만 가진 작업 브랜치에서 구현한다. 브랜치 이름, 한글 커밋, PR 준비는 브랜치 작업 하네스를 따른다.
 - 입력 검증, 결과 없음, 데이터 결측, 로딩·오류 상태를 정상 사용자 흐름으로 구현한다.
 - 추천과 일정 엔진에서 제약 충족을 점수보다 먼저 평가하고, 계산 근거·추정·fallback 상태가 UI까지 전달되게 한다.
-- 변경에 맞는 Jest 단위·통합 검증과 Playwright 화면 점검을 추가하거나 실행하고, `npm run verify`를 통과시킨다.
+- 현재 MVP에서는 자동 검증과 화면 점검을 생략하고, 기능 구현 완료 뒤 사용자가 직접 확인할 수 있도록 PR을 준비한다.
 - PR에 변경 목적, 명세 연계, 검증 결과, 의도적으로 제외한 범위와 남은 위험을 기록한다.
 
 ## 권한과 제약
@@ -92,10 +90,9 @@ DURUDURU의 지속적인 구현 담당자다. PM이 정리한 제품 범위와 �
 1. 요청과 관련 문서·코드를 읽고, 기능 ID·에픽·수용 기준·보류 의존성을 확인한다.
 2. 작업 목표, 수정 예상 파일, 구현 순서, 검증 계획, 제품 결정 필요 여부를 간결한 계획으로 제시한다.
 3. 최신 `main`에서 목적이 드러나는 작업 브랜치를 만든다.
-4. 실패하는 테스트를 먼저 작성하고, 작은 논리 단위로 구현·리팩터링하며 관련 Jest 검증을 반복 수행한다.
+4. 작은 논리 단위로 구현·리팩터링한다. 현재 MVP에서는 테스트 작성과 자동 검증을 생략한다.
 5. 완료 전 diff를 검토해 범위 밖 변경, 비밀정보, 문서·코드 불일치를 확인한다.
-6. `npm run verify`와 필요한 Playwright 화면 점검(`npm run test:e2e`)을 실행하고 결과를 기록한다.
-7. 한글 커밋 메시지로 커밋하고 PR 템플릿을 채운다. 병합 전에는 PR diff와 CI 결과를 다시 확인한다.
+6. 한글 커밋 메시지로 커밋하고 PR을 생성한다.
 
 ## 산출물 기준
 
