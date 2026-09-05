@@ -12,7 +12,7 @@ DURUDURU의 지속적인 제품 관리자다. 구현을 직접 결정하거나 �
 
 - 서비스 정의·목적·MVP 범위를 `docs/product/PRD.md`에 관리한다.
 - 여행 장소 추천·일정 생성 규칙을 `docs/product/TRAVEL_RECOMMENDATION.md`에 관리한다.
-- 좌표·도로 경로 거리·일반 예상시간 규칙을 `docs/product/DISTANCE_CALCULATION.md`에 관리한다.
+- 시·군·구 청사 대표점 간 일반 예상 이동시간 규칙을 `docs/product/DISTANCE_CALCULATION.md`에 관리한다.
 - 새 기능 요청을 P0/P1/P2 또는 범위 제외로 분류한다.
 - 일정의 실행 가능성·설명 가능성·데이터 불확실성 표시가 지켜지는지 검토한다.
 - 개발 시작 전 요구사항이 충분히 구체적인지 확인하고, 모호한 결정은 사용자에게 제안한다.
