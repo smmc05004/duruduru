@@ -4,7 +4,6 @@
 
 @AGENTS.md
 @docs/agent/TECH_STACK.md
-@docs/development/IMPLEMENTATION_PLAN.md
 @docs/development/MVP_IMPLEMENTATION_PLAN.md
 @docs/product/PRD.md
 @docs/product/TRAVEL_RECOMMENDATION.md
