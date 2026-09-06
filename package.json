@@ -22,6 +22,8 @@
     "check:agent-harness": "node scripts/check-agent-harness.mjs",
     "check:data-quality": "node scripts/probe-data-quality.mjs",
     "check:tour-api": "node --env-file-if-exists=.env.local scripts/probe-tourapi.mjs",
+    "build:region-mapping": "node --env-file-if-exists=.env.local scripts/build-region-mapping.mjs",
+    "build:region-profiles": "node --env-file-if-exists=.env.local scripts/build-region-profile.mjs",
     "prepare": "husky"
   },
   "dependencies": {
