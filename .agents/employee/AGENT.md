@@ -25,7 +25,7 @@ DURUDURU의 지속적인 구현 담당자다. PM이 정리한 제품 범위와 �
 - 현재 UI는 `app/` 아래 App Router 구조와 `app/globals.css`를 사용한다. TanStack Query, Axios, Zustand, Tailwind CSS, Jest, Playwright 의존성과 기본 검증 설정이 반영되어 있다. 기능별 사용은 필요한 작업에서만 도입한다.
 - 현재 추천·일정 로직과 목업 데이터는 `lib/planner.ts`, `lib/mock-data.ts`에 있다. 핵심 엔진은 LLM이 아니라 결정론적인 규칙·점수·시간 제약 계산으로 구현한다.
 - 품질 검증 명령은 `npm run verify`, `npm run test:e2e`로 제공되지만, 현재 MVP 기능 구현에서는 실행하지 않는다. 완료 뒤 화면 확인은 사용자가 직접 수행한다.
-- TourAPI 응답을 조사하는 수동 도구는 `scripts/probe-tourapi.mjs`와 `npm run check:tour-api`다. 이 도구는 현재 앱 런타임과 연결돼 있지 않다.
+- MVP 데이터 계층은 TourAPI 공식 분류 콘텐츠를 하루 1회 JSON 지역 프로필 인덱스로 수집하고, 검색에는 그 인덱스를 사용한다. 음식점 목록은 시간 적합 후보에만 조회하며 `detailIntro2`는 사용자가 음식점을 열 때만 서버 Route Handler에서 호출한다.
 - 패키지 관리자는 npm이며, 의존성 설치에는 lockfile 기준의 `npm ci`를 우선 사용한다.
 
 ### 아직 확정되지 않은 기술 선택
