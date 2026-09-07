@@ -224,6 +224,93 @@ test("선택 뒤 한 지역 음식점과 클릭한 상세만 조회한다", asyn
   );
 });
 
+test("검색 로딩 중에도 입력한 조건 요약을 실제 값으로 유지한다", async ({
+  page,
+}) => {
+  let release: () => void = () => undefined;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/api/search", async (route) => {
+    await gate;
+    await route.fulfill({ json: { kind: "success", candidates } });
+  });
+  await page.goto("/");
+  await fill(page);
+  await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
+  await expect(page.getByRole("status")).toContainText(
+    "갈 수 있는 곳을 찾고 있어요",
+  );
+  const summary = page.getByRole("region", { name: "입력한 여행 조건" });
+  await expect(summary).toContainText("서울특별시");
+  await expect(summary).toContainText("9/12 08:00 출발");
+  await expect(summary).toContainText("9/13 20:00 복귀");
+  await expect(summary).toContainText("역사");
+  await expect(
+    page.getByRole("button", { name: "검색을 멈추고 조건 수정하기" }),
+  ).toBeVisible();
+  release();
+  await expect(
+    page.getByRole("button", { name: "경주 일정 보기" }),
+  ).toBeVisible();
+});
+
+test("검색을 멈추면 조건 화면으로 돌아가고 늦게 온 응답은 무시한다", async ({
+  page,
+}) => {
+  let release: () => void = () => undefined;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/api/search", async (route) => {
+    await gate;
+    await route.fulfill({ json: { kind: "success", candidates } });
+  });
+  await page.goto("/");
+  await fill(page);
+  await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
+  await page
+    .getByRole("button", { name: "검색을 멈추고 조건 수정하기" })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "갈 수 있는 곳 찾기" }),
+  ).toBeVisible();
+  release();
+  await expect(
+    page.getByRole("button", { name: "경주 일정 보기" }),
+  ).toHaveCount(0);
+});
+
+test("음식점 조회 로딩 중에는 선택 후보와 관광 블록을 실제 값으로 유지한다", async ({
+  page,
+}) => {
+  await page.route("**/api/search", (route) =>
+    route.fulfill({ json: { kind: "success", candidates } }),
+  );
+  let release: () => void = () => undefined;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/api/destinations/**/restaurants", async (route) => {
+    await gate;
+    await route.fulfill({ json: { kind: "success", restaurants: [] } });
+  });
+  await page.goto("/");
+  await fill(page);
+  await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
+  await page.getByRole("button", { name: "경주 일정 보기" }).click();
+  const summary = page.getByRole("region", { name: "입력한 여행 조건" });
+  await expect(summary).toContainText("경주");
+  await expect(page.getByRole("status")).toContainText(
+    "음식점을 불러오고 있어요",
+  );
+  await expect(page.getByText("경주 관광지 1")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "조회를 멈추고 다른 지역 보기" }),
+  ).toBeVisible();
+  release();
+});
+
 test("음식점이 네 곳보다 적으면 남은 식사 칸에 안내를 표시한다", async ({
   page,
 }) => {
