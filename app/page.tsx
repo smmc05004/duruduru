@@ -1,8 +1,9 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, ReactNode, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/Button";
 import { Chip } from "@/components/Chip";
+import { ConditionSummary } from "@/components/ConditionSummary";
 import { FieldCard, fieldErrorId } from "@/components/FieldCard";
 import { InputField } from "@/components/InputField";
 import { SegmentedControl } from "@/components/SegmentedControl";
@@ -44,6 +45,21 @@ export default function Page() {
   const [detail, setDetail] = useState<string | null>(null);
   const [showErrors, setShowErrors] = useState(false);
   const errorSummaryRef = useRef<HTMLDivElement>(null);
+  // 진행 중인 검색·조회를 취소·수정으로 중단할 때 늦게 도착한 응답이 화면을 되돌리지 못하게 막는다.
+  const runIdRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
+  const startRun = () => {
+    runIdRef.current += 1;
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
+    return { runId: runIdRef.current, signal: abortRef.current.signal };
+  };
+  const stopRun = (next: View) => {
+    runIdRef.current += 1;
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setView(next);
+  };
   const origin = ORIGINS.find((item) => item.id === input.originId)!;
   const toggle = (id: MvpCategoryId) =>
     setInput((current) => ({
@@ -89,18 +105,22 @@ export default function Page() {
       return;
     }
     setShowErrors(false);
+    const { runId, signal } = startRun();
     setView("searching");
     try {
       const response = await fetch("/api/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
+        signal,
       });
       const result = (await response.json()) as SearchResponse;
+      if (runIdRef.current !== runId) return;
       if (result.kind !== "success") throw new Error(result.message);
       setCandidates(result.candidates);
       setView("candidates");
     } catch (error) {
+      if (runIdRef.current !== runId || signal.aborted) return;
       setMessage(
         error instanceof Error ? error.message : "검색을 시작하지 못했어요.",
       );
@@ -109,12 +129,15 @@ export default function Page() {
   }
   async function choose(candidate: Candidate) {
     setSelected(candidate);
+    const { runId, signal } = startRun();
     setView("restaurants");
     try {
       const response = await fetch(
         `/api/destinations/${candidate.regionId}/restaurants`,
+        { signal },
       );
       const result = await response.json();
+      if (runIdRef.current !== runId) return;
       if (result.kind !== "success") throw new Error(result.message);
       setRestaurants(result.restaurants);
       const items = createSchedule(input, candidate, result.restaurants);
@@ -122,6 +145,7 @@ export default function Page() {
       setSchedule(items);
       setView("schedule");
     } catch (error) {
+      if (runIdRef.current !== runId || signal.aborted) return;
       setMessage(
         error instanceof Error
           ? error.message
@@ -144,17 +168,46 @@ export default function Page() {
       setDetail("음식점 상세 정보를 불러오지 못했어요. 다시 시도해 주세요.");
     }
   }
-  if (view === "searching" || view === "restaurants")
+  if (view === "searching")
     return (
       <main className="dd-screen">
         <Header />
-        <section className="dd-calculating" role="status">
-          <p>
-            {view === "searching"
-              ? "갈 수 있는 곳을 찾고 있어요"
-              : "선택한 지역의 음식점을 불러오고 있어요"}
-          </p>
-        </section>
+        <ConditionSummary input={input} />
+        <ProgressNotice title="갈 수 있는 곳을 찾고 있어요" />
+        <div className="dd-loading-cards">
+          <SkeletonCandidateCard />
+          <SkeletonCandidateCard />
+        </div>
+        <div className="dd-result-actions">
+          <Button variant="secondary" onClick={() => stopRun("input")}>
+            검색을 멈추고 조건 수정하기
+          </Button>
+        </div>
+        <p className="dd-screen__footnote">
+          이동시간은 국가교통DB 기반 지역 간 자동차 일반 예상값이에요. 실시간
+          교통 상황은 반영하지 않아요.
+        </p>
+      </main>
+    );
+  if (view === "restaurants" && selected)
+    return (
+      <main className="dd-screen">
+        <Header />
+        <ConditionSummary input={input} destination={selected} />
+        <ProgressNotice
+          title="선택한 지역의 음식점을 불러오고 있어요"
+          detail={`${selected.displayName} 음식점 목록을 받아 점심·저녁을 채우는 중이에요.`}
+        />
+        <PlanPreview input={input} destination={selected} />
+        <div className="dd-result-actions">
+          <Button variant="secondary" onClick={() => stopRun("candidates")}>
+            조회를 멈추고 다른 지역 보기
+          </Button>
+        </div>
+        <p className="dd-screen__footnote">
+          음식점은 선택한 한 지역에서만 목록 기본 정보를 조회해요.
+          운영시간·메뉴는 나중에 음식점을 열 때 확인해요.
+        </p>
       </main>
     );
   if (view === "error")
@@ -407,6 +460,178 @@ function Header() {
     </div>
   );
 }
+
+/* 진행 상태를 정상 안내 배너(--olive-soft/--olive)로 알린다. DESIGN_TOKENS.md 「로딩 상태」. */
+function ProgressNotice({ title, detail }: { title: string; detail?: string }) {
+  return (
+    <section className="dd-calculating" role="status">
+      <svg
+        width="22"
+        height="22"
+        viewBox="0 0 20 20"
+        fill="none"
+        stroke="var(--olive-ink)"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+        aria-hidden="true"
+      >
+        <path d="M10 2.8a7.2 7.2 0 1 1-6.9 5.1" />
+      </svg>
+      <div className="dd-calculating__body">
+        <p>{title}</p>
+        {detail ? <p className="dd-calculating__sub">{detail}</p> : null}
+      </div>
+    </section>
+  );
+}
+
+/* 아직 나오지 않은 후보 카드. 껍데기(2px --line + 하드 섀도)는 유지하고 내용만 스켈레톤으로 둔다. */
+function SkeletonCandidateCard() {
+  return (
+    <div className="dd-skeleton-card" aria-hidden="true">
+      <div className="dd-skeleton-card__head">
+        <div className="dd-skeleton dd-skeleton--title" />
+        <div className="dd-skeleton dd-skeleton--region" />
+      </div>
+      <div className="dd-skeleton dd-skeleton--bar" />
+      <div className="dd-skeleton dd-skeleton--line" />
+      <div className="dd-skeleton dd-skeleton--line-short" />
+      <div className="dd-skeleton-card__tags">
+        <div className="dd-skeleton dd-skeleton--tag" />
+        <div className="dd-skeleton dd-skeleton--tag" />
+        <div className="dd-skeleton dd-skeleton--tag" />
+      </div>
+    </div>
+  );
+}
+
+type PreviewRow =
+  | { key: string; kind: "이동"; title: string; meta?: string }
+  | { key: string; kind: "관광"; title: string | null }
+  | { key: string; kind: "점심" | "저녁" };
+
+const skeletonBody = (
+  <>
+    <div className="dd-skeleton dd-skeleton--inline" />
+    <div className="dd-skeleton dd-skeleton--meta" />
+  </>
+);
+
+function PlanPreviewRow({ row }: { row: PreviewRow }) {
+  let kindClass = "dd-timeline-row__kind";
+  let kindLabel: string;
+  let stay: boolean;
+  let body: ReactNode;
+  if (row.kind === "이동") {
+    kindLabel = "이동";
+    stay = false;
+    body = (
+      <>
+        <p className="dd-timeline-row__title">{row.title}</p>
+        {row.meta ? <p className="dd-timeline-row__meta">{row.meta}</p> : null}
+      </>
+    );
+  } else if (row.kind === "관광") {
+    kindClass += " dd-timeline-row__kind--visit";
+    kindLabel = "방문";
+    stay = true;
+    body = row.title ? (
+      <>
+        <p className="dd-timeline-row__title">{row.title}</p>
+        <p className="dd-timeline-row__meta">체류 1시간</p>
+      </>
+    ) : (
+      skeletonBody
+    );
+  } else {
+    kindClass += " dd-timeline-row__kind--meal";
+    kindLabel = row.kind;
+    stay = true;
+    body = skeletonBody;
+  }
+  return (
+    <div className="dd-timeline-row">
+      <div className="dd-timeline-row__time">
+        <div className="dd-skeleton" />
+      </div>
+      <div
+        className={
+          stay
+            ? "dd-timeline-row__card dd-timeline-row__card--stay"
+            : "dd-timeline-row__card"
+        }
+      >
+        <span className={kindClass}>{kindLabel}</span>
+        {body}
+      </div>
+    </div>
+  );
+}
+
+/*
+ * 음식점 조회 중 계획 미리보기.
+ * 관광·이동 블록은 선택한 후보의 실제 값을 유지하고, 아직 못 받은 식사 칸과
+ * 아직 계산 전인 시각 열만 스켈레톤으로 둔다(이슈 #53).
+ */
+function PlanPreview({
+  input,
+  destination,
+}: {
+  input: typeof initial;
+  destination: Candidate;
+}) {
+  const originLabel =
+    ORIGINS.find((item) => item.id === input.originId)?.label ?? "출발지";
+  const attraction = (index: number) =>
+    destination.attractions[index]?.title ?? null;
+  const days: Array<{ day: 1 | 2; rows: PreviewRow[] }> = [
+    {
+      day: 1,
+      rows: [
+        {
+          key: "d1-depart",
+          kind: "이동",
+          title: `${withDirectionParticle(destination.displayName)} 출발`,
+          meta: `일반 예상 이동 ${formatHoursAndMinutes(
+            destination.oneWayMinutes / 60,
+          )} · 자차 기준`,
+        },
+        { key: "d1-lunch", kind: "점심" },
+        { key: "d1-a0", kind: "관광", title: attraction(0) },
+        { key: "d1-a1", kind: "관광", title: attraction(1) },
+        { key: "d1-dinner", kind: "저녁" },
+      ],
+    },
+    {
+      day: 2,
+      rows: [
+        { key: "d2-a2", kind: "관광", title: attraction(2) },
+        { key: "d2-lunch", kind: "점심" },
+        { key: "d2-a3", kind: "관광", title: attraction(3) },
+        { key: "d2-dinner", kind: "저녁" },
+        {
+          key: "d2-return",
+          kind: "이동",
+          title: `${withDirectionParticle(originLabel)} 복귀`,
+          meta: "자차 기준",
+        },
+      ],
+    },
+  ];
+  return (
+    <div className="dd-plan-preview">
+      {days.map(({ day, rows }) => (
+        <div key={day} className="dd-plan-preview__group">
+          <p className="dd-plan-preview__day">{day}일차</p>
+          {rows.map((row) => (
+            <PlanPreviewRow key={row.key} row={row} />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function createSchedule(
   input: typeof initial,
   candidate: Candidate,
