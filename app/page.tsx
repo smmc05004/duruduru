@@ -11,8 +11,11 @@ import { formatHoursAndMinutes } from "@/lib/format-duration";
 import {
   INTERESTS,
   ORIGINS,
+  assessItinerary,
+  createSchedule,
   withDirectionParticle,
   type Candidate,
+  type ItineraryShortfall,
   type MvpOriginId,
   type Restaurant,
   type ScheduleItem,
@@ -20,7 +23,13 @@ import {
 import type { MvpCategoryId } from "@/lib/mvp-region-data";
 
 type View =
-  "input" | "searching" | "candidates" | "restaurants" | "schedule" | "error";
+  | "input"
+  | "searching"
+  | "candidates"
+  | "restaurants"
+  | "schedule"
+  | "no-itinerary"
+  | "error";
 type SearchResponse =
   | { kind: "success"; candidates: Candidate[] }
   | {
@@ -42,6 +51,7 @@ export default function Page() {
   const [selected, setSelected] = useState<Candidate | null>(null);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [schedule, setSchedule] = useState<ScheduleItem[] | null>(null);
+  const [shortfall, setShortfall] = useState<ItineraryShortfall | null>(null);
   const [detail, setDetail] = useState<string | null>(null);
   const [showErrors, setShowErrors] = useState(false);
   const errorSummaryRef = useRef<HTMLDivElement>(null);
@@ -140,8 +150,25 @@ export default function Page() {
       if (runIdRef.current !== runId) return;
       if (result.kind !== "success") throw new Error(result.message);
       setRestaurants(result.restaurants);
+      // 시간 경계 산술로 최소 시간표가 나오지 않으면 데이터 장애가 아니라
+      // 정상 예외(일정 생성 불가)로 보낸다. DESIGN_TOKENS.md 「결과 없음 · 일정 생성 불가 · 데이터 장애」.
+      const assessment = assessItinerary(input, candidate);
+      if (!assessment.feasible) {
+        setShortfall(assessment);
+        setView("no-itinerary");
+        return;
+      }
       const items = createSchedule(input, candidate, result.restaurants);
-      if (!items) throw new Error("식사 정보를 준비하지 못했어요.");
+      if (!items) {
+        // assessment가 feasible이면 여기 오지 않지만, 방어적으로 정상 예외로 처리한다.
+        setShortfall({
+          reason: "이 조건으로는 겹치지 않는 최소 시간표를 만들지 못했어요.",
+          roundTripHours: Math.round((candidate.oneWayMinutes * 2) / 6) / 10,
+          days: [],
+        });
+        setView("no-itinerary");
+        return;
+      }
       setSchedule(items);
       setView("schedule");
     } catch (error) {
@@ -224,6 +251,67 @@ export default function Page() {
         >
           다시 시도하기
         </Button>
+      </main>
+    );
+  if (view === "no-itinerary" && selected && shortfall)
+    return (
+      <main className="dd-screen">
+        <Header />
+        <ConditionSummary input={input} destination={selected} />
+        <section className="dd-no-itinerary" aria-label="일정 생성 불가">
+          <svg
+            className="dd-no-itinerary__icon"
+            width="92"
+            height="72"
+            viewBox="0 0 116 90"
+            fill="none"
+            stroke="var(--line-dashed)"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <rect x="12" y="16" width="92" height="62" />
+            <path d="M12 32h92M32 8v14M84 8v14" />
+            <path d="M30 48h20M30 62h34" stroke="var(--track-move)" />
+            <path d="M68 46l18 18M86 46l-18 18" />
+          </svg>
+          <p className="dd-no-itinerary__title">
+            {"지금은 계획을\n만들 수 없어요"}
+          </p>
+          <p className="dd-no-itinerary__reason">{shortfall.reason}</p>
+          <p className="dd-no-itinerary__note">
+            문제가 생긴 게 아니라, 조건과 시간표가 서로 맞지 않는 거예요. 어설픈
+            계획을 억지로 만들지 않았어요.
+          </p>
+        </section>
+        {shortfall.days.length > 0 ? (
+          <>
+            <p className="dd-no-itinerary__breakdown-title">
+              시간이 어떻게 모자랐는지
+            </p>
+            <div className="dd-no-itinerary__breakdown">
+              {shortfall.days.map((entry) => (
+                <div key={entry.day} className="dd-shortfall-day">
+                  <p className="dd-shortfall-day__label">{entry.day}일차</p>
+                  <p className="dd-shortfall-day__note">{entry.note}</p>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : null}
+        <div className="dd-result-actions dd-no-itinerary__actions">
+          <Button variant="primary" onClick={() => stopRun("input")}>
+            조건 수정하기
+          </Button>
+          <Button variant="secondary" onClick={() => stopRun("candidates")}>
+            더 가까운 다른 곳 보기
+          </Button>
+        </div>
+        <p className="dd-screen__footnote">
+          머무는 시간과 복귀 여유 시간의 기준은 아직 확정되지 않았어요. 확정되면
+          이 판단도 달라질 수 있어요. 시스템·데이터 장애와는 다른 정상 상태예요.
+        </p>
       </main>
     );
   if (view === "schedule" && selected && schedule)
@@ -630,45 +718,4 @@ function PlanPreview({
       ))}
     </div>
   );
-}
-
-function createSchedule(
-  input: typeof initial,
-  candidate: Candidate,
-  restaurants: Restaurant[],
-): ScheduleItem[] | null {
-  const distinctRestaurants = [
-    ...new Map(
-      restaurants.map((restaurant) => [restaurant.contentId, restaurant]),
-    ).values(),
-  ];
-  if (candidate.attractions.length < 3) return null;
-  const place = (index: number) =>
-    candidate.attractions[index % candidate.attractions.length].title;
-  const mealRestaurant = (index: number) =>
-    distinctRestaurants[index]?.name ?? "추천할 식당을 더 찾지 못했어요";
-  return [
-    {
-      day: 1,
-      time: input.startAt.slice(11),
-      type: "이동",
-      title: `${withDirectionParticle(candidate.displayName)} 출발`,
-    },
-    { day: 1, time: "11:30", type: "점심", title: mealRestaurant(0) },
-    { day: 1, time: "13:30", type: "관광", title: place(0) },
-    { day: 1, time: "15:00", type: "관광", title: place(1) },
-    { day: 1, time: "17:30", type: "저녁", title: mealRestaurant(1) },
-    { day: 2, time: "09:00", type: "관광", title: place(2) },
-    { day: 2, time: "11:30", type: "점심", title: mealRestaurant(2) },
-    { day: 2, time: "13:30", type: "관광", title: place(3) },
-    { day: 2, time: "17:30", type: "저녁", title: mealRestaurant(3) },
-    {
-      day: 2,
-      time: input.returnBy.slice(11),
-      type: "이동",
-      title: `${withDirectionParticle(
-        ORIGINS.find((item) => item.id === input.originId)?.label ?? "출발지",
-      )} 복귀`,
-    },
-  ];
 }
