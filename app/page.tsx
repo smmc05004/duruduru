@@ -38,8 +38,29 @@ export default function Page() {
         ? current.interests.filter((item) => item !== id)
         : [...current.interests, id],
     }));
+  const isOneNight = () => {
+    const start = new Date(`${input.startAt}:00+09:00`);
+    const end = new Date(`${input.returnBy}:00+09:00`);
+    if (
+      Number.isNaN(start.getTime()) ||
+      Number.isNaN(end.getTime()) ||
+      end <= start
+    )
+      return false;
+    return (
+      Math.floor((end.getTime() + 32_400_000) / 86_400_000) -
+        Math.floor((start.getTime() + 32_400_000) / 86_400_000) +
+        1 ===
+      2
+    );
+  };
   async function search(event: FormEvent) {
     event.preventDefault();
+    if (!isOneNight() || input.interests.length === 0) {
+      setMessage("서울 출발 1박 2일 일정과 관심사를 입력해 주세요.");
+      setView("error");
+      return;
+    }
     setView("searching");
     try {
       const response = await fetch("/api/search", {
