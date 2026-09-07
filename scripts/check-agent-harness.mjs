@@ -14,10 +14,15 @@ const requiredSources = [
   "docs/development/BRANCH_WORKFLOW.md",
   "docs/product/TRAVEL_RECOMMENDATION.md",
   "docs/product/DISTANCE_CALCULATION.md",
+  ".agents/README.md",
   ".agents/pm/AGENT.md",
   ".agents/employee/AGENT.md",
   ".agents/reviewer/AGENT.md",
   ".agents/designer/AGENT.md",
+  ".claude/agents/pm.md",
+  ".claude/agents/employee.md",
+  ".claude/agents/reviewer.md",
+  ".claude/agents/designer.md",
   "docs/design/DESIGN_DIRECTION.md",
   "docs/design/DESIGN_TOKENS.md",
   ".claude/settings.json",
@@ -33,10 +38,16 @@ const referenceDocuments = [
   "CLAUDE.md",
   "docs/development/BRANCH_WORKFLOW.md",
   ".github/pull_request_template.md",
+  ".agents/README.md",
 ];
 
 // 백틱 경로를 검사할 문서를 찾을 디렉터리.
-const referenceDirectories = ["docs/agent", "docs/product", "docs/design"];
+const referenceDirectories = [
+  "docs/agent",
+  "docs/product",
+  "docs/design",
+  ".claude/agents",
+];
 
 // 역할 문서를 찾을 디렉터리와 파일명. 하위 디렉터리마다 이 파일이 있으면 검사한다.
 const agentRoleDirectory = ".agents";

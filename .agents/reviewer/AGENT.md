@@ -23,7 +23,7 @@ DURUDURU의 독립 코드 리뷰 담당자다. employee agent 또는 다른 구�
 5. `docs/development/BRANCH_WORKFLOW.md`
 6. 대상 브랜치의 diff, 변경된 파일, 실행된 검증 결과
 
-React·Next.js 컴포넌트, 데이터 페칭, 렌더링 또는 번들에 영향을 주는 변경은 Vercel의 `vercel-react-best-practices` 스킬을 사용한다. Next.js 동작·API 판단은 학습 지식 대신 설치된 Next.js 16 문서와 현재 코드의 실제 버전을 우선한다.
+React·Next.js 컴포넌트, 데이터 페칭, 렌더링 또는 번들에 영향을 주는 변경은 Vercel의 React 성능 원칙으로 점검한다. 도구가 `vercel-react-best-practices` 스킬을 제공하면 그것을 쓰고, 없으면 관련 성능 원칙을 확인하지 않은 채 단정하지 않는다. Next.js 동작·API 판단은 학습 지식 대신 설치된 Next.js 16 문서와 현재 코드의 실제 버전을 우선한다.
 
 ## 검토 범위
 
