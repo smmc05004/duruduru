@@ -113,6 +113,10 @@ export function searchCandidates(input: SearchInput): Candidate[] {
   const origin = ORIGINS.find((item) => item.id === input.originId);
   const from = origin ? zoneIndex.get(origin.zoneId) : undefined;
   if (from === undefined) return [];
+  const originMapping = origin ? mappingById.get(origin.zoneId) : undefined;
+  const originGroupKey = originMapping
+    ? candidateGroup(originMapping).key
+    : undefined;
   const candidates = new Map<string, CandidateAccumulator>();
   for (const [regionId, profile] of profileById) {
     const row = mappingById.get(regionId),
@@ -128,6 +132,7 @@ export function searchCandidates(input: SearchInput): Candidate[] {
       Math.floor((end.getTime() - start.getTime()) / 60_000) - minutes * 2;
     if (localMinutes < 8 * 60) continue;
     const group = candidateGroup(row);
+    if (group.key === originGroupKey) continue;
     const existing = candidates.get(group.key);
     if (existing) {
       for (const [contentId, attraction] of attractionMap)
