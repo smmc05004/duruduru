@@ -551,7 +551,8 @@ button {
   border-radius: var(--radius-pill);
   font-size: 12px;
   font-weight: 700;
-  color: var(--mustard-ink);
+  /* 머스터드 위 대비를 위한 값. DESIGN_TOKENS.md 칩 표에 명시된 예외 색이다(--mustard-ink는 4.5:1 미달). */
+  color: #4a3708;
 }
 
 .dd-list-head {
@@ -952,6 +953,19 @@ button {
   color: var(--olive-ink);
 }
 
+.dd-calculating__body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.dd-calculating p.dd-calculating__sub {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.6;
+  color: var(--olive-ink);
+}
+
 .dd-calculating svg {
   flex-shrink: 0;
 }
@@ -1002,4 +1016,130 @@ button {
 
 .dd-result-actions {
   padding: 22px 18px 0;
+}
+
+/* ── 로딩 화면: 조건 요약 + 스켈레톤 (이슈 #53) ─────────────
+   design/screens/Loading.dc.html, RestaurantLoading.dc.html 기준.
+   DESIGN_TOKENS.md 「로딩 상태」: 조건 요약 카드는 실제 값을 유지하고,
+   아직 안 나온 결과 카드만 껍데기(2px --line + 하드 섀도)를 지킨 채 내용만 스켈레톤으로 바꾼다.
+   값은 모두 app/tokens.css의 토큰에서 온다. */
+
+.dd-loading-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 18px 18px 0;
+}
+
+.dd-skeleton-card__tags {
+  display: flex;
+  gap: 6px;
+  margin-top: 16px;
+}
+
+.dd-skeleton--tag {
+  width: 60px;
+  height: 22px;
+}
+
+/* 음식점 조회 중 계획 미리보기. 관광·이동 블록은 실제 값, 식사 칸과 시각 열만 스켈레톤. */
+.dd-plan-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 18px 0;
+}
+
+.dd-plan-preview__group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dd-plan-preview__day {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--ink-muted);
+}
+
+.dd-timeline-row {
+  display: flex;
+  gap: 12px;
+}
+
+.dd-timeline-row__time {
+  width: 52px;
+  flex-shrink: 0;
+}
+
+.dd-timeline-row__time .dd-skeleton {
+  width: 38px;
+  height: 12px;
+  margin-top: 3px;
+}
+
+.dd-timeline-row__card {
+  flex-grow: 1;
+  padding: 15px 16px;
+  background: var(--card);
+  border: var(--border-card) solid var(--line);
+  box-shadow: var(--shadow-item);
+}
+
+.dd-timeline-row__card--stay {
+  border-left: 6px solid var(--olive-bar);
+}
+
+.dd-timeline-row__kind {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-muted);
+}
+
+.dd-timeline-row__kind--visit {
+  color: var(--olive-ink);
+}
+
+.dd-timeline-row__kind--meal {
+  color: var(--mustard-ink);
+}
+
+.dd-timeline-row__title {
+  margin: 9px 0 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.dd-timeline-row__meta {
+  margin: 6px 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-muted);
+}
+
+.dd-skeleton--inline {
+  width: 60%;
+  height: 15px;
+  margin-top: 9px;
+}
+
+.dd-skeleton--meta {
+  width: 40%;
+  height: 12px;
+  margin-top: 8px;
+}
+
+/* 스켈레톤은 애니메이션 없이도 성립한다. 움직임은 선호할 때만 더한다. */
+@media (prefers-reduced-motion: no-preference) {
+  .dd-skeleton {
+    animation: dd-skeleton-pulse 1.6s ease-in-out infinite;
+  }
+}
+
+@keyframes dd-skeleton-pulse {
+  50% {
+    opacity: 0.55;
+  }
 }
