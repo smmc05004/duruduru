@@ -103,8 +103,43 @@ test("당일치기는 검색 요청 없이 거절한다", async ({ page }) => {
   await page.getByLabel("복귀 가능 일시").fill("2026-09-12T20:00");
   await page.getByRole("checkbox", { name: "역사" }).click();
   await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
-  await expect(page.locator(".dd-error-summary")).toContainText("1박 2일");
+  await expect(page.locator(".dd-error-summary")).toContainText(
+    "고쳐야 할 항목이 1개",
+  );
+  await expect(page.locator(".dd-field-error__text")).toContainText("1박 2일");
   expect(searches).toBe(0);
+});
+
+test("검증 오류를 항목별로 표시하고 고치면 제출을 허용한다", async ({
+  page,
+}) => {
+  let searches = 0;
+  await page.route("**/api/search", async (route) => {
+    searches += 1;
+    await route.fulfill({ json: { kind: "success", candidates } });
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
+  await expect(page.locator(".dd-error-summary")).toContainText(
+    "고쳐야 할 항목이 2개",
+  );
+  await expect(page.locator(".dd-field-error__text")).toHaveCount(2);
+  await expect(
+    page.getByRole("button", { name: "갈 수 있는 곳 찾기" }),
+  ).toBeDisabled();
+  await expect(page.locator(".dd-button-note")).toContainText(
+    "아직 찾을 수 없어요",
+  );
+  expect(searches).toBe(0);
+  await fill(page);
+  await expect(page.locator(".dd-error-summary")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "갈 수 있는 곳 찾기" }),
+  ).toBeEnabled();
+  await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
+  await expect(
+    page.getByRole("button", { name: "경주 일정 보기" }),
+  ).toBeVisible();
 });
 
 test("선택 뒤 한 지역 음식점과 클릭한 상세만 조회한다", async ({ page }) => {
