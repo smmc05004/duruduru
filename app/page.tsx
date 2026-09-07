@@ -10,6 +10,7 @@ import { formatHoursAndMinutes } from "@/lib/format-duration";
 import {
   INTERESTS,
   ORIGINS,
+  withDirectionParticle,
   type Candidate,
   type MvpOriginId,
   type Restaurant,
@@ -160,7 +161,9 @@ export default function Page() {
     return (
       <main className="dd-screen">
         <Header />
-        <h1 className="dd-screen__title">{selected.name} 참고용 여행 계획</h1>
+        <h1 className="dd-screen__title">
+          {selected.displayName} 참고용 여행 계획
+        </h1>
         {([1, 2] as const).map((day) => (
           <section key={day} className="dd-summary-card">
             <h2>{day}일차</h2>
@@ -199,7 +202,10 @@ export default function Page() {
         <ol className="dd-candidates">
           {candidates.map((candidate) => (
             <li className="dd-candidate" key={candidate.regionId}>
-              <h2>{candidate.name}</h2>
+              <h2 className="dd-candidate__name">{candidate.displayName}</h2>
+              {candidate.name !== candidate.displayName ? (
+                <p className="dd-candidate__region">{candidate.name}</p>
+              ) : null}
               <p>
                 왕복 일반 예상{" "}
                 {formatHoursAndMinutes((candidate.oneWayMinutes * 2) / 60)} ·
@@ -211,7 +217,7 @@ export default function Page() {
                 {candidate.attractions.length}곳
               </p>
               <Button variant="primary" onClick={() => choose(candidate)}>
-                {candidate.name} 일정 보기
+                {candidate.displayName} 일정 보기
               </Button>
             </li>
           ))}
@@ -324,7 +330,7 @@ function createSchedule(
       day: 1,
       time: input.startAt.slice(11),
       type: "이동",
-      title: `${candidate.name}으로 출발`,
+      title: `${withDirectionParticle(candidate.displayName)} 출발`,
     },
     { day: 1, time: "11:30", type: "점심", title: mealRestaurant(0) },
     { day: 1, time: "13:30", type: "관광", title: place(0) },
@@ -338,7 +344,9 @@ function createSchedule(
       day: 2,
       time: input.returnBy.slice(11),
       type: "이동",
-      title: `${ORIGINS.find((item) => item.id === input.originId)?.label ?? "출발지"}로 복귀`,
+      title: `${withDirectionParticle(
+        ORIGINS.find((item) => item.id === input.originId)?.label ?? "출발지",
+      )} 복귀`,
     },
   ];
 }

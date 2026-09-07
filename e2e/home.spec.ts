@@ -1,14 +1,19 @@
 import { expect, test } from "@playwright/test";
 
-const candidates = ["경주", "공주", "강릉"].map((name, index) => ({
+const candidates = [
+  { displayName: "경주", name: "경상북도 경주시" },
+  { displayName: "공주", name: "충청남도 공주시" },
+  { displayName: "강릉", name: "강원특별자치도 강릉시" },
+].map(({ displayName, name }, index) => ({
   regionId: `region-${index}`,
+  displayName,
   name,
   province: "검증 지역",
   oneWayMinutes: 120,
   localMinutes: 1800,
   attractions: [0, 1, 2, 3].map((item) => ({
-    contentId: `${name}-${item}`,
-    title: `${name} 관광지 ${item + 1}`,
+    contentId: `${displayName}-${item}`,
+    title: `${displayName} 관광지 ${item + 1}`,
     categoryId: "history",
   })),
   interestLabels: ["역사"],
