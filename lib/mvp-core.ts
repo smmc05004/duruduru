@@ -22,6 +22,26 @@ export const ORIGINS = [
 export type MvpOriginId = (typeof ORIGINS)[number]["id"];
 const HOUR = 3_600_000;
 const kstDate = (value: string) => new Date(`${value}:00+09:00`);
+
+const METROPOLITAN_SUFFIX = /(?:특별시|광역시|특별자치시)$/u;
+
+/** 도 지역 후보의 짧은 표시명. "경상북도 경주시" 대신 "경주"처럼 지명만 남긴다. */
+export function municipalityDisplayName(district: string): string {
+  const tokens = district.trim().split(/\s+/u);
+  if (tokens.length === 1) return tokens[0].replace(/(?:시|군)$/u, "");
+  return `${tokens[0].replace(/시$/u, "")} ${tokens[tokens.length - 1]}`;
+}
+
+/**
+ * 표시명 받침에 맞춰 방향 조사(로/으로)를 붙인다.
+ * 받침이 없거나 ㄹ 받침이면 "로", 그 외에는 "으로"를 쓴다.
+ */
+export function withDirectionParticle(word: string): string {
+  const last = word.charCodeAt(word.length - 1);
+  if (Number.isNaN(last) || last < 0xac00 || last > 0xd7a3) return `${word}로`;
+  const jongseong = (last - 0xac00) % 28;
+  return jongseong === 0 || jongseong === 8 ? `${word}로` : `${word}으로`;
+}
 const zoneIndex = new Map(
   travelTimes.regions.map((region, index) => [region.id, index]),
 );
@@ -43,6 +63,9 @@ export type SearchInput = {
 };
 export type Candidate = {
   regionId: string;
+  /** 카드·일정 제목에 쓰는 짧은 표시명. 광역시는 시도명, 도 지역은 지명만. */
+  displayName: string;
+  /** 표시명 아래 행정구역 줄에 쓰는 전체 행정명. 광역시는 표시명과 같다. */
   name: string;
   province: string;
   oneWayMinutes: number;
@@ -52,6 +75,7 @@ export type Candidate = {
 };
 type CandidateGroup = {
   key: string;
+  displayName: string;
   name: string;
   province: string;
 };
@@ -90,17 +114,17 @@ export function validOneNight(input: SearchInput) {
 }
 
 function candidateGroup(mapping: RegionMapping): CandidateGroup {
-  const isMetropolitan = /(?:특별시|광역시|특별자치시)$/u.test(
-    mapping.province,
-  );
+  const isMetropolitan = METROPOLITAN_SUFFIX.test(mapping.province);
   return isMetropolitan
     ? {
         key: `metropolitan:${mapping.province}`,
+        displayName: mapping.province,
         name: mapping.province,
         province: mapping.province,
       }
     : {
         key: `municipality:${mapping.province}:${mapping.district}`,
+        displayName: municipalityDisplayName(mapping.district),
         name: mapping.name,
         province: mapping.province,
       };
@@ -141,6 +165,7 @@ export function searchCandidates(input: SearchInput): Candidate[] {
     }
     candidates.set(group.key, {
       regionId,
+      displayName: group.displayName,
       name: group.name,
       province: group.province,
       oneWayMinutes: minutes,
@@ -200,7 +225,7 @@ export function createSchedule(
       day: 1,
       time: input.startAt.slice(11),
       type: "이동",
-      title: `${candidate.name}으로 출발`,
+      title: `${withDirectionParticle(candidate.displayName)} 출발`,
     },
     { day: 1, time: "11:30", type: "점심", title: mealRestaurant(0) },
     { day: 1, time: "13:30", type: "관광", title: pick(0).title },
@@ -214,7 +239,7 @@ export function createSchedule(
       day: 2,
       time: input.returnBy.slice(11),
       type: "이동",
-      title: `${origin.label}로 복귀`,
+      title: `${withDirectionParticle(origin.label)} 복귀`,
     },
   ];
 }
