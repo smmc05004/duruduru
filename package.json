@@ -24,6 +24,8 @@
     "check:tour-api": "node --env-file-if-exists=.env.local scripts/probe-tourapi.mjs",
     "build:region-mapping": "node --env-file-if-exists=.env.local scripts/build-region-mapping.mjs",
     "build:region-profiles": "node --env-file-if-exists=.env.local scripts/build-region-profile.mjs",
+    "build:food-culture": "node scripts/build-food-culture-keywords.mjs",
+    "build:excellent-restaurants": "node --env-file-if-exists=.env.local scripts/build-excellent-restaurant-cache.mjs",
     "prepare": "husky"
   },
   "dependencies": {
