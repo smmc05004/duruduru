@@ -65,6 +65,28 @@ test("부산 출발을 선택하면 부산 기준으로 후보를 검색한다",
   expect(originId).toBe("busan");
 });
 
+test("광역시 내부 구는 하나의 후보 권역으로 묶는다", async ({ page }) => {
+  const response = await page.request.post("/api/search", {
+    data: {
+      originId: "busan",
+      startAt: "2026-09-12T08:00",
+      returnBy: "2026-09-13T20:00",
+      interests: ["culture"],
+    },
+  });
+  expect(response.ok()).toBeTruthy();
+  const result = (await response.json()) as {
+    kind: string;
+    candidates: Array<{ name: string; province: string }>;
+  };
+  expect(result.kind).toBe("success");
+  const seoul = result.candidates.filter(
+    (candidate) => candidate.province === "서울특별시",
+  );
+  expect(seoul).toHaveLength(1);
+  expect(seoul[0]?.name).toBe("서울특별시");
+});
+
 test("당일치기는 검색 요청 없이 거절한다", async ({ page }) => {
   let searches = 0;
   await page.route("**/api/search", async (route) => {

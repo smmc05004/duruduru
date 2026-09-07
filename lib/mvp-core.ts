@@ -4,6 +4,7 @@ import travelTimes from "@/data/ktdb/interregional-travel-times-2024.json";
 import type {
   MvpCategoryId,
   RegionAttraction,
+  RegionMapping,
   RegionProfile,
 } from "@/lib/mvp-region-data";
 
@@ -49,6 +50,14 @@ export type Candidate = {
   attractions: RegionAttraction[];
   interestLabels: string[];
 };
+type CandidateGroup = {
+  key: string;
+  name: string;
+  province: string;
+};
+type CandidateAccumulator = Candidate & {
+  attractionMap: Map<string, RegionAttraction>;
+};
 export type Restaurant = {
   contentId: string;
   name: string;
@@ -80,6 +89,23 @@ export function validOneNight(input: SearchInput) {
   );
 }
 
+function candidateGroup(mapping: RegionMapping): CandidateGroup {
+  const isMetropolitan = /(?:특별시|광역시|특별자치시)$/u.test(
+    mapping.province,
+  );
+  return isMetropolitan
+    ? {
+        key: `metropolitan:${mapping.province}`,
+        name: mapping.province,
+        province: mapping.province,
+      }
+    : {
+        key: `municipality:${mapping.province}:${mapping.district}`,
+        name: mapping.name,
+        province: mapping.province,
+      };
+}
+
 export function searchCandidates(input: SearchInput): Candidate[] {
   if (!validOneNight(input)) return [];
   const start = kstDate(input.startAt),
@@ -87,7 +113,7 @@ export function searchCandidates(input: SearchInput): Candidate[] {
   const origin = ORIGINS.find((item) => item.id === input.originId);
   const from = origin ? zoneIndex.get(origin.zoneId) : undefined;
   if (from === undefined) return [];
-  const candidates: Candidate[] = [];
+  const candidates = new Map<string, CandidateAccumulator>();
   for (const [regionId, profile] of profileById) {
     const row = mappingById.get(regionId),
       to = zoneIndex.get(regionId),
@@ -98,23 +124,40 @@ export function searchCandidates(input: SearchInput): Candidate[] {
       for (const attraction of profile.attractions)
         if (attraction.categoryId === interest)
           attractionMap.set(attraction.contentId, attraction);
-    if (attractionMap.size < 3) continue;
     const localMinutes =
       Math.floor((end.getTime() - start.getTime()) / 60_000) - minutes * 2;
     if (localMinutes < 8 * 60) continue;
-    candidates.push({
+    const group = candidateGroup(row);
+    const existing = candidates.get(group.key);
+    if (existing) {
+      for (const [contentId, attraction] of attractionMap)
+        existing.attractionMap.set(contentId, attraction);
+      if (minutes < existing.oneWayMinutes) {
+        existing.regionId = regionId;
+        existing.oneWayMinutes = minutes;
+        existing.localMinutes = localMinutes;
+      }
+      continue;
+    }
+    candidates.set(group.key, {
       regionId,
-      name: profile.name,
-      province: profile.province,
+      name: group.name,
+      province: group.province,
       oneWayMinutes: minutes,
       localMinutes,
-      attractions: [...attractionMap.values()],
+      attractions: [],
+      attractionMap,
       interestLabels: input.interests.map(
         (id) => INTERESTS.find((item) => item.id === id)?.label ?? id,
       ),
     });
   }
-  return candidates
+  return [...candidates.values()]
+    .map(({ attractionMap, ...candidate }) => ({
+      ...candidate,
+      attractions: [...attractionMap.values()],
+    }))
+    .filter((candidate) => candidate.attractions.length >= 3)
     .toSorted(
       (a, b) =>
         b.attractions.length - a.attractions.length ||
