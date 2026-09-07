@@ -3,6 +3,7 @@
 기능 구현의 기준은 다음 문서를 함께 따른다.
 
 - `docs/agent/TECH_STACK.md`
+- `docs/development/MVP_IMPLEMENTATION_PLAN.md` — 기능·에픽의 최신 구현 상태와 다음 employee 작업
 - `docs/product/PRD.md`
 - `docs/product/TRAVEL_RECOMMENDATION.md`
 - `docs/product/DISTANCE_CALCULATION.md`
@@ -16,6 +17,7 @@
 2. `docs/product/PRD.md` — 서비스 정의·목적·MVP 범위
 3. `docs/product/TRAVEL_RECOMMENDATION.md` — 추천·일정 생성 규칙
 4. `docs/product/DISTANCE_CALCULATION.md` — 국가교통DB 기반 지역 간 일반 예상 이동시간 규칙
+5. `docs/development/MVP_IMPLEMENTATION_PLAN.md` — 현재 구현 상태, 다음 작업, 교체 대상
 
 ## 기본 원칙
 
@@ -41,10 +43,20 @@
 
 ## 지속 에이전트 역할
 
-- 제품 범위와 의사결정은 `.agents/pm/AGENT.md`의 PM 에이전트가 관리한다.
-- 구현 작업의 계획·수행·PR 준비는 `.agents/employee/AGENT.md`의 employee agent가 담당한다.
-- 화면 설계와 디자인 토큰·공통 컴포넌트는 `.agents/designer/AGENT.md`의 designer agent가 담당한다.
-- 구현 결과의 독립 검토는 `.agents/reviewer/AGENT.md`의 reviewer agent가 담당한다. 단, 현재 MVP 구현에서는 독립 리뷰를 생략한다.
+DURUDURU는 네 개의 지속 에이전트 역할로 일한다. 각 역할의 책임·권한·절차·제약을 정의하는 문서가 그 역할의 **단일 출처(SSOT)**이며, 규칙은 그 문서에만 두고 다른 곳에 복제하지 않는다.
+
+| 역할     | 정의 문서(SSOT)             | 담당                                                                       |
+| -------- | --------------------------- | -------------------------------------------------------------------------- |
+| PM       | `.agents/pm/AGENT.md`       | 제품 범위·우선순위·MVP 경계·성공 기준, 기능 요청 분류, `docs/product` 관리 |
+| Employee | `.agents/employee/AGENT.md` | 명세를 작업 계획으로 분해, 작업 브랜치 구현, PR 준비                       |
+| Designer | `.agents/designer/AGENT.md` | 화면·상태 설계, 디자인 토큰·공통 컴포넌트의 단일 출처                      |
+| Reviewer | `.agents/reviewer/AGENT.md` | 완료된 변경의 독립 검토. 현재 MVP 구현에서는 생략한다                      |
+
+어떤 도구(Claude Code, Codex 등)에서든 특정 역할로 작업할 때는 해당 정의 문서를 먼저 열어 그 내용을 작업 지침으로 삼고, 그 문서가 지시하는 참고 문서까지 읽은 뒤 착수한다.
+
+- Claude Code는 `.claude/agents/<역할>.md`로 같은 역할을 서브에이전트로 등록한다. 이 파일은 정의 문서를 가리키는 얇은 포인터이며 규칙을 담지 않는다.
+- Codex 등 다른 도구는 이 표의 정의 문서를 직접 읽어 같은 역할로 작업한다.
+- 도구별 배선과 갱신 규칙은 `.agents/README.md`를 따른다.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

@@ -23,7 +23,7 @@ DURUDURU의 지속적인 구현 담당자다. PM이 정리한 제품 범위와 �
 
 - 현재 저장소는 **Next.js 16 App Router**, **React 19**, **TypeScript 6** 기반이다.
 - 현재 UI는 `app/` 아래 App Router 구조와 `app/globals.css`를 사용한다. TanStack Query, Axios, Zustand, Tailwind CSS, Jest, Playwright 의존성과 기본 검증 설정이 반영되어 있다. 기능별 사용은 필요한 작업에서만 도입한다.
-- 현재 추천·일정 로직과 목업 데이터는 `lib/planner.ts`, `lib/mock-data.ts`에 있다. 핵심 엔진은 LLM이 아니라 결정론적인 규칙·점수·시간 제약 계산으로 구현한다.
+- 현재 MVP 핵심 흐름은 `lib/mvp-core.ts`(후보 검색·일정), `lib/mvp-region-data.ts`(지역 타입·카테고리 규칙), `lib/restaurant-selection.ts`(식사 우선순위)와 `app/api/` 아래 Route Handler에 있다. `lib/planner.ts`·`lib/recommendation.ts`·`lib/poc-data-adapter.ts` 등 이전 PoC 모듈은 `docs/development/MVP_IMPLEMENTATION_PLAN.md` 3장의 교체·삭제 대상이며 새 흐름이 참조하지 않는다. 핵심 엔진은 LLM이 아니라 결정론적인 규칙·점수·시간 제약 계산으로 구현한다.
 - 품질 검증 명령은 `npm run verify`, `npm run test:e2e`로 제공되지만, 현재 MVP 기능 구현에서는 실행하지 않는다. 완료 뒤 화면 확인은 사용자가 직접 수행한다.
 - MVP 데이터 계층은 TourAPI 공식 분류 콘텐츠를 하루 1회 JSON 지역 프로필 인덱스로 수집하고, 검색에는 그 인덱스를 사용한다. 선택 카테고리의 서로 다른 관광지 콘텐츠 ID가 3개 이상인 지역만 후보가 될 수 있다. 음식점 목록은 사용자가 선택한 지역 한 곳에만 조회하며 `detailIntro2`는 사용자가 음식점을 열 때만 서버 Route Handler에서 호출한다. MVP 입력은 1박 2일만 허용한다.
 - 지역N문화 대표음식과 모범음식점 공식 원천은 목적지 선택 뒤 식사 음식점 우선순위화에만 사용한다. 이 준비 데이터가 없어도 TourAPI 지역 프로필·목적지 후보 필터를 막지 않으며, 임의 대표음식·평점·리뷰·랭킹으로 대체하지 않는다.
@@ -49,6 +49,7 @@ DURUDURU의 지속적인 구현 담당자다. PM이 정리한 제품 범위와 �
 - Jest는 추천·일정 제약, 입력 검증, 데이터 결측·fallback, 상태 전환 같은 결정론적 동작을 검증한다. 네트워크·시간·데이터는 재현 가능한 fixture 또는 mock으로 통제한다.
 - Playwright는 실제 브라우저에서 조건 입력, 추천 결과·결과 없음, 목적지 선택, 일정 결과·오류/로딩 등 핵심 흐름을 점검한다. 화면 전용 E2E 검증을 Jest 단위 테스트로 대체하지 않는다.
 - 기능을 완료했다고 보고하기 전에는 변경 범위에 맞는 Jest 테스트와 Playwright 점검을 실행한다. 실행하지 못한 검증은 이유와 위험을 PR·완료 보고에 명시한다.
+  단, 현재 MVP 구현 기간에는 `AGENTS.md`의 예외를 따라 Jest·Playwright·자동 검증을 생략하고 사용자가 직접 화면을 확인한다. MVP 종료 뒤에는 이 검증 원칙을 그대로 적용한다.
 - 외부 공공 API는 UI에서 직접 호출하지 않고, 정규화된 내부 데이터 계약 뒤에 둔다.
 - 도메인 계산은 UI 컴포넌트에 섞지 않고 TypeScript 모듈로 분리하며, 같은 입력·정책·데이터 버전에서 같은 결과가 재현되게 한다.
 - 타입 안전성을 유지한다. `any`, 숨겨진 암묵 변환, 근거 없는 기본값으로 데이터 결측을 감추지 않는다.
@@ -66,6 +67,7 @@ DURUDURU의 지속적인 구현 담당자다. PM이 정리한 제품 범위와 �
 6. `docs/product/API_FETCH_FLOW.md`
 7. `docs/product/FOOD_DATA_POLICY.md`
 8. `docs/product/INTERREGIONAL_TRAVEL_TIME.md`
+9. `docs/development/MVP_IMPLEMENTATION_PLAN.md` — 최신 구현 상태, 다음 작업, 교체·삭제 대상
 
 그 뒤 현재 코드, 테스트, 패키지 스크립트, 관련 데이터 계약을 읽어 문서와 실제 기준선의 차이를 확인한다.
 
