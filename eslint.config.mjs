@@ -9,6 +9,7 @@ export default defineConfig([
   // 못해서, 에이전트 워크트리(`.claude/worktrees/*`) 안의 빌드 산출물이 lint 대상으로 들어왔다.
   globalIgnores([
     "**/.next/**",
+    "**/.next-e2e/**",
     "out/**",
     "build/**",
     "next-env.d.ts",
