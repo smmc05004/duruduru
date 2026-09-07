@@ -14,7 +14,11 @@ export const INTERESTS: Array<{ id: MvpCategoryId; label: string }> = [
   { id: "culture", label: "문화" },
   { id: "leisure", label: "레저" },
 ];
-export const SEOUL_ZONE_ID = "ktdb-zone-2";
+export const ORIGINS = [
+  { id: "seoul", label: "서울특별시", zoneId: "ktdb-zone-2" },
+  { id: "busan", label: "부산광역시", zoneId: "ktdb-zone-26" },
+] as const;
+export type MvpOriginId = (typeof ORIGINS)[number]["id"];
 const HOUR = 3_600_000;
 const kstDate = (value: string) => new Date(`${value}:00+09:00`);
 const zoneIndex = new Map(
@@ -31,6 +35,7 @@ const mappingById = new Map(
 );
 
 export type SearchInput = {
+  originId: MvpOriginId;
   startAt: string;
   returnBy: string;
   interests: MvpCategoryId[];
@@ -70,6 +75,7 @@ export function validOneNight(input: SearchInput) {
     !Number.isNaN(start.getTime()) &&
     end > start &&
     days === 2 &&
+    ORIGINS.some((origin) => origin.id === input.originId) &&
     input.interests.length > 0
   );
 }
@@ -78,7 +84,8 @@ export function searchCandidates(input: SearchInput): Candidate[] {
   if (!validOneNight(input)) return [];
   const start = kstDate(input.startAt),
     end = kstDate(input.returnBy);
-  const from = zoneIndex.get(SEOUL_ZONE_ID);
+  const origin = ORIGINS.find((item) => item.id === input.originId);
+  const from = origin ? zoneIndex.get(origin.zoneId) : undefined;
   if (from === undefined) return [];
   const candidates: Candidate[] = [];
   for (const [regionId, profile] of profileById) {
@@ -129,15 +136,22 @@ export function createSchedule(
   candidate: Candidate,
   restaurants: Restaurant[],
 ): ScheduleItem[] | null {
-  if (restaurants.length < 1) return null;
   const attractions = [
     ...new Map(
       candidate.attractions.map((item) => [item.contentId, item]),
     ).values(),
   ];
   if (attractions.length < 3) return null;
+  const distinctRestaurants = [
+    ...new Map(
+      restaurants.map((restaurant) => [restaurant.contentId, restaurant]),
+    ).values(),
+  ];
+  const origin = ORIGINS.find((item) => item.id === input.originId);
+  if (!origin) return null;
   const pick = (index: number) => attractions[index % attractions.length];
-  const restaurant = restaurants[0];
+  const mealRestaurant = (index: number) =>
+    distinctRestaurants[index]?.name ?? "추천할 식당을 더 찾지 못했어요";
   return [
     {
       day: 1,
@@ -145,19 +159,19 @@ export function createSchedule(
       type: "이동",
       title: `${candidate.name}으로 출발`,
     },
-    { day: 1, time: "11:30", type: "점심", title: restaurant.name },
+    { day: 1, time: "11:30", type: "점심", title: mealRestaurant(0) },
     { day: 1, time: "13:30", type: "관광", title: pick(0).title },
     { day: 1, time: "15:00", type: "관광", title: pick(1).title },
-    { day: 1, time: "17:30", type: "저녁", title: restaurant.name },
+    { day: 1, time: "17:30", type: "저녁", title: mealRestaurant(1) },
     { day: 2, time: "09:00", type: "관광", title: pick(2).title },
-    { day: 2, time: "11:30", type: "점심", title: restaurant.name },
+    { day: 2, time: "11:30", type: "점심", title: mealRestaurant(2) },
     { day: 2, time: "13:30", type: "관광", title: pick(3).title },
-    { day: 2, time: "17:30", type: "저녁", title: restaurant.name },
+    { day: 2, time: "17:30", type: "저녁", title: mealRestaurant(3) },
     {
       day: 2,
       time: input.returnBy.slice(11),
       type: "이동",
-      title: "서울특별시로 복귀",
+      title: `${origin.label}로 복귀`,
     },
   ];
 }

@@ -9,7 +9,9 @@ import { SegmentedControl } from "@/components/SegmentedControl";
 import { formatHoursAndMinutes } from "@/lib/format-duration";
 import {
   INTERESTS,
+  ORIGINS,
   type Candidate,
+  type MvpOriginId,
   type Restaurant,
   type ScheduleItem,
 } from "@/lib/mvp-core";
@@ -20,7 +22,12 @@ type View =
 type SearchResponse =
   | { kind: "success"; candidates: Candidate[] }
   | { kind: string; message: string };
-const initial = { startAt: "", returnBy: "", interests: [] as MvpCategoryId[] };
+const initial = {
+  originId: "seoul" as MvpOriginId,
+  startAt: "",
+  returnBy: "",
+  interests: [] as MvpCategoryId[],
+};
 
 export default function Page() {
   const [input, setInput] = useState(initial);
@@ -31,6 +38,7 @@ export default function Page() {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [schedule, setSchedule] = useState<ScheduleItem[] | null>(null);
   const [detail, setDetail] = useState<string | null>(null);
+  const origin = ORIGINS.find((item) => item.id === input.originId)!;
   const toggle = (id: MvpCategoryId) =>
     setInput((current) => ({
       ...current,
@@ -57,7 +65,7 @@ export default function Page() {
   async function search(event: FormEvent) {
     event.preventDefault();
     if (!isOneNight() || input.interests.length === 0) {
-      setMessage("서울 출발 1박 2일 일정과 관심사를 입력해 주세요.");
+      setMessage("출발지, 1박 2일 일정과 관심사를 입력해 주세요.");
       setView("error");
       return;
     }
@@ -184,7 +192,7 @@ export default function Page() {
     return (
       <main className="dd-screen">
         <Header />
-        <h1 className="dd-screen__title">서울에서 갈 수 있는 곳</h1>
+        <h1 className="dd-screen__title">{origin.label}에서 갈 수 있는 곳</h1>
         <ol className="dd-candidates">
           {candidates.map((candidate) => (
             <li className="dd-candidate" key={candidate.regionId}>
@@ -220,7 +228,14 @@ export default function Page() {
       <form onSubmit={search}>
         <div className="dd-screen__fields">
           <FieldCard label="어디서 출발해요?">
-            <p>서울특별시 출발</p>
+            <SegmentedControl
+              label="출발지"
+              options={ORIGINS.map(({ id, label }) => ({ value: id, label }))}
+              value={input.originId}
+              onChange={(originId) =>
+                setInput({ ...input, originId: originId as MvpOriginId })
+              }
+            />
           </FieldCard>
           <FieldCard label="언제 나가서 언제까지 돌아와요?">
             <div className="dd-datetime-pair">
@@ -296,11 +311,11 @@ function createSchedule(
       restaurants.map((restaurant) => [restaurant.contentId, restaurant]),
     ).values(),
   ];
-  if (distinctRestaurants.length < 4 || candidate.attractions.length < 3)
-    return null;
+  if (candidate.attractions.length < 3) return null;
   const place = (index: number) =>
     candidate.attractions[index % candidate.attractions.length].title;
-  const mealRestaurant = (index: number) => distinctRestaurants[index].name;
+  const mealRestaurant = (index: number) =>
+    distinctRestaurants[index]?.name ?? "추천할 식당을 더 찾지 못했어요";
   return [
     {
       day: 1,
@@ -320,7 +335,7 @@ function createSchedule(
       day: 2,
       time: input.returnBy.slice(11),
       type: "이동",
-      title: "서울특별시로 복귀",
+      title: `${ORIGINS.find((item) => item.id === input.originId)?.label ?? "출발지"}로 복귀`,
     },
   ];
 }

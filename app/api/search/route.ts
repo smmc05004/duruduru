@@ -12,7 +12,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         kind: "input-error",
-        message: "서울 출발 1박 2일 일정과 관심사를 입력해 주세요.",
+        message: "출발지, 1박 2일 일정과 관심사를 입력해 주세요.",
       },
       { status: 400 },
     );
