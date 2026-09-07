@@ -1,9 +1,9 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/Button";
 import { Chip } from "@/components/Chip";
-import { FieldCard } from "@/components/FieldCard";
+import { FieldCard, fieldErrorId } from "@/components/FieldCard";
 import { InputField } from "@/components/InputField";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { formatHoursAndMinutes } from "@/lib/format-duration";
@@ -42,6 +42,8 @@ export default function Page() {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [schedule, setSchedule] = useState<ScheduleItem[] | null>(null);
   const [detail, setDetail] = useState<string | null>(null);
+  const [showErrors, setShowErrors] = useState(false);
+  const errorSummaryRef = useRef<HTMLDivElement>(null);
   const origin = ORIGINS.find((item) => item.id === input.originId)!;
   const toggle = (id: MvpCategoryId) =>
     setInput((current) => ({
@@ -66,13 +68,27 @@ export default function Page() {
       2
     );
   };
+  // 항목별 검증. 출발지는 세그먼티드라 항상 값이 있어 오류가 없다.
+  const fieldErrors: { tripDates?: string; interests?: string } = {};
+  if (!isOneNight())
+    fieldErrors.tripDates =
+      "1박 2일 일정만 만들 수 있어요. 복귀 날짜를 출발 다음날로 맞춰 주세요.";
+  if (input.interests.length === 0)
+    fieldErrors.interests =
+      "관심사를 하나 이상 골라 주세요. 고른 관심사의 공식 분류 관광지로 후보를 걸러요.";
+  const errorCount = Object.keys(fieldErrors).length;
+  const visibleErrors = showErrors ? fieldErrors : {};
+  const visibleErrorCount = showErrors ? errorCount : 0;
+  useEffect(() => {
+    if (visibleErrorCount > 0) errorSummaryRef.current?.focus();
+  }, [visibleErrorCount]);
   async function search(event: FormEvent) {
     event.preventDefault();
-    if (!isOneNight() || input.interests.length === 0) {
-      setMessage("출발지, 1박 2일 일정과 관심사를 입력해 주세요.");
-      setView("error");
+    if (errorCount > 0) {
+      setShowErrors(true);
       return;
     }
+    setShowErrors(false);
     setView("searching");
     try {
       const response = await fetch("/api/search", {
@@ -234,6 +250,38 @@ export default function Page() {
         쓸 수 있는 시간을 알려주면
         <br />갈 곳부터 골라줄게요
       </h1>
+      {visibleErrorCount > 0 ? (
+        <div
+          className="dd-error-summary"
+          role="alert"
+          tabIndex={-1}
+          ref={errorSummaryRef}
+        >
+          <svg
+            className="dd-error-summary__icon"
+            width="20"
+            height="20"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="var(--alert)"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M10 3.2l7 12.4H3z" />
+            <path d="M10 7.8v3.4M10 13.6v.2" />
+          </svg>
+          <div>
+            <p className="dd-error-summary__title">
+              고쳐야 할 항목이 {visibleErrorCount}개 있어요
+            </p>
+            <p className="dd-error-summary__text">
+              아래 표시된 곳을 고치면 바로 찾아볼 수 있어요.
+            </p>
+          </div>
+        </div>
+      ) : null}
       <form onSubmit={search}>
         <div className="dd-screen__fields">
           <FieldCard label="어디서 출발해요?">
@@ -246,11 +294,29 @@ export default function Page() {
               }
             />
           </FieldCard>
-          <FieldCard label="언제 나가서 언제까지 돌아와요?">
+          <FieldCard
+            label="언제 나가서 언제까지 돌아와요?"
+            errors={
+              visibleErrors.tripDates
+                ? [
+                    {
+                      inputId: "trip-dates",
+                      message: visibleErrors.tripDates,
+                    },
+                  ]
+                : undefined
+            }
+          >
             <div className="dd-datetime-pair">
               <InputField
                 id="start"
                 aria-label="출발 일시"
+                aria-describedby={
+                  visibleErrors.tripDates
+                    ? fieldErrorId("trip-dates")
+                    : undefined
+                }
+                invalid={Boolean(visibleErrors.tripDates)}
                 prefix="출발"
                 type="datetime-local"
                 value={input.startAt}
@@ -261,6 +327,12 @@ export default function Page() {
               <InputField
                 id="return"
                 aria-label="복귀 가능 일시"
+                aria-describedby={
+                  visibleErrors.tripDates
+                    ? fieldErrorId("trip-dates")
+                    : undefined
+                }
+                invalid={Boolean(visibleErrors.tripDates)}
                 prefix="복귀"
                 type="datetime-local"
                 value={input.returnBy}
@@ -281,8 +353,24 @@ export default function Page() {
               onChange={() => undefined}
             />
           </FieldCard>
-          <FieldCard label="어떤 걸 좋아해요?">
-            <div className="dd-chip-group">
+          <FieldCard
+            label="어떤 걸 좋아해요?"
+            labelAside="· 하나 이상 골라 주세요"
+            invalid={Boolean(visibleErrors.interests)}
+            errors={
+              visibleErrors.interests
+                ? [{ inputId: "interests", message: visibleErrors.interests }]
+                : undefined
+            }
+          >
+            <div
+              className="dd-chip-group"
+              role="group"
+              aria-label="관심사"
+              aria-describedby={
+                visibleErrors.interests ? fieldErrorId("interests") : undefined
+              }
+            >
               {INTERESTS.map((interest) => (
                 <Chip
                   key={interest.id}
@@ -295,9 +383,18 @@ export default function Page() {
             </div>
           </FieldCard>
         </div>
-        <Button type="submit" variant="primary">
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={visibleErrorCount > 0}
+        >
           갈 수 있는 곳 찾기
         </Button>
+        {visibleErrorCount > 0 ? (
+          <p className="dd-button-note">
+            고쳐야 할 항목이 남아 있어 아직 찾을 수 없어요
+          </p>
+        ) : null}
       </form>
     </main>
   );

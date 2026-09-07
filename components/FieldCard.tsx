@@ -33,6 +33,11 @@ type FieldCardProps = {
   hintFor?: string;
   /** 항목 검증 오류. 하나 이상 있으면 hint 대신 오류를 모두 보인다. */
   errors?: FieldCardError[];
+  /**
+   * 카드 테두리·라벨을 오류색으로 바꾼다. 칩 그룹처럼 컨트롤마다 테두리를 줄 수 없어
+   * 카드가 오류를 나타내야 할 때 쓴다. 입력 필드는 컨트롤에 `invalid`를 직접 준다.
+   */
+  invalid?: boolean;
   /** 라벨을 연결할 컨트롤의 id. 없으면 그룹 라벨로 렌더한다. */
   htmlFor?: string;
   children: ReactNode;
@@ -44,6 +49,7 @@ export function FieldCard({
   hint,
   hintFor,
   errors = [],
+  invalid = false,
   htmlFor,
   children,
 }: FieldCardProps) {
@@ -57,7 +63,11 @@ export function FieldCard({
   );
 
   return (
-    <div className="dd-field-card">
+    <div
+      className={["dd-field-card", invalid ? "dd-field-card--invalid" : null]
+        .filter(Boolean)
+        .join(" ")}
+    >
       {htmlFor ? (
         <label className="dd-field-card__label" htmlFor={htmlFor}>
           {labelContent}
