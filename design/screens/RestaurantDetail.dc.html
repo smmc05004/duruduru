@@ -1,0 +1,98 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gaegu:wght@700&family=Gothic+A1:wght@500;600;700;800&family=Jua&display=swap">
+  <style>
+    body { margin:0; font-family:'Gothic A1',sans-serif; }
+    a { color:#4a6b2f; } a:hover { color:#2e441d; }
+  </style>
+</helmet>
+<div style="width:390px; min-height:1000px; background:#efe9d5; background-image:radial-gradient(#d9d0b3 1px, transparent 1px); background-size:16px 16px">
+
+  <!-- 뒤에 흐려진 일정 화면 (시트가 위를 덮는다) -->
+  <div style="padding:20px 20px 10px; opacity:0.3">
+    <div style="display:flex; align-items:center; justify-content:space-between">
+      <span style="font-family:'Jua',sans-serif; font-size:20px; color:#3f6b2b">경주 참고용 여행 계획</span>
+      <span style="padding:5px 10px; background:#4a6b2f; color:#f6f2e5; font-size:11px; font-weight:700; border-radius:2px">1박 2일</span>
+    </div>
+    <div style="margin-top:14px; padding:12px 16px; background:#fbf8ee; border:2px solid #33301f; border-left:6px solid #6c9b4a">
+      <span style="font-size:11px; font-weight:700; color:#3f6b2b">점심 · 음식점</span>
+      <p style="margin:6px 0 0; font-size:15px; font-weight:700">［음식점 이름 1］</p>
+    </div>
+  </div>
+
+  <!-- 상세 시트 -->
+  <div style="position:relative; padding:10px 20px 28px; background:#fbf8ee; border:2px solid #33301f; box-shadow:0 -6px 0 #cfc5a4">
+    <div style="width:44px; height:4px; margin:6px auto 0; border-radius:99px; background:#a8a081"></div>
+
+    <div style="display:flex; align-items:baseline; justify-content:space-between; margin-top:16px">
+      <p style="margin:0; font-family:'Jua',sans-serif; font-size:24px; line-height:1.2; color:#2b2a1d">［음식점 이름 1］</p>
+      <span style="padding:5px 10px; background:#e6efd8; border-radius:2px; font-size:11px; font-weight:600; color:#3f6b2b">음식점</span>
+    </div>
+    <p style="margin:8px 0 0; font-size:12px; font-weight:600; color:#5a5442">경상북도 경주시 · TourAPI 콘텐츠 ID 기준</p>
+
+    <div style="display:flex; flex-direction:column; gap:10px; margin-top:18px">
+      <div style="display:flex; align-items:center; gap:9px; padding:11px 13px; background:#e6efd8; border:1px solid #3f6b2b">
+        <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="#3f6b2b" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="10" cy="10" r="7.2"></circle><path d="M10 6.2V10l2.8 1.8"></path></svg>
+        <div>
+          <p style="margin:0; font-size:11px; font-weight:700; color:#3f6b2b">운영시간</p>
+          <p style="margin:3px 0 0; font-size:13px; font-weight:700; color:#2b2a1d; border-bottom:1.5px dashed #a8a081; display:inline-block">detailIntro2 · opentimefood 값 표시</p>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:9px; padding:11px 13px; background:#f7e6b8; border:1px solid #7a5710">
+        <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="#7a5710" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M4 5h12v11H4zM4 8.5h12M8 3v3M12 3v3"></path></svg>
+        <div>
+          <p style="margin:0; font-size:11px; font-weight:700; color:#7a5710">휴무</p>
+          <p style="margin:3px 0 0; font-size:13px; font-weight:700; color:#2b2a1d; border-bottom:1.5px dashed #a8a081; display:inline-block">detailIntro2 · restdatefood 값 표시</p>
+        </div>
+      </div>
+    </div>
+
+    <p style="margin:18px 0 0; font-size:12px; font-weight:700; color:#3d3a2c">대표 메뉴</p>
+    <div style="display:flex; flex-direction:column; gap:7px; margin-top:9px">
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:9px 12px; background:#fdfcf6; border:1.5px solid #a8a081">
+        <span style="font-size:13px; font-weight:600; color:#3d3a2c; border-bottom:1.5px dashed #a8a081">firstmenu 값</span>
+      </div>
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:9px 12px; background:#fdfcf6; border:1.5px solid #a8a081">
+        <span style="font-size:13px; font-weight:600; color:#3d3a2c; border-bottom:1.5px dashed #a8a081">treatmenu 값 (여러 개는 줄바꿈)</span>
+      </div>
+    </div>
+
+    <div style="display:flex; align-items:flex-start; gap:6px; margin-top:16px; padding:11px 13px; background:#f4f0e2; border:1px dashed #a8a081">
+      <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#6a6450" stroke-width="1.9" stroke-linecap="round" style="flex-shrink:0; margin-top:2px"><circle cx="10" cy="10" r="7.2"></circle><path d="M10 9v4.4M10 6.4v.2"></path></svg>
+      <p style="margin:0; font-size:11px; font-weight:500; line-height:1.6; color:#6a6450">TourAPI 상세(detailIntro2) · 2026-09-07 12:14 조회. 운영시간·메뉴·휴무는 바뀔 수 있으니 방문 전 다시 확인하세요. 이 조회는 확인용이라 일정의 식사 배치와 시간표를 바꾸지 않아요.</p>
+    </div>
+
+    <div style="display:flex; align-items:center; justify-content:center; min-height:52px; margin-top:16px; background:#fbf8ee; border:2px solid #33301f; box-shadow:5px 5px 0 #cfc5a4; font-size:15px; font-weight:700; color:#2b2a1d">닫기</div>
+  </div>
+
+  <!-- 상태 · 상세 조회 실패 (해당 음식점만 재시도, 일정 전체 장애 아님) -->
+  <div style="margin:26px 18px 0; padding:2px 0 30px">
+    <p style="margin:0 2px 10px; font-size:11px; font-weight:700; color:#5a5442">같은 시트 · 상세 조회 실패 상태</p>
+    <div style="padding:18px 18px 20px; background:#fbf8ee; border:2px solid #33301f; box-shadow:0 -5px 0 #cfc5a4">
+      <div style="width:44px; height:4px; margin:0 auto; border-radius:99px; background:#a8a081"></div>
+      <p style="margin:16px 0 0; font-family:'Jua',sans-serif; font-size:22px; color:#2b2a1d">［음식점 이름 1］</p>
+      <div style="display:flex; align-items:flex-start; gap:9px; margin-top:14px; padding:13px 14px; background:#f4dcdf; border:2px solid #8c2140">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#8c2140" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M10 3.2l7 12.4H3z"></path><path d="M10 7.8v3.4M10 13.6v.2"></path></svg>
+        <div>
+          <p style="margin:0; font-size:13px; font-weight:700; color:#6f1a33">이 음식점 정보를 불러오지 못했어요</p>
+          <p style="margin:4px 0 0; font-size:12px; font-weight:500; line-height:1.6; color:#6f1a33">상세 조회만 실패했어요. 일정과 다른 음식점은 그대로예요.</p>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; justify-content:center; gap:8px; min-height:52px; margin-top:14px; background:#8c2140; border:2px solid #6f1a33; color:#f6f2e5; font-family:'Jua',sans-serif; font-size:17px">
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="#f6f2e5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16.4 10a6.4 6.4 0 1 1-2-4.6"></path><path d="M16.6 3.4v3.2h-3.2"></path></svg>
+        다시 시도하기
+      </div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>
