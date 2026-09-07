@@ -57,7 +57,7 @@ test("당일치기는 검색 요청 없이 거절한다", async ({ page }) => {
   await page.getByLabel("복귀 가능 일시").fill("2026-09-12T20:00");
   await page.getByRole("checkbox", { name: "역사" }).click();
   await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
-  await expect(page.getByRole("alert")).toContainText("1박 2일");
+  await expect(page.locator(".dd-error-summary")).toContainText("1박 2일");
   expect(searches).toBe(0);
 });
 
