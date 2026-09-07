@@ -1,6 +1,7 @@
 import profiles from "@/data/region-profiles.json";
 import mapping from "@/data/region-mapping.json";
 import travelTimes from "@/data/ktdb/interregional-travel-times-2024.json";
+import { formatHoursAndMinutes } from "@/lib/format-duration";
 import type {
   MvpCategoryId,
   RegionAttraction,
@@ -22,6 +23,37 @@ export const ORIGINS = [
 export type MvpOriginId = (typeof ORIGINS)[number]["id"];
 const HOUR = 3_600_000;
 const kstDate = (value: string) => new Date(`${value}:00+09:00`);
+
+/**
+ * 1박 2일 참고 계획의 고정 시간 경계.
+ * TRAVEL_RECOMMENDATION.md 「시간 경계」: 매일 21:00~다음날 07:00은 휴식으로 고정하고,
+ * 관광지·음식점 체류는 각각 1시간이다.
+ */
+const REST_START_HOUR = 21;
+const DAY_RESUME_HOUR = 7;
+const STAY_MINUTES = 60;
+/** 정상 예외 판정용 최소치: 점심 1시간 + 저녁 1시간 + 관광 최소 1곳 1시간. */
+const MIN_LOCAL_MINUTES = STAY_MINUTES * 3;
+
+const kstClock = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "Asia/Seoul",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
+const kstDay = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Seoul",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+/** `base`가 속한 KST 날짜의 `hour`시 정각을 반환한다. */
+function atKstHour(base: Date, hour: number): Date {
+  return new Date(
+    `${kstDay.format(base)}T${String(hour).padStart(2, "0")}:00:00+09:00`,
+  );
+}
 
 const METROPOLITAN_SUFFIX = /(?:특별시|광역시|특별자치시)$/u;
 
@@ -199,11 +231,96 @@ export function regionMappingFor(regionId: string) {
   return mappingById.get(regionId) ?? null;
 }
 
+export type ItineraryShortfall = {
+  /** "지금은 계획을 만들 수 없어요" 아래에 붙는 한 줄 사유. */
+  reason: string;
+  /** 왕복 일반 예상 이동시간(시간, 소수 첫째 자리). */
+  roundTripHours: number;
+  /** 1·2일차별 시간 경계 산술 근거. 관광지 근거 부족이면 비어 있다. */
+  days: Array<{ day: 1 | 2; note: string }>;
+};
+
+export type ItineraryAssessment =
+  { feasible: true } | ({ feasible: false } & ItineraryShortfall);
+
+/**
+ * 선택 후보로 최소 시간표를 만들 수 있는지 산술로 판정한다.
+ *
+ * 데이터·API 장애가 아니라 정상 예외다(DESIGN_TOKENS.md 「결과 없음 · 일정 생성 불가 · 데이터 장애」).
+ * `복귀 - 출발 - 왕복 이동시간`에서 고정 휴식(21:00~07:00)을 뺀 현지 가용시간이
+ * 점심·저녁·관광 최소 1곳(각 1시간)을 겹치지 않게 담지 못하면 `feasible: false`를 반환한다.
+ * 여기서는 식사 시간대(11:30~13:30·17:30~19:30) 배치까지 검사하지 않는다.
+ * 그 블록 배치 엔진은 MVP 구현계획 6단계(`lib/itinerary-scheduler.ts`)의 범위다.
+ */
+export function assessItinerary(
+  input: SearchInput,
+  candidate: Pick<Candidate, "oneWayMinutes" | "attractions">,
+): ItineraryAssessment {
+  const oneWay = candidate.oneWayMinutes;
+  const roundTripHours = Math.round((oneWay * 2) / 6) / 10;
+  const attractions = new Map(
+    candidate.attractions.map((item) => [item.contentId, item]),
+  );
+  if (attractions.size < 3)
+    return {
+      feasible: false,
+      roundTripHours,
+      reason:
+        "이 지역에서 참고 계획에 넣을 공식 분류 관광지를 3곳 이상 찾지 못했어요.",
+      days: [],
+    };
+
+  const start = kstDate(input.startAt);
+  const end = kstDate(input.returnBy);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()))
+    return {
+      feasible: false,
+      roundTripHours,
+      reason: "출발·복귀 시각을 다시 확인해 주세요.",
+      days: [],
+    };
+
+  const arrival = new Date(start.getTime() + oneWay * 60_000);
+  const departure = new Date(end.getTime() - oneWay * 60_000);
+  const restStart = atKstHour(start, REST_START_HOUR);
+  const resume = atKstHour(end, DAY_RESUME_HOUR);
+
+  const day1Local = Math.max(
+    0,
+    Math.round((restStart.getTime() - arrival.getTime()) / 60_000),
+  );
+  const day2Local = Math.max(
+    0,
+    Math.round((departure.getTime() - resume.getTime()) / 60_000),
+  );
+  if (day1Local + day2Local >= MIN_LOCAL_MINUTES) return { feasible: true };
+
+  const day1Note =
+    arrival.getTime() >= restStart.getTime()
+      ? `${kstClock.format(start)} 출발 → ${kstClock.format(arrival)} 도착. 도착 시각이 이미 휴식 시작(21:00)을 지나 관광·식사를 넣지 못해요.`
+      : `${kstClock.format(start)} 출발 → ${kstClock.format(arrival)} 도착. 휴식 시작(21:00)까지 ${formatHoursAndMinutes(day1Local / 60)}만 남아 관광·식사를 다 넣지 못해요.`;
+  const day2Note =
+    departure.getTime() <= resume.getTime()
+      ? "2일차 07:00 전에 복귀를 시작해야 해 현지에서 쓸 시간이 없어요."
+      : `07:00 재개 → ${kstClock.format(departure)} 복귀 출발. 관광 1시간과 점심·저녁을 넣을 여유가 없어요.`;
+
+  return {
+    feasible: false,
+    roundTripHours,
+    reason: `왕복 이동에 약 ${roundTripHours}시간이 들어, 이 출발·복귀 시각 사이에는 관광 한 곳과 점심·저녁을 겹치지 않게 넣을 시간이 부족해요.`,
+    days: [
+      { day: 1, note: day1Note },
+      { day: 2, note: day2Note },
+    ],
+  };
+}
+
 export function createSchedule(
   input: SearchInput,
   candidate: Candidate,
   restaurants: Restaurant[],
 ): ScheduleItem[] | null {
+  if (!assessItinerary(input, candidate).feasible) return null;
   const attractions = [
     ...new Map(
       candidate.attractions.map((item) => [item.contentId, item]),
