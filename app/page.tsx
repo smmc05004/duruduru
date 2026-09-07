@@ -21,7 +21,10 @@ type View =
   "input" | "searching" | "candidates" | "restaurants" | "schedule" | "error";
 type SearchResponse =
   | { kind: "success"; candidates: Candidate[] }
-  | { kind: string; message: string };
+  | {
+      kind: "input-error" | "no-results" | "data-error";
+      message: string;
+    };
 const initial = {
   originId: "seoul" as MvpOriginId,
   startAt: "",
