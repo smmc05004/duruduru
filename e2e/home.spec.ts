@@ -80,6 +80,30 @@ test("선택 뒤 한 지역 음식점과 클릭한 상세만 조회한다", asyn
             certified: true,
             foodCultureMatch: true,
           },
+          {
+            contentId: "food-2",
+            name: "검증 식당 둘",
+            address: "서울",
+            phone: "",
+            certified: false,
+            foodCultureMatch: false,
+          },
+          {
+            contentId: "food-3",
+            name: "검증 식당 셋",
+            address: "서울",
+            phone: "",
+            certified: false,
+            foodCultureMatch: false,
+          },
+          {
+            contentId: "food-4",
+            name: "검증 식당 넷",
+            address: "서울",
+            phone: "",
+            certified: false,
+            foodCultureMatch: false,
+          },
         ],
       },
     });
@@ -98,6 +122,19 @@ test("선택 뒤 한 지역 음식점과 클릭한 상세만 조회한다", asyn
   await expect(page.getByText("2일차")).toBeVisible();
   await expect(page.getByText("점심")).toHaveCount(2);
   await expect(page.getByText("저녁")).toHaveCount(2);
+  const meals = page.locator(".dd-summary-card p");
+  await expect(
+    meals.filter({ hasText: /^11:30 · 점심 · 검증 식당$/u }),
+  ).toHaveCount(1);
+  await expect(
+    meals.filter({ hasText: /^17:30 · 저녁 · 검증 식당 둘$/u }),
+  ).toHaveCount(1);
+  await expect(
+    meals.filter({ hasText: /^11:30 · 점심 · 검증 식당 셋$/u }),
+  ).toHaveCount(1);
+  await expect(
+    meals.filter({ hasText: /^17:30 · 저녁 · 검증 식당 넷$/u }),
+  ).toHaveCount(1);
   expect(calls.filter((url) => url.includes("/destinations/")).length).toBe(1);
   await page.getByRole("button", { name: "검증 식당" }).first().click();
   await expect(page.getByText(/검증 메뉴/)).toBeVisible();

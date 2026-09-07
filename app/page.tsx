@@ -291,10 +291,16 @@ function createSchedule(
   candidate: Candidate,
   restaurants: Restaurant[],
 ): ScheduleItem[] | null {
-  if (!restaurants.length || candidate.attractions.length < 3) return null;
+  const distinctRestaurants = [
+    ...new Map(
+      restaurants.map((restaurant) => [restaurant.contentId, restaurant]),
+    ).values(),
+  ];
+  if (distinctRestaurants.length < 4 || candidate.attractions.length < 3)
+    return null;
   const place = (index: number) =>
-      candidate.attractions[index % candidate.attractions.length].title,
-    restaurant = restaurants[0].name;
+    candidate.attractions[index % candidate.attractions.length].title;
+  const mealRestaurant = (index: number) => distinctRestaurants[index].name;
   return [
     {
       day: 1,
@@ -302,14 +308,14 @@ function createSchedule(
       type: "이동",
       title: `${candidate.name}으로 출발`,
     },
-    { day: 1, time: "11:30", type: "점심", title: restaurant },
+    { day: 1, time: "11:30", type: "점심", title: mealRestaurant(0) },
     { day: 1, time: "13:30", type: "관광", title: place(0) },
     { day: 1, time: "15:00", type: "관광", title: place(1) },
-    { day: 1, time: "17:30", type: "저녁", title: restaurant },
+    { day: 1, time: "17:30", type: "저녁", title: mealRestaurant(1) },
     { day: 2, time: "09:00", type: "관광", title: place(2) },
-    { day: 2, time: "11:30", type: "점심", title: restaurant },
+    { day: 2, time: "11:30", type: "점심", title: mealRestaurant(2) },
     { day: 2, time: "13:30", type: "관광", title: place(3) },
-    { day: 2, time: "17:30", type: "저녁", title: restaurant },
+    { day: 2, time: "17:30", type: "저녁", title: mealRestaurant(3) },
     {
       day: 2,
       time: input.returnBy.slice(11),
