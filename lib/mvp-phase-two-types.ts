@@ -87,6 +87,22 @@ export type DataMetadata = {
   representativePoint: string;
   searchedAt: string;
 };
+export type RecommendationRole = "easy" | "interest" | "relaxed";
+export type CandidateRecommendation = {
+  role: RecommendationRole;
+  algorithmVersion: "e1-v1";
+  roundTripMinutes: number;
+  fulfilledInterestCount: number;
+  attractionCount: number;
+  categoryDiversity: number;
+  localFreeMinutes: number;
+  distancePairCount: number;
+  validDistancePairCount: number;
+  averageDistanceKm: number | null;
+  proximityComparable: boolean;
+  requestedInterests: MvpCategoryId[];
+  missingInterests: MvpCategoryId[];
+};
 export type Candidate = {
   groupId: string;
   memberRegionIds: string[];
@@ -98,7 +114,12 @@ export type Candidate = {
   attractions: Attraction[];
   preview: { blocks: TimeBlock[]; metrics: PlanMetrics };
   metadata: DataMetadata;
+  /** E1 metadata is absent in pre-E1 v2 saved plans. */
+  recommendation?: CandidateRecommendation;
   reasons: string[];
+};
+export type RecommendedCandidate = Candidate & {
+  recommendation: CandidateRecommendation;
 };
 export type PlanSnapshot = {
   schemaVersion: 2;

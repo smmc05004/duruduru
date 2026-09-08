@@ -1,6 +1,6 @@
 # MVP 구현 계획
 
-> MVP는 사용자 확인 및 병합으로 종료됐다. 다음 employee 작업은 [서비스 고도화 기획서](../product/SERVICE_ENHANCEMENT_SPEC.md) E1~E4 순차 구현이다. [고도화 계획](../product/SERVICE_ENHANCEMENT_PLAN.md)에 승인 범위와 기획 리뷰 결과가 있으며, 아래 MVP 구현/실패 기록은 과거 이력이다. 고도화부터는 MVP 검증 생략 예외를 적용하지 않는다.
+> MVP는 사용자 확인 및 병합으로 종료됐다. 다음 employee 작업은 [서비스 고도화 기획서](../product/SERVICE_ENHANCEMENT_SPEC.md) E1~E4 순차 구현이다. [고도화 계획](../product/SERVICE_ENHANCEMENT_PLAN.md)에 승인 범위와 기획 리뷰 결과가 있으며, E1의 현재 작업 상태·검증·PR 근거는 [서비스 고도화 구현 계획](SERVICE_ENHANCEMENT_IMPLEMENTATION_PLAN.md)에 기록한다. 아래 MVP 구현/실패 기록은 과거 이력이다. 고도화부터는 MVP 검증 생략 예외를 적용하지 않는다.
 
 > 최신 진입점(2026-09-08): 사용자 승인된 [MVP 2단계 기획](../product/MVP_PHASE_2.md)의 P2-01~07과 야간 이동 정책을 `feat/mvp-phase-two`에 반영했다. employee의 기존 H · 여행 수첩 디자인 복원도 코드 반영 완료했으며 교체·편집·저장 기능을 유지한다. 사용자는 현재 범위를 MVP 마무리 범위로 수용하고 커밋·PR 반영을 요청했다. 후속 변경은 같은 PR #64에 포함한다. [2단계 구현 계획](MVP_PHASE_2_IMPLEMENTATION_PLAN.md)에 구현 상태·검증 이력·다음 확인 사항을 기록한다. 사용자가 별도 요청한 기존 E2E는 실패했으며 통과로 간주하지 않는다. 아래 1단계 기록과 충돌 시 2단계 기획을 따른다.
 

@@ -1,6 +1,7 @@
 import type {
   Attraction,
   Candidate,
+  CandidateRecommendation,
   PlanMetrics,
   PlanSnapshot,
   Restaurant,
@@ -39,7 +40,7 @@ function timestamp(v: unknown): number {
   return Date.parse(/[Z]|[+-]\d{2}:\d{2}$/.test(v) ? v : `${v}+09:00`);
 }
 const validDate = (v: unknown) => Number.isFinite(timestamp(v));
-const categories = (v: unknown) =>
+const categories = (v: unknown): v is Array<(typeof INTERESTS)[number]["id"]> =>
   Array.isArray(v) &&
   v.every((c: unknown) => INTERESTS.some((i) => i.id === c));
 function coordinates(v: unknown) {
@@ -92,6 +93,32 @@ function metrics(v: unknown): v is PlanMetrics {
     ].every(finite) &&
     categories(v.fulfilledInterests) &&
     (v.averageDistanceKm === null || finite(v.averageDistanceKm))
+  );
+}
+function recommendation(v: unknown): v is CandidateRecommendation {
+  if (!object(v)) return false;
+  const pairCount = v.distancePairCount;
+  const validPairCount = v.validDistancePairCount;
+  const requestedInterests = v.requestedInterests;
+  const missingInterests = v.missingInterests;
+  return (
+    ["easy", "interest", "relaxed"].includes(String(v.role)) &&
+    v.algorithmVersion === "e1-v1" &&
+    [
+      v.roundTripMinutes,
+      v.fulfilledInterestCount,
+      v.attractionCount,
+      v.categoryDiversity,
+      v.localFreeMinutes,
+    ].every(finite) &&
+    finite(pairCount) &&
+    finite(validPairCount) &&
+    validPairCount <= pairCount &&
+    (v.averageDistanceKm === null || finite(v.averageDistanceKm)) &&
+    typeof v.proximityComparable === "boolean" &&
+    categories(requestedInterests) &&
+    categories(missingInterests) &&
+    missingInterests.every((interest) => requestedInterests.includes(interest))
   );
 }
 function blocks(
@@ -190,6 +217,7 @@ function candidate(v: unknown): v is Candidate {
     !v.attractions.every(attraction) ||
     !Array.isArray(v.reasons) ||
     !v.reasons.every(text) ||
+    (v.recommendation !== undefined && !recommendation(v.recommendation)) ||
     !object(v.metadata)
   )
     return false;
@@ -392,6 +420,27 @@ function cleanMetrics(m: PlanMetrics): PlanMetrics {
     averageDistanceKm: m.averageDistanceKm,
   };
 }
+function cleanRecommendation(
+  recommendation: CandidateRecommendation | undefined,
+): CandidateRecommendation | undefined {
+  return recommendation
+    ? {
+        role: recommendation.role,
+        algorithmVersion: recommendation.algorithmVersion,
+        roundTripMinutes: recommendation.roundTripMinutes,
+        fulfilledInterestCount: recommendation.fulfilledInterestCount,
+        attractionCount: recommendation.attractionCount,
+        categoryDiversity: recommendation.categoryDiversity,
+        localFreeMinutes: recommendation.localFreeMinutes,
+        distancePairCount: recommendation.distancePairCount,
+        validDistancePairCount: recommendation.validDistancePairCount,
+        averageDistanceKm: recommendation.averageDistanceKm,
+        proximityComparable: recommendation.proximityComparable,
+        requestedInterests: [...recommendation.requestedInterests],
+        missingInterests: [...recommendation.missingInterests],
+      }
+    : undefined;
+}
 function snapshot(plan: PlanSnapshot): PlanSnapshot {
   const d = plan.destination,
     m = d.metadata;
@@ -423,6 +472,7 @@ function snapshot(plan: PlanSnapshot): PlanSnapshot {
         blocks: d.preview.blocks.map(cleanBlock),
         metrics: cleanMetrics(d.preview.metrics),
       },
+      recommendation: cleanRecommendation(d.recommendation),
       reasons: [...d.reasons],
       metadata: {
         profileGeneratedAt: m.profileGeneratedAt,

@@ -101,6 +101,42 @@ test("서울 출발 검색은 음식점 조회 없이 후보를 보여준다", a
   expect(restaurantCalls).toBe(0);
 });
 
+test("실제 검색 엔진의 역할 후보를 선택한 뒤에만 음식점 API를 요청한다", async ({
+  page,
+}) => {
+  let restaurantCalls = 0;
+  await page.route("**/api/phase-two/restaurants", async (route) => {
+    restaurantCalls += 1;
+    await route.fulfill({
+      json: {
+        kind: "success",
+        restaurants: [],
+        queriedRegionIds: [],
+        failedRegionIds: [],
+        truncated: false,
+        fetchedAt: "2026-09-08T00:00:00.000Z",
+        message: "",
+      },
+    });
+  });
+
+  await page.goto("/");
+  await fillRequired(page);
+  await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
+
+  const results = page.getByRole("region", { name: "목적지 추천" });
+  await expect(results.locator(".dd-candidate").first()).toBeVisible();
+  await expect(results).toContainText("이동 부담을 줄인 여행");
+  expect(restaurantCalls).toBe(0);
+
+  await results
+    .getByRole("button", { name: /일정 보기$/ })
+    .first()
+    .click();
+  await expect(page.getByRole("region", { name: "여행 계획" })).toBeVisible();
+  await expect.poll(() => restaurantCalls).toBe(1);
+});
+
 test("부산 출발 선택은 부산을 검색 입력으로 전송한다", async ({ page }) => {
   const origins: string[] = [];
   await mockSearch(page, origins);
