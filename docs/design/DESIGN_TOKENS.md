@@ -78,6 +78,7 @@
 | 선택 칩 글자 `#4a3708` on `--mustard` `#e0b743` | 5.99 | AA 통과 |
 | `--on-dark` `#f6f2e5` on `--olive` `#4a6b2f` | 5.46 | AA 통과 |
 | `--alert-ink` `#6f1a33` on `--alert-soft` `#f4dcdf` | 8.63 | AA 통과 |
+| `--on-dark` `#f6f2e5` on `--alert` `#8c2140` (장애 복구 버튼) | 7.79 | AA 통과 |
 | `--olive-ink` `#3f6b2b` on `--olive-soft` `#e6efd8` | 5.29 | AA 통과 |
 | `--mustard-ink` `#7a5710` on `--mustard-soft` `#f7e6b8` | 5.30 | AA 통과 |
 

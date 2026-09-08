@@ -358,3 +358,81 @@ test("음식점이 네 곳보다 적으면 남은 식사 칸에 안내를 표시
   ).toHaveCount(1);
   await expect(page.getByText("추천할 식당을 더 찾지 못했어요")).toHaveCount(2);
 });
+
+test("음식점 목록 수집이 실패해도 관광 계획은 유지하고 식사 섹션만 재시도 상태로 보인다", async ({
+  page,
+}) => {
+  await page.route("**/api/search", (route) =>
+    route.fulfill({ json: { kind: "success", candidates } }),
+  );
+  let calls = 0;
+  await page.route("**/api/destinations/**/restaurants", async (route) => {
+    calls += 1;
+    if (calls === 1) {
+      await route.fulfill({
+        status: 502,
+        json: {
+          kind: "data-error",
+          message: "음식점 목록을 불러오지 못했어요. 다시 시도해 주세요.",
+        },
+      });
+      return;
+    }
+    await route.fulfill({
+      json: {
+        kind: "success",
+        restaurants: [
+          {
+            contentId: "food-1",
+            name: "재시도 식당",
+            address: "서울",
+            phone: "",
+            certified: false,
+            foodCultureMatch: false,
+          },
+          {
+            contentId: "food-2",
+            name: "재시도 식당 둘",
+            address: "서울",
+            phone: "",
+            certified: false,
+            foodCultureMatch: false,
+          },
+        ],
+      },
+    });
+  });
+  await page.goto("/");
+  await fill(page);
+  await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
+  await page.getByRole("button", { name: "경주 일정 보기" }).click();
+
+  // 관광 계획은 그대로 렌더된다.
+  await expect(page.getByText("경주 참고용 여행 계획")).toBeVisible();
+  await expect(page.getByText("경주 관광지 1")).toBeVisible();
+  await expect(page.getByText("경주 관광지 4")).toBeVisible();
+
+  // 식사 섹션만 자적색 재시도 상태다. 수집 실패는 "식당 부족" 안내와 구분한다.
+  const mealBanner = page.locator(".dd-meal-failure");
+  await expect(mealBanner).toHaveAttribute("role", "alert");
+  await expect(mealBanner).toContainText("식사 정보를 불러오지 못했어요");
+  await expect(mealBanner).toContainText("임의 음식점으로 대체");
+  await expect(
+    page.getByText("식사 정보를 다시 불러오면 채워져요"),
+  ).toHaveCount(4);
+  await expect(page.getByText("추천할 식당을 더 찾지 못했어요")).toHaveCount(0);
+
+  // 재시도는 음식점 목록만 다시 부른다. 성공하면 이름이 채워지고
+  // 부족한 칸은 안내 문구(재시도 UI 아님)로 남는다.
+  await page.getByRole("button", { name: "식사 정보 다시 불러오기" }).click();
+  const meals = page.locator(".dd-summary-card p");
+  await expect(
+    meals.filter({ hasText: /^11:30 · 점심 · 재시도 식당$/u }),
+  ).toHaveCount(1);
+  await expect(
+    meals.filter({ hasText: /^17:30 · 저녁 · 재시도 식당 둘$/u }),
+  ).toHaveCount(1);
+  await expect(page.getByText("추천할 식당을 더 찾지 못했어요")).toHaveCount(2);
+  await expect(page.locator(".dd-meal-failure")).toHaveCount(0);
+  expect(calls).toBe(2);
+});
