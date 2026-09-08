@@ -33,6 +33,267 @@ button {
   cursor: pointer;
 }
 
+/* MVP 2단계: 기존 표면·서체·강조 토큰을 사용하는 계획 편집 화면. */
+.p2-page {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 24px 20px 64px;
+}
+.p2-header,
+.p2-plan-head,
+.p2-saved-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.p2-logo {
+  color: var(--ink);
+  font-family: var(--font-title);
+  font-size: 28px;
+  text-decoration: none;
+}
+.p2-intro {
+  margin: 48px 0 32px;
+}
+.p2-intro h1 {
+  font-family: var(--font-title);
+  font-size: clamp(32px, 6vw, 48px);
+  line-height: 1.3;
+  margin: 12px 0;
+}
+.p2-page h2,
+.p2-page h3 {
+  font-family: var(--font-title);
+  font-weight: 400;
+}
+.p2-page h2 {
+  font-size: 26px;
+  margin: 0 0 12px;
+}
+.p2-eyebrow {
+  color: var(--olive-ink);
+  font-weight: 800;
+}
+.p2-panel {
+  padding: 24px;
+  margin: 24px 0;
+  background: var(--card);
+  border: var(--border-card) solid var(--line);
+  box-shadow: var(--shadow-card);
+}
+.p2-form {
+  max-width: 720px;
+}
+.p2-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-weight: 700;
+}
+.p2-form input,
+.p2-form select,
+.p2-duration select {
+  min-height: var(--touch-min);
+  min-width: 0;
+  border: var(--border-card) solid var(--line);
+  background: var(--field);
+  padding: 8px 12px;
+}
+.p2-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 20px 0;
+}
+.p2-form fieldset {
+  border: 0;
+  padding: 0;
+  margin: 24px 0;
+}
+.p2-form legend {
+  margin-bottom: 12px;
+}
+.p2-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.p2-control {
+  min-height: var(--touch-min);
+  border: var(--border-card) solid var(--line);
+  padding: 8px 12px;
+  background: var(--card);
+  border-radius: var(--radius-tag);
+  font-size: 14px;
+}
+.p2-control[aria-pressed="true"] {
+  background: var(--olive-soft);
+  color: var(--olive-ink);
+  border-color: var(--olive);
+}
+.p2-control:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.p2-control:focus-visible,
+.p2-place:focus-visible {
+  outline: 3px solid var(--olive);
+  outline-offset: 3px;
+}
+.p2-notice {
+  padding: 16px;
+  background: var(--mustard-soft);
+  border: var(--border-card) solid var(--mustard-ink);
+  color: var(--ink);
+}
+.p2-muted {
+  color: var(--ink-muted);
+  font-size: 13px;
+}
+.p2-candidates {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+.p2-candidates .p2-panel {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+.p2-candidates .dd-button {
+  margin-top: auto;
+}
+.p2-preview {
+  padding-left: 20px;
+}
+.p2-preview li {
+  margin: 12px 0;
+}
+.p2-day {
+  margin: 32px 0;
+}
+.p2-timeline {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.p2-block {
+  display: grid;
+  grid-template-columns: 128px minmax(0, 1fr);
+  gap: 16px;
+  padding: 20px;
+  border: var(--border-card) solid var(--line);
+  margin: 12px 0;
+  background: var(--card);
+}
+.p2-block--free,
+.p2-block--rest,
+.p2-block--travel {
+  background: var(--card-muted);
+}
+.p2-block-time {
+  font-weight: 800;
+}
+.p2-block-time span {
+  display: block;
+  font-weight: 500;
+  font-size: 12px;
+}
+.p2-block-main {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.p2-place {
+  display: block;
+  text-align: left;
+  background: none;
+  border: 0;
+  padding: 0;
+  min-height: var(--touch-min);
+  font-size: 18px;
+  font-weight: 800;
+}
+.p2-place span {
+  color: var(--olive-ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+.p2-duration {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+}
+.p2-alternatives {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+  max-height: 360px;
+  overflow: auto;
+}
+.p2-alternatives button {
+  text-align: left;
+}
+.p2-alternatives small {
+  display: block;
+  color: var(--ink-muted);
+}
+.p2-saved-row {
+  padding: 16px 0;
+  border-top: 1px dashed var(--line-dashed);
+}
+.p2-detail-fields {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.p2-detail-fields dt {
+  font-weight: 800;
+  margin-top: 20px;
+  color: var(--olive-ink);
+}
+.p2-detail-fields dd {
+  margin: 6px 0 20px;
+}
+.p2-detail-photo {
+  margin: 16px 0;
+}
+.p2-detail-photo img {
+  width: 100%;
+  height: auto;
+}
+.p2-page summary {
+  min-height: var(--touch-min);
+  cursor: pointer;
+  font-weight: 700;
+}
+.p2-page footer {
+  margin-top: 40px;
+}
+@media (max-width: 760px) {
+  .p2-candidates,
+  .p2-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .p2-page {
+    padding-inline: 16px;
+  }
+  .p2-panel {
+    padding: 20px;
+  }
+  .p2-block {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    padding: 16px;
+  }
+  .p2-block-time span {
+    display: inline;
+    margin-left: 8px;
+  }
+}
+
 /* ── 버튼 ─────────────────────────────────────────────── */
 
 .dd-button {
