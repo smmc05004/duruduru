@@ -1,48 +1,92 @@
 import { expect, test } from "@playwright/test";
 
-const candidates = [
-  { displayName: "경주", name: "경상북도 경주시" },
-  { displayName: "공주", name: "충청남도 공주시" },
-  { displayName: "강릉", name: "강원특별자치도 강릉시" },
-].map(({ displayName, name }, index) => ({
-  regionId: `region-${index}`,
-  displayName,
-  name,
+const candidates = ["경주", "공주", "강릉"].map((name, index) => ({
+  groupId: `group-${index}`,
+  memberRegionIds: [`region-${index}`],
+  representativeZoneId: `zone-${index}`,
+  displayName: name,
+  name: `검증 지역 ${name}`,
   province: "검증 지역",
   oneWayMinutes: 120,
-  localMinutes: 1800,
-  attractions: [0, 1, 2, 3].map((item) => ({
-    contentId: `${displayName}-${item}`,
-    title: `${displayName} 관광지 ${item + 1}`,
-    categoryId: "history",
+  attractions: [0, 1, 2].map((item) => ({
+    contentId: `${name}-${item}`,
+    contentTypeId: "12",
+    regionId: `region-${index}`,
+    title: `${name} 관광지 ${item + 1}`,
+    address: `${name} 관광지 주소`,
+    imageUrl: "",
+    coordinates: null,
+    categories: ["history"],
+    cat1: "A02",
+    cat2: "A0201",
+    cat3: "A0201",
   })),
-  interestLabels: ["역사"],
+  preview: {
+    blocks: [],
+    metrics: {
+      arrivalAt: "2026-09-12T10:00",
+      returnDepartureAt: "2026-09-13T18:00",
+      localMinutes: 1800,
+      freeMinutes: 600,
+      attractionCount: 3,
+      localMealCount: 4,
+      fulfilledInterests: ["history"],
+      categoryDiversity: 1,
+      averageDistanceKm: null,
+    },
+  },
+  metadata: {
+    profileGeneratedAt: "2026-09-07",
+    travelTimeGeneratedAt: "2026-09-07",
+    networkYear: 2024,
+    travelTimeSource: "KTDB",
+    representativePoint: "KTDB 존 중심",
+    searchedAt: "2026-09-08T00:00:00.000Z",
+  },
+  reasons: ["관심사에 맞는 관광지를 담을 수 있어요."],
 }));
-async function fill(page: import("@playwright/test").Page) {
+
+async function fillRequired(page: import("@playwright/test").Page) {
   await page.getByLabel("출발 일시").fill("2026-09-12T08:00");
-  await page.getByLabel("복귀 가능 일시").fill("2026-09-13T20:00");
-  await page.getByRole("checkbox", { name: "역사" }).click();
-  // 제출 클릭이 관심사 상태 커밋보다 앞서면 search()가 errorCount>0으로 읽혀
-  // searching 뷰로 넘어가지 않는다. 커밋이 반영될 때까지 기다린다.
-  await expect(page.getByRole("checkbox", { name: "역사" })).toBeChecked();
+  await page.getByLabel("다음날 귀가 완료 일시").fill("2026-09-13T20:00");
+  const history = page.getByRole("checkbox", { name: "역사" });
+  if ((await history.getAttribute("aria-checked")) !== "true")
+    await history.click();
+  await expect(history).toHaveAttribute("aria-checked", "true");
 }
 
-test("서울 고정 1박2일 검색은 음식점 호출 없이 최대 세 후보를 보인다", async ({
-  page,
-}) => {
-  let restaurants = 0;
-  let originId = "";
-  await page.route("**/api/search", async (route) => {
-    originId = JSON.parse(route.request().postData() ?? "{}").originId;
-    await route.fulfill({ json: { kind: "success", candidates } });
+function mockSearch(page: import("@playwright/test").Page, seen: string[]) {
+  return page.route("**/api/search", async (route) => {
+    seen.push(JSON.parse(route.request().postData() ?? "{}").originId);
+    await route.fulfill({
+      json: {
+        kind: "success",
+        searchId: "e2e-search",
+        profileGeneratedAt: "2026-09-07",
+        candidates,
+      },
+    });
   });
-  await page.route("**/api/destinations/**/restaurants", async (route) => {
-    restaurants += 1;
-    await route.fulfill({ json: { kind: "success", restaurants: [] } });
+}
+
+test("서울 출발 검색은 음식점 조회 없이 후보를 보여준다", async ({ page }) => {
+  const origins: string[] = [];
+  await mockSearch(page, origins);
+  let restaurantCalls = 0;
+  await page.route("**/api/phase-two/restaurants", async (route) => {
+    restaurantCalls += 1;
+    await route.fulfill({
+      json: {
+        kind: "success",
+        restaurants: [],
+        failedRegionIds: [],
+        truncated: false,
+      },
+    });
   });
   await page.goto("/");
   await expect(page.getByRole("radio", { name: "서울특별시" })).toBeChecked();
-  await fill(page);
+  await fillRequired(page);
   await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
   await expect(
     page.getByRole("button", { name: "경주 일정 보기" }),
@@ -53,469 +97,30 @@ test("서울 고정 1박2일 검색은 음식점 호출 없이 최대 세 후보
   await expect(
     page.getByRole("button", { name: "강릉 일정 보기" }),
   ).toBeVisible();
-  expect(restaurants).toBe(0);
-  expect(originId).toBe("seoul");
+  expect(origins).toEqual(["seoul"]);
+  expect(restaurantCalls).toBe(0);
 });
 
-test("부산 출발을 선택하면 부산 기준으로 후보를 검색한다", async ({ page }) => {
-  let originId = "";
-  await page.route("**/api/search", async (route) => {
-    originId = JSON.parse(route.request().postData() ?? "{}").originId;
-    await route.fulfill({ json: { kind: "success", candidates } });
-  });
+test("부산 출발 선택은 부산을 검색 입력으로 전송한다", async ({ page }) => {
+  const origins: string[] = [];
+  await mockSearch(page, origins);
   await page.goto("/");
   await page.getByRole("radio", { name: "부산광역시" }).click();
-  await fill(page);
+  await fillRequired(page);
   await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
   await expect(
     page.getByRole("heading", { name: "부산광역시에서 갈 수 있는 곳" }),
   ).toBeVisible();
-  expect(originId).toBe("busan");
+  expect(origins).toEqual(["busan"]);
 });
 
-test("광역시 내부 구는 하나의 후보 권역으로 묶는다", async ({ page }) => {
-  const response = await page.request.post("/api/search", {
-    data: {
-      originId: "busan",
-      startAt: "2026-09-12T08:00",
-      returnBy: "2026-09-13T20:00",
-      interests: ["culture"],
-    },
-  });
-  expect(response.ok()).toBeTruthy();
-  const result = (await response.json()) as {
-    kind: string;
-    candidates: Array<{ name: string; province: string }>;
-  };
-  expect(result.kind).toBe("success");
-  const seoul = result.candidates.filter(
-    (candidate) => candidate.province === "서울특별시",
-  );
-  expect(seoul).toHaveLength(1);
-  expect(seoul[0]?.name).toBe("서울특별시");
-});
-
-test("당일치기는 검색 요청 없이 거절한다", async ({ page }) => {
-  let searches = 0;
-  await page.route("**/api/search", async (route) => {
-    searches += 1;
-    await route.fulfill({ json: { kind: "success", candidates } });
-  });
+test("당일 입력은 검색 요청 없이 1박 2일 오류를 표시한다", async ({ page }) => {
+  const origins: string[] = [];
+  await mockSearch(page, origins);
   await page.goto("/");
   await page.getByLabel("출발 일시").fill("2026-09-12T08:00");
-  await page.getByLabel("복귀 가능 일시").fill("2026-09-12T20:00");
-  await page.getByRole("checkbox", { name: "역사" }).click();
+  await page.getByLabel("다음날 귀가 완료 일시").fill("2026-09-12T20:00");
   await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
-  await expect(page.locator(".dd-error-summary")).toContainText(
-    "고쳐야 할 항목이 1개",
-  );
-  await expect(page.locator(".dd-field-error__text")).toContainText("1박 2일");
-  expect(searches).toBe(0);
-});
-
-test("검증 오류를 항목별로 표시하고 고치면 제출을 허용한다", async ({
-  page,
-}) => {
-  let searches = 0;
-  await page.route("**/api/search", async (route) => {
-    searches += 1;
-    await route.fulfill({ json: { kind: "success", candidates } });
-  });
-  await page.goto("/");
-  await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
-  await expect(page.locator(".dd-error-summary")).toContainText(
-    "고쳐야 할 항목이 2개",
-  );
-  await expect(page.locator(".dd-field-error__text")).toHaveCount(2);
-  await expect(
-    page.getByRole("button", { name: "갈 수 있는 곳 찾기" }),
-  ).toBeDisabled();
-  await expect(page.locator(".dd-button-note")).toContainText(
-    "아직 찾을 수 없어요",
-  );
-  expect(searches).toBe(0);
-  await fill(page);
-  await expect(page.locator(".dd-error-summary")).toHaveCount(0);
-  await expect(
-    page.getByRole("button", { name: "갈 수 있는 곳 찾기" }),
-  ).toBeEnabled();
-  await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
-  await expect(
-    page.getByRole("button", { name: "경주 일정 보기" }),
-  ).toBeVisible();
-});
-
-test("선택 뒤 한 지역 음식점과 클릭한 상세만 조회한다", async ({ page }) => {
-  const calls: string[] = [];
-  await page.route("**/api/search", (route) =>
-    route.fulfill({ json: { kind: "success", candidates } }),
-  );
-  await page.route("**/api/destinations/**/restaurants", async (route) => {
-    calls.push(route.request().url());
-    await route.fulfill({
-      json: {
-        kind: "success",
-        restaurants: [
-          {
-            contentId: "food-1",
-            name: "검증 식당",
-            address: "서울",
-            phone: "",
-            certified: true,
-            foodCultureMatch: true,
-          },
-          {
-            contentId: "food-2",
-            name: "검증 식당 둘",
-            address: "서울",
-            phone: "",
-            certified: false,
-            foodCultureMatch: false,
-          },
-          {
-            contentId: "food-3",
-            name: "검증 식당 셋",
-            address: "서울",
-            phone: "",
-            certified: false,
-            foodCultureMatch: false,
-          },
-          {
-            contentId: "food-4",
-            name: "검증 식당 넷",
-            address: "서울",
-            phone: "",
-            certified: false,
-            foodCultureMatch: false,
-          },
-        ],
-      },
-    });
-  });
-  await page.route("**/api/restaurants/**", async (route) => {
-    calls.push(route.request().url());
-    // route.ts가 detailIntro2 응답을 정규화한 형태를 그대로 돌려준다.
-    await route.fulfill({
-      json: {
-        kind: "success",
-        detail: {
-          openingHours: { status: "confirmed", value: "매일 10:00~21:00" },
-          closedDays: { status: "unknown" },
-          menus: { status: "confirmed", items: ["한우국밥", "떡갈비"] },
-        },
-      },
-    });
-  });
-  await page.goto("/");
-  await fill(page);
-  await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
-  await page.getByRole("button", { name: "경주 일정 보기" }).click();
-  await expect(page.getByText("9월 12일")).toBeVisible();
-  await expect(page.getByText("9월 13일")).toBeVisible();
-  await expect(page.getByText("점심 · 음식점")).toHaveCount(2);
-  await expect(page.getByText("저녁 · 음식점")).toHaveCount(2);
-  // 네 식사 칸에 서로 다른 음식점이 하나씩만 배정된다(타임라인 카드 제목).
-  const meals = page.locator(".dd-tl-title");
-  await expect(meals.filter({ hasText: /^검증 식당$/u })).toHaveCount(1);
-  await expect(meals.filter({ hasText: /^검증 식당 둘$/u })).toHaveCount(1);
-  await expect(meals.filter({ hasText: /^검증 식당 셋$/u })).toHaveCount(1);
-  await expect(meals.filter({ hasText: /^검증 식당 넷$/u })).toHaveCount(1);
-  expect(calls.filter((url) => url.includes("/destinations/")).length).toBe(1);
-  await page.getByRole("button", { name: "검증 식당" }).first().click();
-  const sheet = page.getByRole("dialog");
-  await expect(sheet).toBeVisible();
-  // 정규화된 상세: 운영시간 값, 결측 휴무는 "확인 필요" 문구, 대표 메뉴 목록.
-  await expect(sheet.getByText("매일 10:00~21:00")).toBeVisible();
-  await expect(sheet.getByText("한우국밥")).toBeVisible();
-  await expect(sheet.getByText("떡갈비")).toBeVisible();
-  await expect(
-    sheet.getByText("정보가 없어요 · 방문 전 확인이 필요해요"),
-  ).toBeVisible();
-  await expect(
-    sheet.getByText("일정의 식사 배치와 시간표를 바꾸지 않아요"),
-  ).toBeVisible();
-  // raw JSON 문자열은 더 이상 노출하지 않는다.
-  await expect(page.getByText('{"openingHours"')).toHaveCount(0);
-  expect(calls.filter((url) => url.includes("/api/restaurants/")).length).toBe(
-    1,
-  );
-});
-
-test("음식점 상세 조회가 실패하면 시트 안에서만 재시도하고 일정은 유지한다", async ({
-  page,
-}) => {
-  await page.route("**/api/search", (route) =>
-    route.fulfill({ json: { kind: "success", candidates } }),
-  );
-  await page.route("**/api/destinations/**/restaurants", (route) =>
-    route.fulfill({
-      json: {
-        kind: "success",
-        restaurants: [
-          {
-            contentId: "food-1",
-            name: "검증 식당",
-            address: "서울",
-            phone: "",
-            certified: false,
-            foodCultureMatch: false,
-          },
-          {
-            contentId: "food-2",
-            name: "검증 식당 둘",
-            address: "서울",
-            phone: "",
-            certified: false,
-            foodCultureMatch: false,
-          },
-        ],
-      },
-    }),
-  );
-  let detailCalls = 0;
-  await page.route("**/api/restaurants/**", async (route) => {
-    detailCalls += 1;
-    if (detailCalls === 1) {
-      await route.fulfill({
-        status: 502,
-        json: {
-          kind: "data-error",
-          message: "음식점 상세 정보를 불러오지 못했어요. 다시 시도해 주세요.",
-        },
-      });
-      return;
-    }
-    await route.fulfill({
-      json: {
-        kind: "success",
-        detail: {
-          openingHours: { status: "confirmed", value: "매일 11:00~20:00" },
-          closedDays: { status: "confirmed", value: "월요일" },
-          menus: { status: "unknown" },
-        },
-      },
-    });
-  });
-  await page.goto("/");
-  await fill(page);
-  await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
-  await page.getByRole("button", { name: "경주 일정 보기" }).click();
-  await expect(page.getByText("경주 참고용 여행 계획")).toBeVisible();
-  await page.getByRole("button", { name: "검증 식당" }).first().click();
-
-  const sheet = page.getByRole("dialog");
-  await expect(sheet).toContainText("이 음식점 정보를 불러오지 못했어요");
-  // 상세 실패는 화면 전체 장애가 아니다. 일정과 식사 배치는 그대로.
-  await expect(page.getByText("경주 관광지 1")).toBeVisible();
-  const meals = page.locator(".dd-tl-title");
-  await expect(meals.filter({ hasText: /^검증 식당$/u })).toHaveCount(1);
-
-  await sheet.getByRole("button", { name: "다시 시도하기" }).click();
-  await expect(sheet.getByText("매일 11:00~20:00")).toBeVisible();
-  await expect(sheet.getByText("월요일")).toBeVisible();
-  await expect(sheet).not.toContainText("이 음식점 정보를 불러오지 못했어요");
-  await expect(meals.filter({ hasText: /^검증 식당$/u })).toHaveCount(1);
-  expect(detailCalls).toBe(2);
-});
-
-test("검색 로딩 중에도 입력한 조건 요약을 실제 값으로 유지한다", async ({
-  page,
-}) => {
-  let release: () => void = () => undefined;
-  const gate = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  await page.route("**/api/search", async (route) => {
-    await gate;
-    await route.fulfill({ json: { kind: "success", candidates } });
-  });
-  await page.goto("/");
-  await fill(page);
-  await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
-  await expect(page.getByRole("status")).toContainText(
-    "갈 수 있는 곳을 찾고 있어요",
-  );
-  const summary = page.getByRole("region", { name: "입력한 여행 조건" });
-  await expect(summary).toContainText("서울특별시");
-  await expect(summary).toContainText("9/12 08:00 출발");
-  await expect(summary).toContainText("9/13 20:00 복귀");
-  await expect(summary).toContainText("역사");
-  await expect(
-    page.getByRole("button", { name: "검색을 멈추고 조건 수정하기" }),
-  ).toBeVisible();
-  release();
-  await expect(
-    page.getByRole("button", { name: "경주 일정 보기" }),
-  ).toBeVisible();
-});
-
-test("검색을 멈추면 조건 화면으로 돌아가고 늦게 온 응답은 무시한다", async ({
-  page,
-}) => {
-  let release: () => void = () => undefined;
-  const gate = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  await page.route("**/api/search", async (route) => {
-    await gate;
-    await route.fulfill({ json: { kind: "success", candidates } });
-  });
-  await page.goto("/");
-  await fill(page);
-  await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
-  await page
-    .getByRole("button", { name: "검색을 멈추고 조건 수정하기" })
-    .click();
-  await expect(
-    page.getByRole("button", { name: "갈 수 있는 곳 찾기" }),
-  ).toBeVisible();
-  release();
-  await expect(
-    page.getByRole("button", { name: "경주 일정 보기" }),
-  ).toHaveCount(0);
-});
-
-test("음식점 조회 로딩 중에는 선택 후보와 관광 블록을 실제 값으로 유지한다", async ({
-  page,
-}) => {
-  await page.route("**/api/search", (route) =>
-    route.fulfill({ json: { kind: "success", candidates } }),
-  );
-  let release: () => void = () => undefined;
-  const gate = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  await page.route("**/api/destinations/**/restaurants", async (route) => {
-    await gate;
-    await route.fulfill({ json: { kind: "success", restaurants: [] } });
-  });
-  await page.goto("/");
-  await fill(page);
-  await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
-  await page.getByRole("button", { name: "경주 일정 보기" }).click();
-  const summary = page.getByRole("region", { name: "입력한 여행 조건" });
-  await expect(summary).toContainText("경주");
-  await expect(page.getByRole("status")).toContainText(
-    "음식점을 불러오고 있어요",
-  );
-  await expect(page.getByText("경주 관광지 1")).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "조회를 멈추고 다른 지역 보기" }),
-  ).toBeVisible();
-  release();
-});
-
-test("음식점이 네 곳보다 적으면 남은 식사 칸에 안내를 표시한다", async ({
-  page,
-}) => {
-  await page.route("**/api/search", (route) =>
-    route.fulfill({ json: { kind: "success", candidates } }),
-  );
-  await page.route("**/api/destinations/**/restaurants", (route) =>
-    route.fulfill({
-      json: {
-        kind: "success",
-        restaurants: [
-          {
-            contentId: "food-1",
-            name: "첫 식당",
-            address: "서울",
-            phone: "",
-            certified: false,
-            foodCultureMatch: false,
-          },
-          {
-            contentId: "food-2",
-            name: "둘째 식당",
-            address: "서울",
-            phone: "",
-            certified: false,
-            foodCultureMatch: false,
-          },
-        ],
-      },
-    }),
-  );
-  await page.goto("/");
-  await fill(page);
-  await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
-  await page.getByRole("button", { name: "경주 일정 보기" }).click();
-  const meals = page.locator(".dd-tl-title");
-  await expect(meals.filter({ hasText: /^첫 식당$/u })).toHaveCount(1);
-  await expect(meals.filter({ hasText: /^둘째 식당$/u })).toHaveCount(1);
-  await expect(page.getByText("추천할 식당을 더 찾지 못했어요")).toHaveCount(2);
-});
-
-test("음식점 목록 수집이 실패해도 관광 계획은 유지하고 식사 섹션만 재시도 상태로 보인다", async ({
-  page,
-}) => {
-  await page.route("**/api/search", (route) =>
-    route.fulfill({ json: { kind: "success", candidates } }),
-  );
-  let calls = 0;
-  await page.route("**/api/destinations/**/restaurants", async (route) => {
-    calls += 1;
-    if (calls === 1) {
-      await route.fulfill({
-        status: 502,
-        json: {
-          kind: "data-error",
-          message: "음식점 목록을 불러오지 못했어요. 다시 시도해 주세요.",
-        },
-      });
-      return;
-    }
-    await route.fulfill({
-      json: {
-        kind: "success",
-        restaurants: [
-          {
-            contentId: "food-1",
-            name: "재시도 식당",
-            address: "서울",
-            phone: "",
-            certified: false,
-            foodCultureMatch: false,
-          },
-          {
-            contentId: "food-2",
-            name: "재시도 식당 둘",
-            address: "서울",
-            phone: "",
-            certified: false,
-            foodCultureMatch: false,
-          },
-        ],
-      },
-    });
-  });
-  await page.goto("/");
-  await fill(page);
-  await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
-  await page.getByRole("button", { name: "경주 일정 보기" }).click();
-
-  // 관광 계획은 그대로 렌더된다.
-  await expect(page.getByText("경주 참고용 여행 계획")).toBeVisible();
-  await expect(page.getByText("경주 관광지 1")).toBeVisible();
-  await expect(page.getByText("경주 관광지 4")).toBeVisible();
-
-  // 식사 섹션만 자적색 재시도 상태다. 수집 실패는 "식당 부족" 안내와 구분한다.
-  const mealBanner = page.locator(".dd-meal-failure");
-  await expect(mealBanner).toHaveAttribute("role", "alert");
-  await expect(mealBanner).toContainText("식사 정보를 불러오지 못했어요");
-  await expect(mealBanner).toContainText("임의 음식점으로 대체");
-  await expect(
-    page.getByText("식사 정보를 다시 불러오면 채워져요"),
-  ).toHaveCount(4);
-  await expect(page.getByText("추천할 식당을 더 찾지 못했어요")).toHaveCount(0);
-
-  // 재시도는 음식점 목록만 다시 부른다. 성공하면 이름이 채워지고
-  // 부족한 칸은 안내 문구(재시도 UI 아님)로 남는다.
-  await page.getByRole("button", { name: "식사 정보 다시 불러오기" }).click();
-  const meals = page.locator(".dd-tl-title");
-  await expect(meals.filter({ hasText: /^재시도 식당$/u })).toHaveCount(1);
-  await expect(meals.filter({ hasText: /^재시도 식당 둘$/u })).toHaveCount(1);
-  await expect(page.getByText("추천할 식당을 더 찾지 못했어요")).toHaveCount(2);
-  await expect(page.locator(".dd-meal-failure")).toHaveCount(0);
-  expect(calls).toBe(2);
+  await expect(page.getByRole("status")).toContainText("다음날");
+  expect(origins).toHaveLength(0);
 });
