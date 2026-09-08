@@ -1,12 +1,7 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type FormEvent,
-} from "react";
+import { useCallback, useRef, useState, type FormEvent } from "react";
+import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/Button";
 import {
@@ -95,6 +90,8 @@ export function TripPlanner() {
   const savedOpen = useTripUi((s) => s.savedOpen),
     setSavedOpen = useTripUi((s) => s.setSavedOpen);
   const generation = useRef(0);
+  const activeMealRequest = useRef<MealRequest | null>(null);
+  const mealSequence = useRef(0);
   const closeDetail = useCallback(() => setSelected(null), []);
   const search = useMutation({
     mutationFn: async (variables: {
@@ -108,19 +105,25 @@ export function TripPlanner() {
       return data;
     },
   });
-  const meals = useQuery({
-    queryKey: ["phase-two-restaurants", mealRequest],
-    enabled: mealRequest !== null,
-    queryFn: async ({ signal }) => {
-      if (!mealRequest) throw new Error("음식점 조회 조건이 없어요");
-      const { data } = await tripApi.post<RestaurantResponse>(
-        "/phase-two/restaurants",
-        { groupId: mealRequest.groupId, visits: mealRequest.visits },
-        { signal },
-      );
-      if (data.kind !== "data-error")
+  const meals = useMutation({
+    mutationFn: (request: MealRequest) =>
+      queryClient.fetchQuery({
+        queryKey: ["phase-two-restaurants", request],
+        queryFn: async ({ signal }) => {
+          const { data } = await tripApi.post<RestaurantResponse>(
+            "/phase-two/restaurants",
+            { groupId: request.groupId, visits: request.visits },
+            { signal },
+          );
+          return data;
+        },
+      }),
+    onSuccess: (data, request) => {
+      if (activeMealRequest.current !== request || data.kind === "data-error")
+        return;
+      const restaurants =
         queryClient.setQueryData<Restaurant[]>(
-          ["restaurant-pool", mealRequest.planId],
+          ["restaurant-pool", request.planId],
           (previous = []) => {
             const merged = new Map(
               previous.map((restaurant) => [restaurant.contentId, restaurant]),
@@ -129,8 +132,12 @@ export function TripPlanner() {
               merged.set(restaurant.contentId, restaurant);
             return [...merged.values()];
           },
-        );
-      return data;
+        ) ?? data.restaurants;
+      setPlan((current) =>
+        current?.id === request.planId
+          ? assignRestaurants(current, restaurants)
+          : current,
+      );
     },
   });
   const pool = useQuery<Restaurant[]>({
@@ -138,20 +145,24 @@ export function TripPlanner() {
     queryFn: async () => [],
     enabled: false,
   });
-  useEffect(() => {
-    if (!meals.data || !mealRequest || meals.data.kind === "data-error") return;
-    const requestPlanId = mealRequest.planId,
-      restaurants =
-        queryClient.getQueryData<Restaurant[]>([
-          "restaurant-pool",
-          mealRequest.planId,
-        ]) ?? meals.data.restaurants;
-    setPlan((current) =>
-      current?.id === requestPlanId
-        ? assignRestaurants(current, restaurants)
-        : current,
-    );
-  }, [meals.data, meals.dataUpdatedAt, mealRequest, queryClient]);
+  function clearMeals() {
+    const previous = activeMealRequest.current;
+    activeMealRequest.current = null;
+    if (previous)
+      void queryClient.cancelQueries({
+        queryKey: ["phase-two-restaurants", previous],
+        exact: true,
+      });
+    setMealRequest(null);
+    meals.reset();
+  }
+  function collectMeals(current: PlanSnapshot) {
+    clearMeals();
+    const request = { ...requestFor(current), nonce: ++mealSequence.current };
+    activeMealRequest.current = request;
+    setMealRequest(request);
+    meals.mutate(request);
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -162,7 +173,7 @@ export function TripPlanner() {
     }
     const current = ++generation.current;
     setPlan(null);
-    setMealRequest(null);
+    clearMeals();
     setSelected(null);
     setMessage("");
     setLoaded(false);
@@ -192,7 +203,7 @@ export function TripPlanner() {
     setMessage("");
     setSelected(null);
     setExpanded(null);
-    setMealRequest(requestFor(next));
+    collectMeals(next);
   }
   function change(command: EditCommand) {
     if (!plan) return;
@@ -236,7 +247,7 @@ export function TripPlanner() {
     setPlan(saved);
     setInput(saved.input);
     setLoaded(true);
-    setMealRequest(null);
+    clearMeals();
     setSelected(null);
     setExpanded(null);
     setSavedOpen(false);
@@ -265,9 +276,9 @@ export function TripPlanner() {
   return (
     <main className="p2-page">
       <header className="p2-header">
-        <a href="/" className="p2-logo">
+        <Link href="/" className="p2-logo">
           두루두루
-        </a>
+        </Link>
         <button
           className="p2-control"
           onClick={openSaved}
@@ -467,7 +478,7 @@ export function TripPlanner() {
                   className="p2-control"
                   onClick={() => {
                     setPlan(null);
-                    setMealRequest(null);
+                    clearMeals();
                     setSelected(null);
                   }}
                 >
@@ -498,7 +509,7 @@ export function TripPlanner() {
           <div className="p2-panel">
             <strong>식사 정보</strong>
             <p role="status">
-              {meals.isFetching && mealRequest
+              {meals.isPending && mealRequest
                 ? "관광 일정 주변의 음식점을 불러오고 있어요. 관광 계획은 바로 볼 수 있어요."
                 : mealRequest && meals.isError
                   ? apiMessage(meals.error)
@@ -519,8 +530,8 @@ export function TripPlanner() {
             ) : null}
             <button
               className="p2-control"
-              disabled={meals.isFetching && !!mealRequest}
-              onClick={() => setMealRequest(requestFor(plan))}
+              disabled={meals.isPending && !!mealRequest}
+              onClick={() => collectMeals(plan)}
             >
               식당 목록 {mealRequest ? "다시 조회" : "조회"}
             </button>
@@ -594,7 +605,7 @@ export function TripPlanner() {
                         block.mealScope === "local" &&
                         !block.restaurant ? (
                           <p>
-                            {meals.isFetching && mealRequest
+                            {meals.isPending && mealRequest
                               ? "음식점 정보를 불러오는 중이에요 · 식사 60분은 확보했어요."
                               : "추천할 식당을 더 찾지 못했어요 · 식사 60분은 확보했어요."}
                           </p>
