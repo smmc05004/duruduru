@@ -50,6 +50,9 @@ export type Visit = {
   attraction: Attraction;
   durationMinutes: VisitDuration;
   fixed: boolean;
+  facilityGroupId?: string;
+  sessionId?: string;
+  selectionNotice?: string;
 };
 export type TimeBlock = {
   id: string;
@@ -66,6 +69,10 @@ export type TimeBlock = {
   mealScope?: "local" | "transit";
   mealType?: "lunch" | "dinner";
   direction?: "outbound" | "return";
+  /** E2's conservative facility signal; it is not an official facility ID. */
+  facilityGroupId?: string;
+  /** Date + morning/afternoon selection session, not a route segment. */
+  sessionId?: string;
   reason: string;
 };
 export type PlanMetrics = {
@@ -114,6 +121,8 @@ export type Candidate = {
   attractions: Attraction[];
   preview: { blocks: TimeBlock[]; metrics: PlanMetrics };
   metadata: DataMetadata;
+  /** Optional so v2 saved plans retain their original, pre-E2 evidence. */
+  itineraryAlgorithmVersion?: "e2-v1";
   /** E1 metadata is absent in pre-E1 v2 saved plans. */
   recommendation?: CandidateRecommendation;
   reasons: string[];

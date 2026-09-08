@@ -10,6 +10,7 @@ import type {
 import { groupForMapping } from "@/lib/mvp-phase-two-regions";
 import {
   distinctAttractions,
+  E2_ITINERARY_ALGORITHM_VERSION,
   scheduleTrip,
   validateSearchInput,
   type SchedulingCache,
@@ -369,6 +370,7 @@ export function searchPhaseTwo(
         representativePoint: travelTimes.source.representativePoint,
         searchedAt,
       },
+      itineraryAlgorithmVersion: E2_ITINERARY_ALGORITHM_VERSION,
     });
   }
   if (!candidates.length)

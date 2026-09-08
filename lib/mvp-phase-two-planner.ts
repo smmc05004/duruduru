@@ -20,6 +20,97 @@ const normalize = (text: string) =>
     .toLocaleLowerCase("ko")
     .replace(/[^\p{L}\p{N}]/gu, "");
 const compareId = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+export const E2_ITINERARY_ALGORITHM_VERSION = "e2-v1" as const;
+const GENERIC_FACILITY_TOKENS = new Set(
+  [
+    "관광지",
+    "박물관",
+    "미술관",
+    "문화재",
+    "기념관",
+    "전시관",
+    "공원",
+    "유적지",
+    "전망대",
+    "체험관",
+    "문화센터",
+  ].map(normalize),
+);
+export type FacilityCorrection = {
+  contentIds: readonly [string, string];
+  disposition: "same-facility" | "independent";
+  evidence: string;
+  verifiedAt: string;
+};
+/** Only reviewed pairs belong here. An empty list is intentionally the default. */
+export const FACILITY_CORRECTIONS: readonly FacilityCorrection[] = [];
+const isConfirmedFacilityGroup = (groupId: string | undefined) =>
+  groupId?.startsWith("facility-confirmed-") ?? false;
+
+function facilityTokens(title: string): string[] {
+  return title
+    .normalize("NFKC")
+    .toLocaleLowerCase("ko")
+    .split(/[^\p{L}\p{N}]+/gu)
+    .map(normalize)
+    .filter(
+      (token) =>
+        Array.from(token).length >= 3 && !GENERIC_FACILITY_TOKENS.has(token),
+    );
+}
+function facilitySignal(left: Attraction, right: Attraction): boolean {
+  const leftAddress = normalize(left.address);
+  const rightAddress = normalize(right.address);
+  const distance = distanceKm(left.coordinates, right.coordinates);
+  if (
+    !leftAddress ||
+    leftAddress !== rightAddress ||
+    distance === null ||
+    distance > 0.3
+  )
+    return false;
+  const rightTokens = new Set(facilityTokens(right.title));
+  return facilityTokens(left.title).some((token) => rightTokens.has(token));
+}
+/**
+ * Conservative, client-safe grouping signal. It keeps original attractions and
+ * checks a new member against the representative and every current member.
+ */
+export function facilityGroups(
+  places: Attraction[],
+  corrections: readonly FacilityCorrection[] = FACILITY_CORRECTIONS,
+): Map<string, string> {
+  const groups: Attraction[][] = [];
+  for (const place of [...places].toSorted((a, b) =>
+    compareId(a.contentId, b.contentId),
+  )) {
+    const group = groups.find(
+      (members) =>
+        facilitySignal(place, members[0]) &&
+        members.every((member) => facilitySignal(place, member)),
+    );
+    if (group) group.push(place);
+    else groups.push([place]);
+  }
+  const result = new Map<string, string>();
+  for (const members of groups) {
+    const id = `facility-${members[0].contentId}`;
+    members.forEach((member) => result.set(member.contentId, id));
+  }
+  for (const correction of corrections) {
+    const [first, second] = [...correction.contentIds].toSorted(compareId);
+    if (!result.has(first) || !result.has(second)) continue;
+    if (correction.disposition === "same-facility") {
+      const id = `facility-confirmed-${first}-${second}`;
+      result.set(first, id);
+      result.set(second, id);
+    } else {
+      result.set(first, `facility-independent-${first}`);
+      result.set(second, `facility-independent-${second}`);
+    }
+  }
+  return result;
+}
 export function parseLocalDate(value: unknown): number | null {
   if (
     typeof value !== "string" ||
@@ -119,76 +210,142 @@ export function distinctAttractions(places: Attraction[]): Attraction[] {
   }
   return result;
 }
-function weakDuplicate(a: Attraction, b: Attraction): number {
-  const distance = distanceKm(a.coordinates, b.coordinates);
-  const first = normalize(a.title),
-    second = normalize(b.title);
-  const commonWord = a.title
-    .split(/\s|[()[\]]/u)
-    .some((word) => normalize(word).length >= 2 && b.title.includes(word));
-  return distance !== null &&
-    distance <= 0.3 &&
-    !!normalize(a.address) &&
-    normalize(a.address) === normalize(b.address) &&
-    ((first.length >= 2 && second.includes(first)) ||
-      (second.length >= 2 && first.includes(second)) ||
-      commonWord)
-    ? 1
-    : 0;
-}
-function selectPlaces(
+type ScheduledVisit = Visit;
+export function selectPlaces(
   places: Attraction[],
   interests: SearchInput["interests"],
-  counts: [number, number],
-): Attraction[] {
-  const selected: Attraction[] = [],
+  slots: [Interval[], Interval[]],
+  corrections: readonly FacilityCorrection[] = FACILITY_CORRECTIONS,
+): ScheduledVisit[] {
+  const selected: ScheduledVisit[] = [],
     used = new Set<string>(),
     covered = new Set<string>();
-  const rarity = new Map<string, number>();
-  places.forEach((place) =>
-    rarity.set(
-      detailCategory(place),
-      (rarity.get(detailCategory(place)) ?? 0) + 1,
-    ),
-  );
-  for (const count of counts) {
+  const groups = facilityGroups(places, corrections);
+  const usedGroups = new Set<string>();
+  for (const day of [0, 1] as const) {
     const dayCategories = new Set<string>();
-    let previous: Attraction | undefined;
-    for (let index = 0; index < count; index++) {
-      const missing = (place: Attraction) =>
-        place.categories.filter(
-          (id) => interests.includes(id) && !covered.has(id),
-        ).length;
-      const ordered = places
-        .filter((place) => !used.has(place.contentId))
-        .sort((a, b) => {
+    const sessions = new Map<string, Interval[]>();
+    for (const slot of slots[day]) {
+      const sessionId = `day-${day + 1}-${slot.start % 1440 < 720 ? "morning" : "afternoon"}`;
+      sessions.set(sessionId, [...(sessions.get(sessionId) ?? []), slot]);
+    }
+    for (const [sessionId, sessionSlots] of sessions) {
+      let first: Attraction | undefined;
+      let previous: Attraction | undefined;
+      for (let slotIndex = 0; slotIndex < sessionSlots.length; slotIndex++) {
+        const missing = (place: Attraction) =>
+          place.categories.filter(
+            (id) => interests.includes(id) && !covered.has(id),
+          ).length;
+        const unused = places.filter(
+          (place) =>
+            !used.has(place.contentId) &&
+            !(
+              isConfirmedFacilityGroup(groups.get(place.contentId)) &&
+              usedGroups.has(groups.get(place.contentId)!)
+            ),
+        );
+        const sessionFirst = first;
+        const nearby = sessionFirst?.coordinates
+          ? unused.filter((place) => {
+              const distance = distanceKm(
+                sessionFirst.coordinates,
+                place.coordinates,
+              );
+              return distance !== null && distance <= 5;
+            })
+          : [];
+        const useNearby = Boolean(previous && nearby.length);
+        const fallbackByDistance = Boolean(
+          previous &&
+          !useNearby &&
+          sessionFirst?.coordinates &&
+          unused.some((candidate) => candidate.coordinates),
+        );
+        const candidates = useNearby ? nearby : unused;
+        const ordered = candidates.toSorted((a, b) => {
+          const groupDifference =
+            Number(usedGroups.has(groups.get(a.contentId)!)) -
+            Number(usedGroups.has(groups.get(b.contentId)!));
+          if (groupDifference) return groupDifference;
+          if (fallbackByDistance) {
+            const distanceDifference =
+              (distanceKm(sessionFirst!.coordinates, a.coordinates) ??
+                Infinity) -
+              (distanceKm(sessionFirst!.coordinates, b.coordinates) ??
+                Infinity);
+            if (distanceDifference) return distanceDifference;
+          }
           const interest = missing(b) - missing(a);
           if (interest) return interest;
-          if (!previous)
-            return (
-              (rarity.get(detailCategory(a)) ?? 0) -
-                (rarity.get(detailCategory(b)) ?? 0) ||
-              compareId(a.contentId, b.contentId)
-            );
-          return (
-            weakDuplicate(previous, a) - weakDuplicate(previous, b) ||
+          const categoryDifference =
             Number(dayCategories.has(detailCategory(a))) -
-              Number(dayCategories.has(detailCategory(b))) ||
+            Number(dayCategories.has(detailCategory(b)));
+          if (categoryDifference) return categoryDifference;
+          if (!previous) return compareId(a.contentId, b.contentId);
+          return (
             (distanceKm(previous.coordinates, a.coordinates) ?? Infinity) -
               (distanceKm(previous.coordinates, b.coordinates) ?? Infinity) ||
             compareId(a.contentId, b.contentId)
           );
         });
-      const place = ordered[0];
-      if (!place) break;
-      selected.push(place);
-      used.add(place.contentId);
-      place.categories.forEach((id) => covered.add(id));
-      dayCategories.add(detailCategory(place));
-      previous = place;
+        const place = ordered[0];
+        if (!place) break;
+        const groupId = groups.get(place.contentId)!;
+        const repeat = usedGroups.has(groupId);
+        const locationNotice =
+          previous && !useNearby
+            ? fallbackByDistance
+              ? "장소가 떨어져 있어 위치 확인이 필요해요"
+              : "장소 간 근접성은 확인하지 못했어요"
+            : undefined;
+        selected.push({
+          attraction: place,
+          durationMinutes: 60,
+          fixed: false,
+          facilityGroupId: groupId,
+          sessionId,
+          selectionNotice:
+            [
+              ...(repeat ? ["같은 시설 안 장소가 포함될 수 있어요"] : []),
+              ...(locationNotice ? [locationNotice] : []),
+            ].join(" · ") || undefined,
+        });
+        used.add(place.contentId);
+        usedGroups.add(groupId);
+        place.categories.forEach((id) => covered.add(id));
+        dayCategories.add(detailCategory(place));
+        first ??= place;
+        previous = place;
+      }
     }
   }
   return selected;
+}
+function retainedVisitsForSlots(
+  retained: Visit[],
+  slots: [Interval[], Interval[]],
+  pool: Attraction[],
+): Visit[] {
+  const groups = facilityGroups(pool);
+  const usedGroups = new Set<string>();
+  let index = 0;
+  return slots.flatMap((daySlots, day) =>
+    daySlots.map((slot) => {
+      const visit = retained[index++]!;
+      const facilityGroupId = groups.get(visit.attraction.contentId);
+      const repeat = facilityGroupId && usedGroups.has(facilityGroupId);
+      if (facilityGroupId) usedGroups.add(facilityGroupId);
+      return {
+        ...visit,
+        facilityGroupId,
+        sessionId: `day-${day + 1}-${slot.start % 1440 < 720 ? "morning" : "afternoon"}`,
+        selectionNotice: repeat
+          ? "같은 시설 안 장소가 포함될 수 있어요"
+          : undefined,
+      };
+    }),
+  );
 }
 
 type Interval = { start: number; end: number };
@@ -363,7 +520,8 @@ function fit(gaps: Interval[], durations: number[]): Interval[] | null {
   const result: Interval[] = [];
   let gapIndex = 0,
     cursor = gaps[0]?.start ?? 0;
-  for (const duration of durations) {
+  for (let index = 0; index < durations.length; index++) {
+    const duration = durations[index];
     while (gapIndex < gaps.length && cursor + duration > gaps[gapIndex].end) {
       gapIndex++;
       cursor = gaps[gapIndex]?.start ?? 0;
@@ -371,6 +529,12 @@ function fit(gaps: Interval[], durations: number[]): Interval[] | null {
     if (gapIndex >= gaps.length) return null;
     result.push({ start: cursor, end: cursor + duration });
     cursor += duration;
+    if (index === durations.length - 1) continue;
+    if (cursor + 15 <= gaps[gapIndex].end) cursor += 15;
+    else {
+      gapIndex++;
+      cursor = gaps[gapIndex]?.start ?? 0;
+    }
   }
   return result;
 }
@@ -445,7 +609,6 @@ export function scheduleTrip(
       ok: false,
       reason: "선택 관심사의 서로 다른 관광지를 3곳 이상 찾지 못했어요.",
     };
-  const selections = new Map<string, Attraction[]>();
   const timingKey = `${input.startAt}|${input.returnBy}|${oneWay}`;
   const timingLayouts = timingCache?.get(timingKey) ?? layouts(input, oneWay);
   timingCache?.set(timingKey, timingLayouts);
@@ -482,19 +645,10 @@ export function scheduleTrip(
         const firstSlots = fit(layout.gaps[0], firstDurations),
           secondSlots = fit(layout.gaps[1], secondDurations);
         if (!firstSlots || !secondSlots) continue;
-        const key = `${first}:${second}`;
-        let selected = selections.get(key);
-        if (!retained && !selected) {
-          selected = selectPlaces(places, input.interests, [first, second]);
-          selections.set(key, selected);
-        }
-        const visits: Visit[] =
-          retained ??
-          (selected ?? []).map((attraction) => ({
-            attraction,
-            durationMinutes: 60,
-            fixed: false,
-          }));
+        const visits: Visit[] = retained
+          ? retainedVisitsForSlots(retained, [firstSlots, secondSlots], places)
+          : selectPlaces(places, input.interests, [firstSlots, secondSlots]);
+        if (visits.length !== count) continue;
         best = { layout, slots: [firstSlots, secondSlots], visits, count };
       }
   }
@@ -567,8 +721,9 @@ export function scheduleTrip(
           contentId: visit.attraction.contentId,
           attraction: visit.attraction,
           fixed: visit.fixed,
-          reason:
-            "공식 관심사 분류 · 주변 장소를 함께 구성 · 내부 이동시간 미계산",
+          facilityGroupId: visit.facilityGroupId,
+          sessionId: visit.sessionId,
+          reason: `${visit.selectionNotice ? `${visit.selectionNotice} · ` : ""}공식 관심사 분류 · 반일별 주변 장소를 함께 구성 · 내부 이동시간 미계산`,
         }),
       );
     }
@@ -584,8 +739,9 @@ export function scheduleTrip(
               {
                 id: `free-${cursor}`,
                 kind: "free",
-                title: "자유시간",
-                reason: "현지 여유시간",
+                title: "여유시간",
+                reason:
+                  "이동·주차·대기 등에 사용할 수 있는 여유예요. 실제 이동시간을 계산한 값은 아니에요.",
               },
             ),
           );
@@ -598,8 +754,9 @@ export function scheduleTrip(
             {
               id: `free-${cursor}`,
               kind: "free",
-              title: "자유시간",
-              reason: "현지 여유시간",
+              title: "여유시간",
+              reason:
+                "이동·주차·대기 등에 사용할 수 있는 여유예요. 실제 이동시간을 계산한 값은 아니에요.",
             },
           ),
         );
@@ -647,13 +804,27 @@ export function attractionAlternatives(
       .filter((block) => block.kind === "attraction")
       .map((block) => block.contentId),
   );
-  return plan.destination.attractions.filter(
-    (place) =>
-      !used.has(place.contentId) &&
-      place.categories.some((interest) =>
-        plan.input.interests.includes(interest),
-      ),
+  const groups = facilityGroups(plan.destination.attractions);
+  const usedGroups = new Set(
+    plan.blocks
+      .filter((block) => block.kind === "attraction" && block.contentId)
+      .map((block) => groups.get(block.contentId!)!)
+      .filter(Boolean),
   );
+  return plan.destination.attractions
+    .filter(
+      (place) =>
+        !used.has(place.contentId) &&
+        place.categories.some((interest) =>
+          plan.input.interests.includes(interest),
+        ),
+    )
+    .toSorted(
+      (left, right) =>
+        Number(usedGroups.has(groups.get(left.contentId)!)) -
+          Number(usedGroups.has(groups.get(right.contentId)!)) ||
+        compareId(left.contentId, right.contentId),
+    );
 }
 export function editPlan(plan: PlanSnapshot, command: EditCommand): EditResult {
   const fail = (reason: string): EditResult => ({ ok: false, plan, reason });
@@ -707,6 +878,7 @@ export function editPlan(plan: PlanSnapshot, command: EditCommand): EditResult {
         : undefined;
     if (command.type === "replace-attraction" && !replacement)
       return fail("같은 지역의 미사용 대체 관광지를 선택해 주세요.");
+    const visitGroups = facilityGroups(plan.destination.attractions);
     const visits: Visit[] = plan.blocks
       .filter((block) => block.kind === "attraction" && block.attraction)
       .map((block) => ({
@@ -718,6 +890,13 @@ export function editPlan(plan: PlanSnapshot, command: EditCommand): EditResult {
           ? command.durationMinutes
           : block.durationMinutes) as Visit["durationMinutes"],
         fixed: block.fixed ?? false,
+        facilityGroupId: visitGroups.get(
+          (block.id === target.id && replacement
+            ? replacement
+            : block.attraction!
+          ).contentId,
+        ),
+        sessionId: block.sessionId,
       }));
     const selectedMeals = plan.blocks.filter((block) => block.restaurant);
     const result = scheduleTrip(

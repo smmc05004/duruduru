@@ -764,7 +764,7 @@ export function TripPlanner() {
                                     : "출발 이동"
                                   : block.kind === "rest"
                                     ? "휴식"
-                                    : "자유시간"}
+                                    : block.title}
                           </span>
                           <span>{duration(block.durationMinutes)}</span>
                         </div>
@@ -998,6 +998,10 @@ export function TripPlanner() {
               {clock(plan.metrics.returnDepartureAt)} · 현지 활동{" "}
               {duration(plan.metrics.localMinutes)} · 자유시간{" "}
               {duration(plan.metrics.freeMinutes)}
+            </p>
+            <p>
+              활동 사이 여유는 이동·주차·대기에 쓸 수 있는 자유시간이며, 실제
+              장소 간 이동시간을 계산한 값은 아니에요.
             </p>
             <p>
               {plan.destination.metadata.travelTimeSource} · 기준연도{" "}
