@@ -25,6 +25,12 @@ type Props = {
   input: ConditionInput;
   /** 목적지를 고른 뒤(음식점 조회 중) 화면이면 선택한 후보를 함께 보인다. */
   destination?: Candidate | null;
+  /** 비목적지 화면의 카드 제목을 바꾼다. 기본값은 "OO에서\n갈 수 있는 곳". */
+  title?: string;
+  /** 목적지 화면 변형. "itinerary"는 참고 계획 화면의 20px 지역명 + 조회일 줄. */
+  variant?: "default" | "itinerary";
+  /** "itinerary" 변형에서 카드 오른쪽 위에 적는 조회일. */
+  fetchedAtLabel?: string;
 };
 
 /** "2026-09-12T08:00" → "9/12 08:00". 표시 전용 포맷이며 계산에 쓰지 않는다. */
@@ -35,7 +41,13 @@ function formatTripMoment(value: string): string {
   return `${Number(month)}/${Number(day)} ${time}`;
 }
 
-export function ConditionSummary({ input, destination }: Props) {
+export function ConditionSummary({
+  input,
+  destination,
+  title,
+  variant = "default",
+  fetchedAtLabel,
+}: Props) {
   const originLabel =
     ORIGINS.find((origin) => origin.id === input.originId)?.label ?? "출발지";
   const interestLabels = input.interests.map(
@@ -53,12 +65,23 @@ export function ConditionSummary({ input, destination }: Props) {
   if (destination) {
     return (
       <section className="dd-summary-card" aria-label="입력한 여행 조건">
-        <div className="dd-candidate__head">
-          <h1 className="dd-candidate__name">{destination.displayName}</h1>
-          {destination.name !== destination.displayName ? (
-            <span className="dd-candidate__region">{destination.name}</span>
-          ) : null}
-        </div>
+        {variant === "itinerary" ? (
+          <div className="dd-summary-card__head">
+            <p className="dd-summary-card__region-title">{destination.name}</p>
+            {fetchedAtLabel ? (
+              <span className="dd-summary-card__fetched">
+                조회 {fetchedAtLabel}
+              </span>
+            ) : null}
+          </div>
+        ) : (
+          <div className="dd-candidate__head">
+            <h1 className="dd-candidate__name">{destination.displayName}</h1>
+            {destination.name !== destination.displayName ? (
+              <span className="dd-candidate__region">{destination.name}</span>
+            ) : null}
+          </div>
+        )}
         <div className="dd-summary-card__chips">
           <span className="dd-pill">{originLabel} 출발 · 자차</span>
           <span className="dd-pill">
@@ -72,7 +95,9 @@ export function ConditionSummary({ input, destination }: Props) {
 
   return (
     <section className="dd-summary-card" aria-label="입력한 여행 조건">
-      <h1 className="dd-summary-card__title">{`${originLabel}에서\n갈 수 있는 곳`}</h1>
+      <h1 className="dd-summary-card__title">
+        {title ?? `${originLabel}에서\n갈 수 있는 곳`}
+      </h1>
       <div className="dd-summary-card__chips">
         <span className="dd-pill">{start} 출발</span>
         <span className="dd-pill">{end} 복귀</span>
