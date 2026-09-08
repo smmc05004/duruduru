@@ -21,7 +21,12 @@ const normalize = (text: string) =>
     .replace(/[^\p{L}\p{N}]/gu, "");
 const compareId = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 const normalizeFacilityAddress = (text: string) =>
-  text.normalize("NFKC").toLocaleLowerCase("ko").replace(/\s+/gu, " ").trim();
+  text
+    .normalize("NFKC")
+    .toLocaleLowerCase("ko")
+    .replace(/\s*-\s*/gu, "-")
+    .replace(/\s+/gu, " ")
+    .trim();
 export const E2_ITINERARY_ALGORITHM_VERSION = "e2-v1" as const;
 const GENERIC_FACILITY_TOKENS = new Set(
   [

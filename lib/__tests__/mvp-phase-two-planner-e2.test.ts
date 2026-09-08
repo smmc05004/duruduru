@@ -82,6 +82,12 @@ describe("E2 시설 의심 묶음", () => {
         "충남 공주시 공산성로 12",
         point(36.46, 127.12),
       ),
+      attraction(
+        "H",
+        "공산성 안내판",
+        "충남 공주시 공산성로 1 - 2",
+        point(36.46, 127.12),
+      ),
     ]);
 
     expect(groups.get("A")).toBe(groups.get("B"));
@@ -89,6 +95,8 @@ describe("E2 시설 의심 묶음", () => {
     expect(groups.get("D")).not.toBe(groups.get("A"));
     expect(groups.get("E")).not.toBe(groups.get("A"));
     expect(groups.get("F")).not.toBe(groups.get("G"));
+    expect(groups.get("H")).toBe(groups.get("F"));
+    expect(groups.get("H")).not.toBe(groups.get("G"));
   });
 
   it("대안이 있으면 같은 시설 의심 장소보다 독립 장소를 먼저 고른다", () => {
