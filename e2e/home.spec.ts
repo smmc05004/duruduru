@@ -194,8 +194,16 @@ test("선택 뒤 한 지역 음식점과 클릭한 상세만 조회한다", asyn
   });
   await page.route("**/api/restaurants/**", async (route) => {
     calls.push(route.request().url());
+    // route.ts가 detailIntro2 응답을 정규화한 형태를 그대로 돌려준다.
     await route.fulfill({
-      json: { kind: "success", detail: { menu: "검증 메뉴" } },
+      json: {
+        kind: "success",
+        detail: {
+          openingHours: { status: "confirmed", value: "매일 10:00~21:00" },
+          closedDays: { status: "unknown" },
+          menus: { status: "confirmed", items: ["한우국밥", "떡갈비"] },
+        },
+      },
     });
   });
   await page.goto("/");
@@ -221,10 +229,104 @@ test("선택 뒤 한 지역 음식점과 클릭한 상세만 조회한다", asyn
   ).toHaveCount(1);
   expect(calls.filter((url) => url.includes("/destinations/")).length).toBe(1);
   await page.getByRole("button", { name: "검증 식당" }).first().click();
-  await expect(page.getByText(/검증 메뉴/)).toBeVisible();
+  const sheet = page.getByRole("dialog");
+  await expect(sheet).toBeVisible();
+  // 정규화된 상세: 운영시간 값, 결측 휴무는 "확인 필요" 문구, 대표 메뉴 목록.
+  await expect(sheet.getByText("매일 10:00~21:00")).toBeVisible();
+  await expect(sheet.getByText("한우국밥")).toBeVisible();
+  await expect(sheet.getByText("떡갈비")).toBeVisible();
+  await expect(
+    sheet.getByText("정보가 없어요 · 방문 전 확인이 필요해요"),
+  ).toBeVisible();
+  await expect(
+    sheet.getByText("일정의 식사 배치와 시간표를 바꾸지 않아요"),
+  ).toBeVisible();
+  // raw JSON 문자열은 더 이상 노출하지 않는다.
+  await expect(page.getByText('{"openingHours"')).toHaveCount(0);
   expect(calls.filter((url) => url.includes("/api/restaurants/")).length).toBe(
     1,
   );
+});
+
+test("음식점 상세 조회가 실패하면 시트 안에서만 재시도하고 일정은 유지한다", async ({
+  page,
+}) => {
+  await page.route("**/api/search", (route) =>
+    route.fulfill({ json: { kind: "success", candidates } }),
+  );
+  await page.route("**/api/destinations/**/restaurants", (route) =>
+    route.fulfill({
+      json: {
+        kind: "success",
+        restaurants: [
+          {
+            contentId: "food-1",
+            name: "검증 식당",
+            address: "서울",
+            phone: "",
+            certified: false,
+            foodCultureMatch: false,
+          },
+          {
+            contentId: "food-2",
+            name: "검증 식당 둘",
+            address: "서울",
+            phone: "",
+            certified: false,
+            foodCultureMatch: false,
+          },
+        ],
+      },
+    }),
+  );
+  let detailCalls = 0;
+  await page.route("**/api/restaurants/**", async (route) => {
+    detailCalls += 1;
+    if (detailCalls === 1) {
+      await route.fulfill({
+        status: 502,
+        json: {
+          kind: "data-error",
+          message: "음식점 상세 정보를 불러오지 못했어요. 다시 시도해 주세요.",
+        },
+      });
+      return;
+    }
+    await route.fulfill({
+      json: {
+        kind: "success",
+        detail: {
+          openingHours: { status: "confirmed", value: "매일 11:00~20:00" },
+          closedDays: { status: "confirmed", value: "월요일" },
+          menus: { status: "unknown" },
+        },
+      },
+    });
+  });
+  await page.goto("/");
+  await fill(page);
+  await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
+  await page.getByRole("button", { name: "경주 일정 보기" }).click();
+  await expect(page.getByText("경주 참고용 여행 계획")).toBeVisible();
+  await page.getByRole("button", { name: "검증 식당" }).first().click();
+
+  const sheet = page.getByRole("dialog");
+  await expect(sheet).toContainText("이 음식점 정보를 불러오지 못했어요");
+  // 상세 실패는 화면 전체 장애가 아니다. 일정과 식사 배치는 그대로.
+  await expect(page.getByText("경주 관광지 1")).toBeVisible();
+  const meals = page.locator(".dd-summary-card p");
+  await expect(
+    meals.filter({ hasText: /^11:30 · 점심 · 검증 식당$/u }),
+  ).toHaveCount(1);
+
+  await sheet.getByRole("button", { name: "다시 시도하기" }).click();
+  await expect(sheet.getByText("매일 11:00~20:00")).toBeVisible();
+  await expect(sheet.getByText("월요일")).toBeVisible();
+  await expect(sheet).not.toContainText("이 음식점 정보를 불러오지 못했어요");
+  await expect(
+    meals.filter({ hasText: /^11:30 · 점심 · 검증 식당$/u }),
+  ).toHaveCount(1);
+  expect(detailCalls).toBe(2);
 });
 
 test("검색 로딩 중에도 입력한 조건 요약을 실제 값으로 유지한다", async ({
