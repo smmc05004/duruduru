@@ -29,7 +29,7 @@ MVP 1단계의 검색→지역 선택→관광·식사 결과를 유지하며 �
 | P2-06 | P1       | 이 기기에 계획 저장·불러오기                  |
 | P2-07 | P1       | 관광지 클릭 상세                              |
 
-P0·P1 모두 이번 범위다. 작업·완료 표시는 `../development/MVP_IMPLEMENTATION_PLAN.md`에서 관리한다.
+P0·P1 모두 이번 범위다. 작업·완료 표시는 `docs/development/MVP_IMPLEMENTATION_PLAN.md`에서 관리한다.
 
 ## P2-01 — 공통 시간 엔진
 
