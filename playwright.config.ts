@@ -7,6 +7,10 @@ export default defineConfig({
   testDir: "./e2e",
   testMatch: "**/*.spec.ts",
   reporter: [["list"], ["html", { open: "never" }]],
+  // CI 러너에서 React 커밋 타이밍에 민감한 검사가 간헐적으로 실패한다.
+  // 재시도는 실패 케이스만 다시 돌리므로 실제 회귀는 그대로 드러난다.
+  // 기존 `trace: "on-first-retry"` 설정도 재시도가 있어야 의미가 있다.
+  retries: process.env.CI ? 2 : 0,
   use: {
     baseURL: e2eUrl,
     trace: "on-first-retry",

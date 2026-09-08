@@ -22,6 +22,9 @@ async function fill(page: import("@playwright/test").Page) {
   await page.getByLabel("출발 일시").fill("2026-09-12T08:00");
   await page.getByLabel("복귀 가능 일시").fill("2026-09-13T20:00");
   await page.getByRole("checkbox", { name: "역사" }).click();
+  // 제출 클릭이 관심사 상태 커밋보다 앞서면 search()가 errorCount>0으로 읽혀
+  // searching 뷰로 넘어가지 않는다. 커밋이 반영될 때까지 기다린다.
+  await expect(page.getByRole("checkbox", { name: "역사" })).toBeChecked();
 }
 
 test("서울 고정 1박2일 검색은 음식점 호출 없이 최대 세 후보를 보인다", async ({
