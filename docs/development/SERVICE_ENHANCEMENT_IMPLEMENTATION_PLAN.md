@@ -46,6 +46,7 @@ E1이 검색과 선택에 함께 쓰는 공통 일정 엔진에 보수적 시설
 - 전체 Jest: 93건 통과, 19건 실패. 실패는 기존 `app/__tests__/page.test.tsx`가 이미 제거된 PoC-era `loadConditions`/`loadItinerary` props와 `<select>` 입력을 전제로 해 현재 `TripPlanner` UI 계약과 맞지 않는 기준선 문제다. E2에서 해당 테스트를 삭제·약화하거나 통과로 처리하지 않았다.
 - `npm run verify`: 통과. production build 포함. 기존 `scripts/build-region-profile.mjs`의 미사용 변수 ESLint 경고 2건은 유지된다.
 - Playwright: `E2E_PORT=3100 npm run test:e2e -- e2e/home.spec.ts` 4건 통과. 실제 `/api/search` 및 E2 엔진을 실행하고 음식 목록 API만 mock하여 역할 카드→선택→여유시간 안내→음식 요청 1회를 확인했다.
+- 독립 리뷰 후속: 시설 주소 정규화가 구두점을 모두 지워 `1-2`와 `12`를 충돌시키던 문제를 수정했다. 공백·대소문자만 정리하고 번지 구분자는 보존하며, 해당 충돌 회귀 단위 검증을 추가했다.
 - `npm run cycle`: 그래프를 확인했다. 이 명령은 작업 ID 없이 실행하면 안내만 출력하며 상태 전이를 수행하지 않는다. E2 독립 review·handoff는 PR 생성 뒤 reviewer 근거와 함께 진행한다.
 - 한계: 실제 TourAPI 키·외부 호출은 이 PR에서 성공 근거로 삼지 않았고, 외부 음식 목록은 제한 mock으로 재현했다.
 

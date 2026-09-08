@@ -70,12 +70,25 @@ describe("E2 시설 의심 묶음", () => {
         point(36.46, 127.12),
       ),
       attraction("E", "공산성 전시관", "다른 주소", point(36.46, 127.12)),
+      attraction(
+        "F",
+        "공산성 매표소",
+        "충남 공주시 공산성로 1-2",
+        point(36.46, 127.12),
+      ),
+      attraction(
+        "G",
+        "공산성 안내소",
+        "충남 공주시 공산성로 12",
+        point(36.46, 127.12),
+      ),
     ]);
 
     expect(groups.get("A")).toBe(groups.get("B"));
     expect(groups.get("C")).not.toBe(groups.get("A"));
     expect(groups.get("D")).not.toBe(groups.get("A"));
     expect(groups.get("E")).not.toBe(groups.get("A"));
+    expect(groups.get("F")).not.toBe(groups.get("G"));
   });
 
   it("대안이 있으면 같은 시설 의심 장소보다 독립 장소를 먼저 고른다", () => {

@@ -20,6 +20,8 @@ const normalize = (text: string) =>
     .toLocaleLowerCase("ko")
     .replace(/[^\p{L}\p{N}]/gu, "");
 const compareId = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+const normalizeFacilityAddress = (text: string) =>
+  text.normalize("NFKC").toLocaleLowerCase("ko").replace(/\s+/gu, " ").trim();
 export const E2_ITINERARY_ALGORITHM_VERSION = "e2-v1" as const;
 const GENERIC_FACILITY_TOKENS = new Set(
   [
@@ -59,8 +61,8 @@ function facilityTokens(title: string): string[] {
     );
 }
 function facilitySignal(left: Attraction, right: Attraction): boolean {
-  const leftAddress = normalize(left.address);
-  const rightAddress = normalize(right.address);
+  const leftAddress = normalizeFacilityAddress(left.address);
+  const rightAddress = normalizeFacilityAddress(right.address);
   const distance = distanceKm(left.coordinates, right.coordinates);
   if (
     !leftAddress ||
