@@ -40,7 +40,8 @@ E1이 검색과 선택에 함께 쓰는 공통 일정 엔진에 보수적 시설
 
 ### PR 증거
 
-- 커밋: PR 생성 시 기록한다.
+- PR: [#68 하루 관광 구성과 여유를 구현한다](https://github.com/smmc05004/duruduru/pull/68)
+- 커밋: `7ae152e` 하루 관광 구성과 여유를 구현한다
 - E2 Jest: `lib/__tests__/mvp-phase-two-planner-e2.test.ts`, `lib/__tests__/mvp-phase-two-search.test.ts`, `lib/__tests__/mvp-phase-two-flow-e2.test.ts` 10건 통과. 시설 신호/연쇄 방지, same-facility/independent 보정 계약, 시설 의심 대안 우선, 15분 여유·30분 일일 자유시간, 실제 검색 Route Handler→E2 계획→음식 Route Handler 흐름을 검증했다. 마지막 흐름은 검색·계획 엔진을 실제 실행하고 음식 TourAPI만 제한 mock했다.
 - 전체 Jest: 93건 통과, 19건 실패. 실패는 기존 `app/__tests__/page.test.tsx`가 이미 제거된 PoC-era `loadConditions`/`loadItinerary` props와 `<select>` 입력을 전제로 해 현재 `TripPlanner` UI 계약과 맞지 않는 기준선 문제다. E2에서 해당 테스트를 삭제·약화하거나 통과로 처리하지 않았다.
 - `npm run verify`: 통과. production build 포함. 기존 `scripts/build-region-profile.mjs`의 미사용 변수 ESLint 경고 2건은 유지된다.
