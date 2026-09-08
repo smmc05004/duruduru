@@ -90,13 +90,31 @@ export function NotebookCandidate({
   onChoose: () => void;
 }) {
   const { metrics, blocks } = candidate.preview;
+  const recommendation = candidate.recommendation;
+  const roleTitle = recommendation
+    ? {
+        easy: "이동 부담을 줄인 여행",
+        interest: "관심사를 깊게 즐기는 여행",
+        relaxed: "여유롭게 머무는 여행",
+      }[recommendation.role]
+    : "기존 추천";
+  const fulfilled = INTERESTS.filter((interest) =>
+    metrics.fulfilledInterests.includes(interest.id),
+  )
+    .map((interest) => interest.label)
+    .join(" · ");
+  const missing = INTERESTS.filter((interest) =>
+    recommendation?.missingInterests.includes(interest.id),
+  )
+    .map((interest) => interest.label)
+    .join(" · ");
   const moveRatio =
     (100 * candidate.oneWayMinutes) /
     (2 * candidate.oneWayMinutes + metrics.localMinutes);
   const move = `${Math.floor(candidate.oneWayMinutes / 60)}:${String(candidate.oneWayMinutes % 60).padStart(2, "0")}`;
   return (
     <article className="dd-candidate">
-      {best ? <span className="dd-candidate__best">가장 잘 맞아요</span> : null}
+      <span className="dd-candidate__best">{roleTitle}</span>
       <div className="dd-candidate__head">
         <h2 className="dd-candidate__name">{candidate.displayName}</h2>
         {candidate.name !== candidate.displayName ? (
@@ -127,13 +145,20 @@ export function NotebookCandidate({
         </div>
       </div>
       <p className="dd-candidate__reason">
-        {INTERESTS.filter((interest) =>
-          metrics.fulfilledInterests.includes(interest.id),
-        )
-          .map((interest) => interest.label)
-          .join(" · ")}{" "}
-        여행으로 {metrics.attractionCount}곳을 둘러보고, 자유시간{" "}
-        {notebookDuration(metrics.freeMinutes)}을 남겼어요.
+        {fulfilled || "선택 관심사"} 포함 · 관광 {metrics.attractionCount}곳 ·
+        현지 낮 자유시간 {notebookDuration(metrics.freeMinutes)}
+        {missing ? ` · ${missing} 미포함` : ""}
+      </p>
+      <p className="p2-muted">
+        왕복 자동차 일반 예상시간{" "}
+        {notebookDuration(
+          recommendation?.roundTripMinutes ?? candidate.oneWayMinutes * 2,
+        )}
+        {recommendation
+          ? recommendation.proximityComparable
+            ? " · 실제 초안의 당일 연속 관광지 거리로 비교"
+            : " · 장소 간 근접성은 확인하지 못했어요"
+          : " · 저장 당시 비교 근거는 없어요"}
       </p>
       <p className="p2-muted">
         활동시간은 현지 식사·관광·자유시간이며, 야간 휴식은 제외해요.
@@ -160,6 +185,14 @@ export function NotebookCandidate({
           {candidate.reasons.map((reason) => (
             <li key={reason}>{reason}</li>
           ))}
+          {recommendation ? (
+            <li>
+              비교 수치 · 충족 관심사 {recommendation.fulfilledInterestCount}개
+              · 세부 분류 {recommendation.categoryDiversity}개 · 거리 쌍{" "}
+              {recommendation.validDistancePairCount}/
+              {recommendation.distancePairCount}개
+            </li>
+          ) : null}
         </ul>
       </details>
       <div className="dd-candidate__action">

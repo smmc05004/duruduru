@@ -612,7 +612,7 @@ export function TripPlanner() {
         <section aria-label="목적지 추천">
           <div className="p2-list-head">
             <strong>다녀올 수 있는 곳 {candidates.length}군데</strong>
-            <span>관심사·계획 적합순</span>
+            <span>실제 초안을 바탕으로 서로 다른 기준으로 골랐어요</span>
           </div>
           <div className="p2-candidates">
             {candidates.map((candidate, index) => (
