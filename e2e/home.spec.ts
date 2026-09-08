@@ -133,7 +133,10 @@ test("실제 검색 엔진의 역할 후보를 선택한 뒤에만 음식점 API
     .getByRole("button", { name: /일정 보기$/ })
     .first()
     .click();
-  await expect(page.getByRole("region", { name: "여행 계획" })).toBeVisible();
+  const plan = page.getByRole("region", { name: "여행 계획" });
+  await expect(plan).toBeVisible();
+  await expect(plan).toContainText("여유시간");
+  await expect(plan).toContainText("실제 이동시간을 계산한 값은 아니에요");
   await expect.poll(() => restaurantCalls).toBe(1);
 });
 

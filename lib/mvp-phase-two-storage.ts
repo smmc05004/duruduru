@@ -145,6 +145,13 @@ function blocks(
       !finite(b.durationMinutes)
     )
       return false;
+    if (
+      (b.facilityGroupId !== undefined && !id(b.facilityGroupId)) ||
+      (b.sessionId !== undefined &&
+        (!text(b.sessionId) ||
+          !/^day-[12]-(morning|afternoon)$/.test(b.sessionId)))
+    )
+      return false;
     if (parseLocalDate(b.startAt) === null || parseLocalDate(b.endAt) === null)
       return false;
     const from = timestamp(b.startAt),
@@ -218,6 +225,8 @@ function candidate(v: unknown): v is Candidate {
     !Array.isArray(v.reasons) ||
     !v.reasons.every(text) ||
     (v.recommendation !== undefined && !recommendation(v.recommendation)) ||
+    (v.itineraryAlgorithmVersion !== undefined &&
+      v.itineraryAlgorithmVersion !== "e2-v1") ||
     !object(v.metadata)
   )
     return false;
@@ -404,6 +413,8 @@ function cleanBlock(b: TimeBlock): TimeBlock {
     mealScope: b.mealScope,
     mealType: b.mealType,
     direction: b.direction,
+    facilityGroupId: b.facilityGroupId,
+    sessionId: b.sessionId,
     reason: b.reason,
   };
 }
@@ -473,6 +484,7 @@ function snapshot(plan: PlanSnapshot): PlanSnapshot {
         metrics: cleanMetrics(d.preview.metrics),
       },
       recommendation: cleanRecommendation(d.recommendation),
+      itineraryAlgorithmVersion: d.itineraryAlgorithmVersion,
       reasons: [...d.reasons],
       metadata: {
         profileGeneratedAt: m.profileGeneratedAt,
