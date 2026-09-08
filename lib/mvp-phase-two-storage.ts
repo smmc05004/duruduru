@@ -7,7 +7,12 @@ import type {
   TimeBlock,
 } from "./mvp-phase-two-types";
 import { INTERESTS } from "./mvp-phase-two-types";
-import { parseLocalDate, validateSearchInput } from "./mvp-phase-two-planner";
+import {
+  localRestIntervals,
+  tripMealWindows,
+  parseLocalDate,
+  validateSearchInput,
+} from "./mvp-phase-two-planner";
 
 const STORAGE_KEY = "duruduru.plans.v2";
 const LIMIT = 10;
@@ -248,19 +253,42 @@ export function isSavedPlan(value: unknown): value is PlanSnapshot {
     const midnight =
       Math.floor((start + 540 * 60_000) / 86_400_000) * 86_400_000 -
       540 * 60_000;
-    const restStart = midnight + 1260 * 60_000,
-      restEnd = midnight + 1860 * 60_000;
+    const expectedRest = localRestIntervals(
+      (timestamp(value.metrics.arrivalAt) - midnight) / 60_000,
+      (timestamp(value.metrics.returnDepartureAt) - midnight) / 60_000,
+    );
     const rest = planBlocks.filter((b) => b.kind === "rest");
     if (
-      rest.length !== 1 ||
-      timestamp(rest[0].startAt) !== restStart ||
-      timestamp(rest[0].endAt) !== restEnd
+      rest.length !== expectedRest.length ||
+      rest.some(
+        (b, index) =>
+          timestamp(b.startAt) !==
+            midnight + expectedRest[index].start * 60_000 ||
+          timestamp(b.endAt) !== midnight + expectedRest[index].end * 60_000,
+      )
     )
       return false;
     const mealBlocks = planBlocks.filter((b) => b.kind === "meal");
+    const expectedMeals = tripMealWindows(input.input);
     if (
-      mealBlocks.length !== 4 ||
-      new Set(mealBlocks.map((b) => `${b.day}:${b.mealType}`)).size !== 4
+      mealBlocks.length !== expectedMeals.length ||
+      expectedMeals.some(
+        (meal) =>
+          mealBlocks.filter(
+            (b) => b.day === meal.day && b.mealType === meal.type,
+          ).length !== 1,
+      )
+    )
+      return false;
+    if (
+      planBlocks.some((b) => {
+        if (b.kind !== "attraction" && b.kind !== "free") return false;
+        const dayStart = midnight + (b.day - 1) * 86_400_000;
+        return (
+          timestamp(b.startAt) < dayStart + 420 * 60_000 ||
+          timestamp(b.endAt) > dayStart + 1260 * 60_000
+        );
+      })
     )
       return false;
     if (
