@@ -1,6 +1,6 @@
 # 서비스 고도화 구현 계획
 
-> 상태: E1 구현 진행 중 / 기준일: 2026-09-08 / 작업 브랜치: `feat/destination-comparison`
+> 상태: E1 구현·로컬 검증 완료, PR CI 대기 / 기준일: 2026-09-08 / 작업 브랜치: `feat/destination-comparison`
 
 ## E1 — 비교할 가치가 있는 목적지 3안
 
@@ -37,10 +37,10 @@ E2의 시설 묶음·반일 여유, E3 상세/사진/휴무, E4 편집·저장 �
 
 ### PR 증거
 
-- PR: 미작성
-- 커밋: 미작성
+- PR: [#67 E1 목적지 비교 역할 추천 구현](https://github.com/smmc05004/duruduru/pull/67)
+- 커밋: `2ac8aed` 목적지 비교 역할 추천을 구현한다
 - E1 Jest: `lib/__tests__/mvp-phase-two-search.test.ts` 5건 통과 — A/B/C 역할, 순차 중복 제거와 1~2개, 전체 동점, 거리 결측, 실제 정적 검색→선택 계획→제한된 mock 음식 목록 연결
 - 전체 Jest: 88건 통과, 19건 실패. 실패는 기존 `app/__tests__/page.test.tsx`가 현재 `app/page.tsx`에서 이미 제거된 PoC-era `loadConditions`/`loadItinerary` props와 `<select>` 입력을 전제로 한 기준선 불일치이며 E1 수정 범위 밖이다.
 - `npm run verify`: 통과. ESLint의 기존 `scripts/build-region-profile.mjs` 미사용 변수 경고 2건은 유지된다. 첫 sandbox 실행은 Google Fonts 네트워크 차단으로 build가 실패했고, 허용된 네트워크에서 재실행해 build까지 통과했다.
 - Playwright: `E2E_PORT=3100 npm run test:e2e -- e2e/home.spec.ts` 4건 통과. 새 흐름은 실제 `/api/search` 엔진을 실행하고 음식점 API만 mock해, 역할 카드 표시 후 선택 때만 음식 요청 1회를 확인했다.
-- CI/병합 가능 상태: PR 생성 뒤 확인 예정
+- CI/병합 가능 상태: Vercel Preview Comments·Vercel 통과, E2E·Verify 실행 중 (2026-09-08 확인)
