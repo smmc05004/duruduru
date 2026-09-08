@@ -210,23 +210,16 @@ test("선택 뒤 한 지역 음식점과 클릭한 상세만 조회한다", asyn
   await fill(page);
   await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
   await page.getByRole("button", { name: "경주 일정 보기" }).click();
-  await expect(page.getByText("1일차")).toBeVisible();
-  await expect(page.getByText("2일차")).toBeVisible();
-  await expect(page.getByText("점심")).toHaveCount(2);
-  await expect(page.getByText("저녁")).toHaveCount(2);
-  const meals = page.locator(".dd-summary-card p");
-  await expect(
-    meals.filter({ hasText: /^11:30 · 점심 · 검증 식당$/u }),
-  ).toHaveCount(1);
-  await expect(
-    meals.filter({ hasText: /^17:30 · 저녁 · 검증 식당 둘$/u }),
-  ).toHaveCount(1);
-  await expect(
-    meals.filter({ hasText: /^11:30 · 점심 · 검증 식당 셋$/u }),
-  ).toHaveCount(1);
-  await expect(
-    meals.filter({ hasText: /^17:30 · 저녁 · 검증 식당 넷$/u }),
-  ).toHaveCount(1);
+  await expect(page.getByText("9월 12일")).toBeVisible();
+  await expect(page.getByText("9월 13일")).toBeVisible();
+  await expect(page.getByText("점심 · 음식점")).toHaveCount(2);
+  await expect(page.getByText("저녁 · 음식점")).toHaveCount(2);
+  // 네 식사 칸에 서로 다른 음식점이 하나씩만 배정된다(타임라인 카드 제목).
+  const meals = page.locator(".dd-tl-title");
+  await expect(meals.filter({ hasText: /^검증 식당$/u })).toHaveCount(1);
+  await expect(meals.filter({ hasText: /^검증 식당 둘$/u })).toHaveCount(1);
+  await expect(meals.filter({ hasText: /^검증 식당 셋$/u })).toHaveCount(1);
+  await expect(meals.filter({ hasText: /^검증 식당 넷$/u })).toHaveCount(1);
   expect(calls.filter((url) => url.includes("/destinations/")).length).toBe(1);
   await page.getByRole("button", { name: "검증 식당" }).first().click();
   const sheet = page.getByRole("dialog");
@@ -314,18 +307,14 @@ test("음식점 상세 조회가 실패하면 시트 안에서만 재시도하�
   await expect(sheet).toContainText("이 음식점 정보를 불러오지 못했어요");
   // 상세 실패는 화면 전체 장애가 아니다. 일정과 식사 배치는 그대로.
   await expect(page.getByText("경주 관광지 1")).toBeVisible();
-  const meals = page.locator(".dd-summary-card p");
-  await expect(
-    meals.filter({ hasText: /^11:30 · 점심 · 검증 식당$/u }),
-  ).toHaveCount(1);
+  const meals = page.locator(".dd-tl-title");
+  await expect(meals.filter({ hasText: /^검증 식당$/u })).toHaveCount(1);
 
   await sheet.getByRole("button", { name: "다시 시도하기" }).click();
   await expect(sheet.getByText("매일 11:00~20:00")).toBeVisible();
   await expect(sheet.getByText("월요일")).toBeVisible();
   await expect(sheet).not.toContainText("이 음식점 정보를 불러오지 못했어요");
-  await expect(
-    meals.filter({ hasText: /^11:30 · 점심 · 검증 식당$/u }),
-  ).toHaveCount(1);
+  await expect(meals.filter({ hasText: /^검증 식당$/u })).toHaveCount(1);
   expect(detailCalls).toBe(2);
 });
 
@@ -451,13 +440,9 @@ test("음식점이 네 곳보다 적으면 남은 식사 칸에 안내를 표시
   await fill(page);
   await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
   await page.getByRole("button", { name: "경주 일정 보기" }).click();
-  const meals = page.locator(".dd-summary-card p");
-  await expect(
-    meals.filter({ hasText: /^11:30 · 점심 · 첫 식당$/u }),
-  ).toHaveCount(1);
-  await expect(
-    meals.filter({ hasText: /^17:30 · 저녁 · 둘째 식당$/u }),
-  ).toHaveCount(1);
+  const meals = page.locator(".dd-tl-title");
+  await expect(meals.filter({ hasText: /^첫 식당$/u })).toHaveCount(1);
+  await expect(meals.filter({ hasText: /^둘째 식당$/u })).toHaveCount(1);
   await expect(page.getByText("추천할 식당을 더 찾지 못했어요")).toHaveCount(2);
 });
 
@@ -527,13 +512,9 @@ test("음식점 목록 수집이 실패해도 관광 계획은 유지하고 식�
   // 재시도는 음식점 목록만 다시 부른다. 성공하면 이름이 채워지고
   // 부족한 칸은 안내 문구(재시도 UI 아님)로 남는다.
   await page.getByRole("button", { name: "식사 정보 다시 불러오기" }).click();
-  const meals = page.locator(".dd-summary-card p");
-  await expect(
-    meals.filter({ hasText: /^11:30 · 점심 · 재시도 식당$/u }),
-  ).toHaveCount(1);
-  await expect(
-    meals.filter({ hasText: /^17:30 · 저녁 · 재시도 식당 둘$/u }),
-  ).toHaveCount(1);
+  const meals = page.locator(".dd-tl-title");
+  await expect(meals.filter({ hasText: /^재시도 식당$/u })).toHaveCount(1);
+  await expect(meals.filter({ hasText: /^재시도 식당 둘$/u })).toHaveCount(1);
   await expect(page.getByText("추천할 식당을 더 찾지 못했어요")).toHaveCount(2);
   await expect(page.locator(".dd-meal-failure")).toHaveCount(0);
   expect(calls).toBe(2);
