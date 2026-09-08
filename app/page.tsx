@@ -7,6 +7,10 @@ import { ConditionSummary } from "@/components/ConditionSummary";
 import { FieldCard, fieldErrorId } from "@/components/FieldCard";
 import { InputField } from "@/components/InputField";
 import { SegmentedControl } from "@/components/SegmentedControl";
+import {
+  RestaurantDetailSheet,
+  type RestaurantDetailState,
+} from "@/components/RestaurantDetailSheet";
 import { formatHoursAndMinutes } from "@/lib/format-duration";
 import {
   INTERESTS,
@@ -43,6 +47,22 @@ const kstClock = new Intl.DateTimeFormat("ko-KR", {
   minute: "2-digit",
   hour12: false,
 });
+// 음식점 상세 시트의 "조회 시각"용. 표시 전용이며 일정·시간표에 영향을 주지 않는다.
+const detailClockParts = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
+function formatDetailFetchedAt(date: Date) {
+  const parts = detailClockParts.formatToParts(date);
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((item) => item.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")} ${part("hour")}:${part("minute")}`;
+}
 
 const initial = {
   originId: "seoul" as MvpOriginId,
@@ -65,7 +85,14 @@ export default function Page() {
   const [mealAttemptAt, setMealAttemptAt] = useState("");
   const [schedule, setSchedule] = useState<ScheduleItem[] | null>(null);
   const [shortfall, setShortfall] = useState<ItineraryShortfall | null>(null);
-  const [detail, setDetail] = useState<string | null>(null);
+  // 음식점 상세 시트. 상세 조회 실패는 시트 안에서만 재시도하며 schedule·식사 배치는 건드리지 않는다.
+  const [openedRestaurant, setOpenedRestaurant] = useState<Restaurant | null>(
+    null,
+  );
+  const [detailState, setDetailState] = useState<RestaurantDetailState | null>(
+    null,
+  );
+  const [detailFetchedAt, setDetailFetchedAt] = useState("");
   const [showErrors, setShowErrors] = useState(false);
   const errorSummaryRef = useRef<HTMLDivElement>(null);
   // 진행 중인 검색·조회를 취소·수정으로 중단할 때 늦게 도착한 응답이 화면을 되돌리지 못하게 막는다.
@@ -75,6 +102,9 @@ export default function Page() {
     runIdRef.current += 1;
     abortRef.current?.abort();
     abortRef.current = new AbortController();
+    // 화면 전환 때 이전 음식점 상세 시트를 닫는다(다른 음식점·다른 지역으로 상태가 새지 않게).
+    setOpenedRestaurant(null);
+    setDetailState(null);
     return { runId: runIdRef.current, signal: abortRef.current.signal };
   };
   const stopRun = (next: View) => {
@@ -228,19 +258,30 @@ export default function Page() {
       setMealAttemptAt(kstClock.format(new Date()));
     }
   }
-  async function openRestaurant(restaurant: Restaurant) {
-    setDetail("불러오는 중");
+  async function loadRestaurantDetail(restaurant: Restaurant) {
+    setDetailState({ status: "loading" });
     try {
       const response = await fetch(`/api/restaurants/${restaurant.contentId}`);
       const result = await response.json();
-      setDetail(
-        result.kind === "success"
-          ? JSON.stringify(result.detail)
-          : result.message,
-      );
+      // route.ts는 정규화한 detail을 kind:"success"로, 상세 조회 실패는 kind:"data-error"(502)로 준다.
+      // 상세 실패는 시트 안 재시도로만 처리하고 일정 전체를 장애로 만들지 않는다.
+      if (result.kind === "success") {
+        setDetailFetchedAt(formatDetailFetchedAt(new Date()));
+        setDetailState({ status: "success", detail: result.detail });
+      } else {
+        setDetailState({ status: "error" });
+      }
     } catch {
-      setDetail("음식점 상세 정보를 불러오지 못했어요. 다시 시도해 주세요.");
+      setDetailState({ status: "error" });
     }
+  }
+  async function openRestaurant(restaurant: Restaurant) {
+    setOpenedRestaurant(restaurant);
+    await loadRestaurantDetail(restaurant);
+  }
+  function closeRestaurantDetail() {
+    setOpenedRestaurant(null);
+    setDetailState(null);
   }
   if (view === "searching")
     return (
@@ -407,12 +448,21 @@ export default function Page() {
                 {restaurant.name}
               </button>
             ))}
-            {detail ? <p>{detail}</p> : null}
           </section>
         )}
         <Button variant="secondary" onClick={() => setView("candidates")}>
           다른 지역 보기
         </Button>
+        {openedRestaurant && detailState ? (
+          <RestaurantDetailSheet
+            restaurantName={openedRestaurant.name}
+            regionLabel={`${selected.name} · TourAPI 콘텐츠 ID 기준`}
+            fetchedAt={detailFetchedAt}
+            state={detailState}
+            onRetry={() => loadRestaurantDetail(openedRestaurant)}
+            onClose={closeRestaurantDetail}
+          />
+        ) : null}
       </main>
     );
   if (view === "candidates")
