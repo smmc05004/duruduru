@@ -215,7 +215,7 @@ export function searchPhaseTwo(
       kind: "no-results",
       message:
         classifiedGroups && timingFailures
-          ? "네 끼 식사·왕복 운전·휴식·양일 관광과 여유시간을 함께 확보할 수 있는 지역이 없어요. 출발을 앞당기거나 복귀를 늦춰 주세요."
+          ? "왕복 이동·여행 중 식사·낮 관광과 여유시간을 함께 확보할 수 있는 지역이 없어요. 출발을 앞당기거나 복귀를 늦춰 주세요."
           : "선택 관심사의 서로 다른 관광지를 3곳 이상 확인할 수 있는 지역이 없어요. 관심사를 바꿔 주세요.",
     };
   return {

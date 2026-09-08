@@ -4,6 +4,10 @@ import { useCallback, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/Button";
+import { Chip } from "@/components/Chip";
+import { FieldCard, fieldErrorId } from "@/components/FieldCard";
+import { InputField } from "@/components/InputField";
+import { SegmentedControl } from "@/components/SegmentedControl";
 import {
   INTERESTS,
   ORIGINS,
@@ -39,10 +43,18 @@ import {
   savePlan,
 } from "@/lib/mvp-phase-two-storage";
 import { PlaceDetail, type SelectedPlace } from "./PlaceDetail";
+import {
+  NotebookCandidate,
+  NotebookConditions,
+  NotebookIcon,
+  notebookDate,
+} from "./Notebook";
 
 const clock = (value: string) => value.slice(11, 16);
 const duration = (minutes: number) =>
-  `${Math.floor(minutes / 60)}시간${minutes % 60 ? ` ${minutes % 60}분` : ""}`;
+  minutes < 60
+    ? `${minutes}분`
+    : `${Math.floor(minutes / 60)}시간${minutes % 60 ? ` ${minutes % 60}분` : ""}`;
 const labels = (values: SearchInput["interests"]) =>
   INTERESTS.filter((i) => values.includes(i.id))
     .map((i) => i.label)
@@ -87,6 +99,8 @@ export function TripPlanner() {
   const [savedPlans, setSavedPlans] = useState<PlanSnapshot[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [screen, setScreen] = useState<"input" | "results">("input");
+  const [attempted, setAttempted] = useState(false);
   const savedOpen = useTripUi((s) => s.savedOpen),
     setSavedOpen = useTripUi((s) => s.setSavedOpen);
   const generation = useRef(0);
@@ -166,9 +180,13 @@ export function TripPlanner() {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    await runSearch();
+  }
+  async function runSearch() {
+    setAttempted(true);
     const checked = validateSearchInput(input);
     if (!checked.ok) {
-      setMessage(checked.reason);
+      setMessage("");
       return;
     }
     const current = ++generation.current;
@@ -179,6 +197,8 @@ export function TripPlanner() {
     setLoaded(false);
     setSavedOpen(false);
     setExpanded(null);
+    setScreen("results");
+    window.scrollTo(0, 0);
     try {
       const data = await search.mutateAsync({
         input: checked.input,
@@ -204,6 +224,7 @@ export function TripPlanner() {
     setSelected(null);
     setExpanded(null);
     collectMeals(next);
+    window.scrollTo(0, 0);
   }
   function change(command: EditCommand) {
     if (!plan) return;
@@ -251,6 +272,8 @@ export function TripPlanner() {
     setSelected(null);
     setExpanded(null);
     setSavedOpen(false);
+    setScreen("results");
+    window.scrollTo(0, 0);
     setMessage(
       "저장 당시 계획을 불러왔어요. 음식점과 시간표는 저장 당시 정보예요.",
     );
@@ -273,32 +296,92 @@ export function TripPlanner() {
     search.data?.kind === "success" ? search.data.candidates : [];
   const changedAfterSave =
     plan?.savedAt && Date.parse(plan.updatedAt) > Date.parse(plan.savedAt);
+  const checkedInput = validateSearchInput(input);
+  const inputError = attempted && !checkedInput.ok ? checkedInput.reason : "";
+  const interestError = attempted && input.interests.length === 0;
+  const dateError = inputError && !interestError ? inputError : "";
+  const searchFailed =
+    screen === "results" &&
+    !plan &&
+    (search.isError || search.data?.kind === "data-error");
+  const noResults =
+    screen === "results" && !plan && search.data?.kind === "no-results";
+  const mealFailed =
+    !!mealRequest &&
+    (meals.isError ||
+      meals.data?.kind === "data-error" ||
+      !!meals.data?.failedRegionIds.length);
+  function showInput() {
+    ++generation.current;
+    search.reset();
+    clearMeals();
+    setPlan(null);
+    setSelected(null);
+    setExpanded(null);
+    setMessage("");
+    setScreen("input");
+    window.scrollTo(0, 0);
+  }
+  function showCandidates() {
+    ++generation.current;
+    setPlan(null);
+    clearMeals();
+    setSelected(null);
+    setExpanded(null);
+    setMessage("");
+    window.scrollTo(0, 0);
+  }
   return (
-    <main className="p2-page">
+    <main className={`p2-page${searchFailed ? " p2-page--error" : ""}`}>
       <header className="p2-header">
-        <Link href="/" className="p2-logo">
-          두루두루
-        </Link>
+        {plan ? (
+          <button
+            className="p2-back"
+            onClick={candidates.length ? showCandidates : showInput}
+          >
+            <NotebookIcon kind="back" />
+            {candidates.length ? "추천 목록" : "조건 입력"}
+          </button>
+        ) : (
+          <Link href="/" className="p2-logo">
+            두루두루
+          </Link>
+        )}
+        <span
+          className={`p2-trip-badge${searchFailed ? " p2-trip-badge--error" : ""}`}
+        >
+          {searchFailed ? "데이터 장애" : "1박 2일"}
+        </span>
+      </header>
+      <div className="p2-storage-link">
         <button
-          className="p2-control"
+          className="p2-text-button"
           onClick={openSaved}
           aria-expanded={savedOpen}
         >
-          이 기기 저장 목록
+          저장한 여행
         </button>
-      </header>
-      <section className="p2-intro">
-        <p className="p2-eyebrow">목적지는 아직 몰라도 괜찮아요</p>
-        <h1>
-          시간만 정하면,
-          <br />
-          여행이 시작돼요.
-        </h1>
-        <p>갈 수 있는 곳을 비교하고, 나에게 맞게 바꾸는 1박 2일 여행 초안.</p>
-      </section>
-      {message ? (
-        <p className="p2-notice" role="status">
-          {message}
+      </div>
+      {screen === "input" && !plan ? (
+        <section className="p2-intro">
+          <h1>
+            쓸 수 있는 시간을
+            <br />
+            알려주면 갈 곳부터 골라줄게요
+          </h1>
+        </section>
+      ) : null}
+      {(message && !searchFailed && !noResults) ||
+      (screen === "input" && inputError) ? (
+        <p
+          className={
+            screen === "input" && inputError
+              ? "p2-notice p2-notice--error"
+              : "p2-notice"
+          }
+          role="status"
+        >
+          {screen === "input" && inputError ? inputError : message}
         </p>
       ) : null}
       {savedOpen ? (
@@ -337,151 +420,230 @@ export function TripPlanner() {
           )}
         </section>
       ) : null}
-      <form className="p2-panel p2-form" onSubmit={submit}>
-        <h2>언제 떠날까요?</h2>
-        <label>
-          출발지
-          <select
-            value={input.originId}
-            onChange={(event) =>
-              setInput({
-                ...input,
-                originId: event.target.value as SearchInput["originId"],
-              })
+      {screen === "input" && !plan ? (
+        <form className="p2-form" onSubmit={submit}>
+          <FieldCard
+            label="어디서 출발해요?"
+            hint="지금은 서울·부산 두 곳에서만 출발할 수 있어요."
+          >
+            <SegmentedControl
+              label="출발지"
+              options={ORIGINS.map((origin) => ({
+                value: origin.id,
+                label: origin.label,
+              }))}
+              value={input.originId}
+              onChange={(value) =>
+                setInput({
+                  ...input,
+                  originId: value as SearchInput["originId"],
+                })
+              }
+            />
+          </FieldCard>
+          <FieldCard
+            label="언제 나가서 언제까지 돌아와요?"
+            hint="다음날 귀가하는 1박 2일이에요. 출발·귀가는 어느 시각이든 가능해요."
+            errors={
+              dateError ? [{ inputId: "p2-return", message: dateError }] : []
             }
           >
-            {ORIGINS.map((origin) => (
-              <option key={origin.id} value={origin.id}>
-                {origin.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="p2-grid">
-          <label>
-            출발 일시
-            <input
-              required
-              type="datetime-local"
-              value={input.startAt}
-              onChange={(event) =>
-                setInput({ ...input, startAt: event.target.value })
-              }
-            />
-          </label>
-          <label>
-            다음날 귀가 완료 일시
-            <input
-              required
-              type="datetime-local"
-              value={input.returnBy}
-              onChange={(event) =>
-                setInput({ ...input, returnBy: event.target.value })
-              }
-            />
-          </label>
-        </div>
-        <p className="p2-muted">
-          자차 · 1박 2일 · 출발과 복귀는 07:00~21:00. 양일 점심과 저녁을
-          포함해요.
-        </p>
-        <fieldset>
-          <legend>좋아하는 여행을 골라 주세요 · 1개 이상</legend>
-          <div className="p2-actions">
-            {INTERESTS.map((interest) => (
-              <button
-                className="p2-control"
-                type="button"
-                aria-pressed={input.interests.includes(interest.id)}
-                key={interest.id}
-                onClick={() =>
-                  setInput({
-                    ...input,
-                    interests: input.interests.includes(interest.id)
-                      ? input.interests.filter((id) => id !== interest.id)
-                      : [...input.interests, interest.id],
-                  })
+            <div className="p2-date-fields">
+              <InputField
+                id="p2-start"
+                prefix="출발"
+                aria-label="출발 일시"
+                invalid={!!dateError}
+                aria-describedby={
+                  dateError ? fieldErrorId("p2-return") : undefined
                 }
-              >
-                {interest.label}
-              </button>
-            ))}
+                required
+                type="datetime-local"
+                value={input.startAt}
+                onChange={(event) =>
+                  setInput({ ...input, startAt: event.target.value })
+                }
+              />
+              <InputField
+                id="p2-return"
+                prefix="귀가"
+                aria-label="다음날 귀가 완료 일시"
+                invalid={!!dateError}
+                aria-describedby={
+                  dateError ? fieldErrorId("p2-return") : undefined
+                }
+                required
+                type="datetime-local"
+                value={input.returnBy}
+                onChange={(event) =>
+                  setInput({ ...input, returnBy: event.target.value })
+                }
+              />
+            </div>
+          </FieldCard>
+          <FieldCard
+            label="무엇으로 이동해요?"
+            hint="현재는 자차 여행만 지원해요."
+          >
+            <SegmentedControl
+              label="이동수단"
+              options={[
+                {
+                  value: "car",
+                  label: "자차",
+                  icon: <NotebookIcon kind="travel" />,
+                },
+              ]}
+              value="car"
+              onChange={() => {}}
+            />
+          </FieldCard>
+          <FieldCard
+            label="어떤 걸 좋아해요?"
+            labelAside="· 하나 이상 골라 주세요"
+            invalid={interestError}
+            errors={
+              interestError
+                ? [
+                    {
+                      inputId: "p2-interests",
+                      message: "관심사를 하나 이상 골라 주세요.",
+                    },
+                  ]
+                : []
+            }
+          >
+            <div
+              className="p2-actions"
+              role="group"
+              aria-label="관심사"
+              aria-describedby={
+                interestError ? fieldErrorId("p2-interests") : undefined
+              }
+            >
+              {INTERESTS.map((interest) => (
+                <Chip
+                  variant="selectable"
+                  label={interest.label}
+                  selected={input.interests.includes(interest.id)}
+                  key={interest.id}
+                  onToggle={() =>
+                    setInput({
+                      ...input,
+                      interests: input.interests.includes(interest.id)
+                        ? input.interests.filter((id) => id !== interest.id)
+                        : [...input.interests, interest.id],
+                    })
+                  }
+                />
+              ))}
+            </div>
+          </FieldCard>
+          <p className="p2-muted">
+            관광은 07:00~21:00에, 점심·저녁은 여행 시간에 맞춰 포함해요.
+          </p>
+          <Button
+            variant="primary"
+            type="submit"
+            disabled={search.isPending || !!inputError}
+          >
+            {search.isPending
+              ? "갈 수 있는 곳을 찾고 있어요…"
+              : "갈 수 있는 곳 찾기"}
+          </Button>
+          {inputError ? (
+            <p className="p2-muted">
+              표시된 항목을 수정하면 다시 찾을 수 있어요.
+            </p>
+          ) : null}
+        </form>
+      ) : null}
+      {screen === "results" && !plan && search.variables ? (
+        <NotebookConditions
+          input={search.variables.input}
+          title={`${ORIGINS.find((origin) => origin.id === search.variables?.input.originId)?.label}에서 갈 수 있는 곳`}
+        />
+      ) : null}
+      {screen === "results" && !plan && search.isPending ? (
+        <section aria-label="여행지 검색 중">
+          <p className="p2-notice" role="status">
+            시간에 맞는 여행지를 찾고 있어요.
+          </p>
+          <div className="p2-panel" aria-hidden="true">
+            <div className="p2-loading-title dd-skeleton" />
+            <div className="p2-loading-line dd-skeleton" />
+            <div className="p2-loading-line dd-skeleton" />
           </div>
-        </fieldset>
-        <Button variant="primary" type="submit" disabled={search.isPending}>
-          {search.isPending
-            ? "갈 수 있는 곳을 찾고 있어요…"
-            : "갈 수 있는 곳 찾기"}
-        </Button>
-      </form>
-      {!plan && candidates.length > 0 && !search.isPending ? (
+        </section>
+      ) : null}
+      {searchFailed ||
+      noResults ||
+      (screen === "results" && !plan && search.data?.kind === "input-error") ? (
+        <section
+          className={`p2-panel p2-result-state${searchFailed ? " p2-result-state--error" : ""}`}
+          role={searchFailed ? "alert" : "status"}
+        >
+          <NotebookIcon kind={searchFailed ? "warning" : "map"} />
+          <h2>
+            {searchFailed
+              ? "정보를 불러오지 못했어요"
+              : "이번 조건에 맞는 곳을 찾지 못했어요"}
+          </h2>
+          <p>{message}</p>
+          <p className="p2-muted">
+            {searchFailed
+              ? "잠시 후 다시 시도해 주세요."
+              : "관심사를 더 고르거나 여행 시간을 늘려 다시 찾아보세요."}
+          </p>
+          {searchFailed ? (
+            <button
+              className="dd-button p2-retry"
+              onClick={() => void runSearch()}
+            >
+              다시 시도하기
+            </button>
+          ) : null}
+        </section>
+      ) : null}
+      {screen === "results" &&
+      !plan &&
+      candidates.length > 0 &&
+      !search.isPending ? (
         <section aria-label="목적지 추천">
-          <h2>이 시간에 다녀올 수 있어요</h2>
-          <p>실제 방문 장소와 여유시간을 비교해 보세요.</p>
+          <div className="p2-list-head">
+            <strong>다녀올 수 있는 곳 {candidates.length}군데</strong>
+            <span>관심사·계획 적합순</span>
+          </div>
           <div className="p2-candidates">
-            {candidates.map((candidate) => (
-              <article className="p2-panel" key={candidate.groupId}>
-                <p className="p2-eyebrow">{candidate.province}</p>
-                <h2>{candidate.displayName}</h2>
-                <p>
-                  {labels(candidate.preview.metrics.fulfilledInterests)} ·{" "}
-                  {candidate.preview.metrics.attractionCount}곳 방문
-                </p>
-                <p>
-                  왕복 운전 {duration(candidate.oneWayMinutes * 2)}
-                  <br />
-                  현지 활동 {duration(candidate.preview.metrics.localMinutes)} ·
-                  자유시간 {duration(candidate.preview.metrics.freeMinutes)}
-                </p>
-                <ol className="p2-preview">
-                  {candidate.preview.blocks
-                    .filter((b) => b.kind === "attraction")
-                    .map((block) => (
-                      <li key={block.id}>
-                        {block.day}일차 {clock(block.startAt)}~
-                        {clock(block.endAt)}
-                        <br />
-                        <strong>{block.title}</strong>
-                      </li>
-                    ))}
-                </ol>
-                <ul>
-                  {candidate.reasons.map((reason, i) => (
-                    <li key={i}>{reason}</li>
-                  ))}
-                </ul>
-                <Button variant="primary" onClick={() => choose(candidate)}>
-                  이곳으로 계획하기
-                </Button>
-              </article>
+            {candidates.map((candidate, index) => (
+              <NotebookCandidate
+                key={candidate.groupId}
+                candidate={candidate}
+                best={index === 0}
+                onChoose={() => choose(candidate)}
+              />
             ))}
           </div>
         </section>
       ) : null}
+      {screen === "results" && !plan ? (
+        <Button variant="secondary" onClick={showInput}>
+          {search.isPending ? "검색 취소·조건 수정" : "조건 수정하기"}
+        </Button>
+      ) : null}
       {plan ? (
         <section aria-label="여행 계획">
+          <NotebookConditions
+            input={plan.input}
+            title={`${plan.destination.displayName} 참고용 여행 계획`}
+          />
           <div className="p2-plan-head">
-            <div>
-              <p className="p2-eyebrow">나의 1박 2일 참고 계획</p>
-              <h2>{plan.destination.displayName}</h2>
-              <p>
-                {plan.input.startAt.replace("T", " ")} 출발 →{" "}
-                {plan.input.returnBy.replace("T", " ")} 귀가 완료
-              </p>
-            </div>
             <div className="p2-actions">
               <button className="p2-control" onClick={persist}>
                 이 기기에 저장
               </button>
               {candidates.length ? (
-                <button
-                  className="p2-control"
-                  onClick={() => {
-                    setPlan(null);
-                    clearMeals();
-                    setSelected(null);
-                  }}
-                >
+                <button className="p2-control" onClick={showCandidates}>
                   다른 목적지 보기
                 </button>
               ) : null}
@@ -493,8 +655,12 @@ export function TripPlanner() {
             {plan.metrics.attractionCount}곳
           </p>
           <p>
-            여행지 도착 {clock(plan.metrics.arrivalAt)} · 다음날 귀가 운전 시작{" "}
-            {clock(plan.metrics.returnDepartureAt)}
+            <span className="p2-arrival">
+              여행지 도착 {notebookDate(plan.metrics.arrivalAt)}
+            </span>
+            <span className="p2-arrival">
+              귀가 운전 시작 {notebookDate(plan.metrics.returnDepartureAt)}
+            </span>
           </p>
           {plan.savedAt ? (
             <p className="p2-notice">
@@ -506,8 +672,26 @@ export function TripPlanner() {
                 : ""}
             </p>
           ) : null}
-          <div className="p2-panel">
-            <strong>식사 정보</strong>
+          <details
+            className={`p2-meal-info${mealFailed ? " p2-meal-info--error" : ""}`}
+            open={
+              mealFailed || (!!mealRequest && meals.isPending)
+                ? true
+                : undefined
+            }
+          >
+            <summary>
+              {mealFailed ? (
+                <>
+                  <NotebookIcon kind="warning" />{" "}
+                  {meals.isError || meals.data?.kind === "data-error"
+                    ? "식사 정보를 불러오지 못했어요"
+                    : "식사 정보를 일부 불러오지 못했어요"}
+                </>
+              ) : (
+                "식사 정보·목록 다시 조회"
+              )}
+            </summary>
             <p role="status">
               {meals.isPending && mealRequest
                 ? "관광 일정 주변의 음식점을 불러오고 있어요. 관광 계획은 바로 볼 수 있어요."
@@ -529,13 +713,13 @@ export function TripPlanner() {
               </p>
             ) : null}
             <button
-              className="p2-control"
+              className={mealFailed ? "dd-button p2-retry" : "p2-control"}
               disabled={meals.isPending && !!mealRequest}
               onClick={() => collectMeals(plan)}
             >
               식당 목록 {mealRequest ? "다시 조회" : "조회"}
             </button>
-          </div>
+          </details>
           {[1, 2].map((day) => (
             <section key={day} className="p2-day">
               <h3>
@@ -550,22 +734,40 @@ export function TripPlanner() {
                   .map((block) => (
                     <li
                       key={block.id}
-                      className={`p2-block p2-block--${block.kind}`}
+                      className={`p2-block p2-block--${block.kind}${block.kind === "meal" && block.mealScope === "local" && !block.restaurant ? " p2-block--empty" : ""}${block.restaurant ? " p2-block--restaurant" : ""}`}
                     >
-                      <div className="p2-block-time">
-                        {clock(block.startAt)}—{clock(block.endAt)}
-                        {block.kind === "rest" ? <span>다음날까지</span> : null}
-                      </div>
-                      <div className="p2-block-main">
-                        {block.kind === "meal" ? (
-                          <p className="p2-eyebrow">
-                            {block.mealType === "lunch" ? "점심" : "저녁"} ·{" "}
-                            {block.mealScope === "local"
-                              ? "현지 식사"
-                              : "이동 중 자유 식사"}{" "}
-                            · 60분
-                          </p>
+                      <div className="p2-block-time dd-timeline-row__time">
+                        <time dateTime={block.startAt}>
+                          {clock(block.startAt)}
+                        </time>
+                        <span>~{clock(block.endAt)}</span>
+                        {block.startAt.slice(0, 10) !==
+                        block.endAt.slice(0, 10) ? (
+                          <span>다음날까지</span>
                         ) : null}
+                        <span
+                          className="dd-timeline-row__rail"
+                          aria-hidden="true"
+                        />
+                      </div>
+                      <div className="p2-block-main dd-timeline-row__card">
+                        <div className="p2-block-label">
+                          <span>
+                            <NotebookIcon kind={block.kind} />
+                            {block.kind === "attraction"
+                              ? `방문 · ${labels(block.attraction?.categories ?? [])}`
+                              : block.kind === "meal"
+                                ? `${block.mealType === "lunch" ? "점심" : "저녁"} · ${block.mealScope === "local" ? "음식점" : "이동 중 식사"}`
+                                : block.kind === "travel"
+                                  ? block.direction === "return"
+                                    ? "복귀 이동"
+                                    : "출발 이동"
+                                  : block.kind === "rest"
+                                    ? "휴식"
+                                    : "자유시간"}
+                          </span>
+                          <span>{duration(block.durationMinutes)}</span>
+                        </div>
                         {block.attraction ? (
                           <button
                             className="p2-place"
@@ -576,7 +778,8 @@ export function TripPlanner() {
                               })
                             }
                           >
-                            {block.attraction.title} <span>상세 보기</span>
+                            {block.attraction.title}{" "}
+                            <span>눌러서 장소 정보 확인</span>
                           </button>
                         ) : block.restaurant ? (
                           <button
@@ -588,7 +791,8 @@ export function TripPlanner() {
                               })
                             }
                           >
-                            {block.restaurant.name} <span>식당 상세</span>
+                            {block.restaurant.name}{" "}
+                            <span>눌러서 운영시간·메뉴 확인</span>
                           </button>
                         ) : (
                           <strong>
@@ -600,14 +804,18 @@ export function TripPlanner() {
                                 : block.title}
                           </strong>
                         )}
-                        <p className="p2-muted">{block.reason}</p>
+                        {block.fixed ? (
+                          <span className="p2-fixed">장소 고정됨</span>
+                        ) : null}
                         {block.kind === "meal" &&
                         block.mealScope === "local" &&
                         !block.restaurant ? (
                           <p>
                             {meals.isPending && mealRequest
                               ? "음식점 정보를 불러오는 중이에요 · 식사 60분은 확보했어요."
-                              : "추천할 식당을 더 찾지 못했어요 · 식사 60분은 확보했어요."}
+                              : mealFailed
+                                ? "식사 정보를 다시 불러오면 채워져요 · 식사 60분은 확보했어요."
+                                : "추천할 식당을 더 찾지 못했어요 · 식사 60분은 확보했어요."}
                           </p>
                         ) : null}
                         {block.kind === "meal" &&
@@ -618,76 +826,81 @@ export function TripPlanner() {
                           </p>
                         ) : null}
                         {block.attraction ? (
-                          <div className="p2-actions">
-                            <button
-                              className="p2-control"
-                              aria-pressed={!!block.fixed}
-                              onClick={() =>
-                                change({
-                                  type: "toggle-fixed",
-                                  blockId: block.id,
-                                })
-                              }
-                            >
-                              {block.fixed ? "장소 고정됨 · 해제" : "장소 고정"}
-                            </button>
-                            <label className="p2-duration">
-                              방문시간
-                              <select
-                                value={block.durationMinutes}
-                                onChange={(event) =>
+                          <details className="p2-edit-tools">
+                            <summary>방문 수정</summary>
+                            <div className="p2-actions">
+                              <button
+                                className="p2-control"
+                                aria-pressed={!!block.fixed}
+                                onClick={() =>
                                   change({
-                                    type: "duration",
+                                    type: "toggle-fixed",
                                     blockId: block.id,
-                                    durationMinutes: Number(
-                                      event.target.value,
-                                    ) as VisitDuration,
                                   })
                                 }
                               >
-                                {[30, 60, 90, 120].map((minutes) => (
-                                  <option key={minutes} value={minutes}>
-                                    {minutes}분
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-                            <button
-                              className="p2-control"
-                              onClick={() => {
-                                if (block.fixed)
-                                  setMessage(
-                                    "교체하려면 먼저 장소 고정을 해제해 주세요.",
-                                  );
-                                else
-                                  setExpanded(
-                                    expanded === block.id ? null : block.id,
-                                  );
-                              }}
-                            >
-                              관광지 교체
-                            </button>
-                            <button
-                              className="p2-control"
-                              onClick={() => {
-                                if (block.fixed)
-                                  setMessage(
-                                    "삭제하려면 먼저 장소 고정을 해제해 주세요.",
-                                  );
-                                else if (
-                                  window.confirm(
-                                    `${block.title} 방문을 삭제하고 자유시간으로 바꿀까요?`,
+                                {block.fixed
+                                  ? "장소 고정됨 · 해제"
+                                  : "장소 고정"}
+                              </button>
+                              <label className="p2-duration">
+                                방문시간
+                                <select
+                                  value={block.durationMinutes}
+                                  onChange={(event) =>
+                                    change({
+                                      type: "duration",
+                                      blockId: block.id,
+                                      durationMinutes: Number(
+                                        event.target.value,
+                                      ) as VisitDuration,
+                                    })
+                                  }
+                                >
+                                  {[30, 60, 90, 120].map((minutes) => (
+                                    <option key={minutes} value={minutes}>
+                                      {minutes}분
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                              <button
+                                className="p2-control"
+                                onClick={() => {
+                                  if (block.fixed)
+                                    setMessage(
+                                      "교체하려면 먼저 장소 고정을 해제해 주세요.",
+                                    );
+                                  else
+                                    setExpanded(
+                                      expanded === block.id ? null : block.id,
+                                    );
+                                }}
+                              >
+                                관광지 교체
+                              </button>
+                              <button
+                                className="p2-control"
+                                onClick={() => {
+                                  if (block.fixed)
+                                    setMessage(
+                                      "삭제하려면 먼저 장소 고정을 해제해 주세요.",
+                                    );
+                                  else if (
+                                    window.confirm(
+                                      `${block.title} 방문을 삭제하고 자유시간으로 바꿀까요?`,
+                                    )
                                   )
-                                )
-                                  change({
-                                    type: "delete-attraction",
-                                    blockId: block.id,
-                                  });
-                              }}
-                            >
-                              삭제
-                            </button>
-                          </div>
+                                    change({
+                                      type: "delete-attraction",
+                                      blockId: block.id,
+                                    });
+                                }}
+                              >
+                                삭제
+                              </button>
+                            </div>
+                          </details>
                         ) : null}
                         {block.kind === "meal" &&
                         block.mealScope === "local" ? (
@@ -768,6 +981,10 @@ export function TripPlanner() {
                             )}
                           </div>
                         ) : null}
+                        <details className="p2-block-basis">
+                          <summary>배치 근거</summary>
+                          <p>{block.reason}</p>
+                        </details>
                       </div>
                     </li>
                   ))}
@@ -810,6 +1027,9 @@ export function TripPlanner() {
               <p>식당 목록 조회 {meals.data.fetchedAt}</p>
             ) : null}
           </details>
+          <Button variant="secondary" onClick={showInput}>
+            조건 수정하기
+          </Button>
         </section>
       ) : null}
       <footer className="p2-muted">

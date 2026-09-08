@@ -62,18 +62,8 @@ export function validateSearchInput(
     return fail("올바른 출발·복귀 날짜와 시각을 입력해 주세요.");
   const startDay = Math.floor((start + 9 * 60 * MINUTE) / (1440 * MINUTE));
   const endDay = Math.floor((end + 9 * 60 * MINUTE) / (1440 * MINUTE));
-  const startMinute = (((start / MINUTE + 540) % 1440) + 1440) % 1440;
-  const endMinute = (((end / MINUTE + 540) % 1440) + 1440) % 1440;
-  if (
-    endDay - startDay !== 1 ||
-    startMinute < 420 ||
-    startMinute > 1260 ||
-    endMinute < 420 ||
-    endMinute > 1260
-  )
-    return fail(
-      "출발과 복귀는 연속된 이틀의 07:00~21:00 안으로 입력해 주세요.",
-    );
+  if (endDay - startDay !== 1)
+    return fail("복귀 날짜는 출발 날짜의 다음날로 입력해 주세요.");
   return {
     ok: true,
     input: {
@@ -224,6 +214,42 @@ function stamp(input: SearchInput, minute: number): string {
     .toISOString()
     .slice(0, 16);
 }
+// A meal is required only when a complete hour in its window is in the trip.
+export function tripMealWindows(input: SearchInput) {
+  const start = minuteOf(input.startAt),
+    end = 1440 + minuteOf(input.returnBy);
+  return [690, 1050, 2130, 2490].flatMap((base, index) => {
+    const starts = [base, base + 30, base + 60].filter(
+      (time) => time >= start && time + 60 <= end,
+    );
+    return starts.length
+      ? [
+          {
+            starts,
+            day: (index < 2 ? 1 : 2) as 1 | 2,
+            type: (index % 2 === 0 ? "lunch" : "dinner") as "lunch" | "dinner",
+            id: `meal-${index < 2 ? 1 : 2}-${index % 2 === 0 ? "lunch" : "dinner"}`,
+          },
+        ]
+      : [];
+  });
+}
+
+export function localRestIntervals(
+  arrival: number,
+  departure: number,
+): Interval[] {
+  return [
+    { start: 0, end: 420 },
+    { start: 1260, end: 1860 },
+    { start: 2700, end: 2880 },
+  ]
+    .map((period) => ({
+      start: Math.max(arrival, period.start),
+      end: Math.min(departure, period.end),
+    }))
+    .filter((period) => period.end > period.start);
+}
 function driveBoundary(
   anchor: number,
   minutes: number,
@@ -261,70 +287,73 @@ function layouts(input: SearchInput, oneWay: number): Layout[] {
   const start = minuteOf(input.startAt),
     end = 1440 + minuteOf(input.returnBy),
     result: Layout[] = [];
-  for (let a = 0; a < 3; a++)
-    for (let b = 0; b < 3; b++)
-      for (let c = 0; c < 3; c++)
-        for (let d = 0; d < 3; d++) {
-          const meals: Meal[] = [
-            690 + a * 30,
-            1050 + b * 30,
-            2130 + c * 30,
-            2490 + d * 30,
-          ].map((time, index) => ({
+  const combinations = tripMealWindows(input).reduce<Meal[][]>(
+    (previous, window) =>
+      previous.flatMap((meals) =>
+        window.starts.map((time) => [
+          ...meals,
+          {
             start: time,
             end: time + 60,
-            day: index < 2 ? 1 : 2,
-            type: index % 2 === 0 ? "lunch" : "dinner",
-            id: `meal-${index < 2 ? 1 : 2}-${index % 2 === 0 ? "lunch" : "dinner"}`,
-          }));
-          if (meals.some((meal) => meal.start < start || meal.end > end))
-            continue;
-          const outgoing = driveBoundary(start, oneWay, meals, false),
-            returning = driveBoundary(end, oneWay, meals, true);
-          const arrival = outgoing.boundary,
-            departure = returning.boundary;
-          if (arrival > 1260 || departure < 1860 || arrival >= departure)
-            continue;
-          const localMeals = new Set(
-            meals
-              .filter((meal) => meal.start >= arrival && meal.end <= departure)
-              .map((meal) => meal.id),
-          );
-          const gaps: [Interval[], Interval[]] = [[], []];
-          for (const day of [0, 1] as const) {
-            const lower = Math.max(arrival, day * 1440 + 420),
-              upper = Math.min(departure, day * 1440 + 1260);
-            let cursor = lower;
-            for (const meal of meals.filter(
-              (item) => item.day === day + 1 && localMeals.has(item.id),
-            )) {
-              if (meal.start > cursor)
-                gaps[day].push({ start: cursor, end: meal.start });
-              cursor = meal.end;
-            }
-            if (upper > cursor) gaps[day].push({ start: cursor, end: upper });
-          }
-          result.push({
-            meals,
-            arrival,
-            departure,
-            localMeals,
-            gaps,
-            drives: [
-              ...outgoing.intervals.map((interval) => ({
-                ...interval,
-                direction: "outbound" as const,
-              })),
-              ...returning.intervals.map((interval) => ({
-                ...interval,
-                direction: "return" as const,
-              })),
-            ],
-          });
-        }
+            day: window.day,
+            type: window.type,
+            id: window.id,
+          },
+        ]),
+      ),
+    [[]],
+  );
+  for (const meals of combinations) {
+    const outgoing = driveBoundary(start, oneWay, meals, false),
+      returning = driveBoundary(end, oneWay, meals, true);
+    const arrival = outgoing.boundary,
+      departure = returning.boundary;
+    if (arrival >= departure) continue;
+    const localMeals = new Set(
+      meals
+        .filter((meal) => meal.start >= arrival && meal.end <= departure)
+        .map((meal) => meal.id),
+    );
+    const gaps: [Interval[], Interval[]] = [[], []];
+    for (const day of [0, 1] as const) {
+      const lower = Math.max(arrival, day * 1440 + 420),
+        upper = Math.min(departure, day * 1440 + 1260);
+      let cursor = lower;
+      for (const meal of meals.filter(
+        (item) =>
+          item.day === day + 1 &&
+          localMeals.has(item.id) &&
+          item.start >= lower &&
+          item.end <= upper,
+      )) {
+        if (meal.start > cursor)
+          gaps[day].push({ start: cursor, end: meal.start });
+        cursor = meal.end;
+      }
+      if (upper > cursor) gaps[day].push({ start: cursor, end: upper });
+    }
+    result.push({
+      meals,
+      arrival,
+      departure,
+      localMeals,
+      gaps,
+      drives: [
+        ...outgoing.intervals.map((interval) => ({
+          ...interval,
+          direction: "outbound" as const,
+        })),
+        ...returning.intervals.map((interval) => ({
+          ...interval,
+          direction: "return" as const,
+        })),
+      ],
+    });
+  }
   return result;
 }
 function fit(gaps: Interval[], durations: number[]): Interval[] | null {
+  if (durations.length === 0) return [];
   if (
     gaps.reduce((sum, gap) => sum + gap.end - gap.start, 0) -
       durations.reduce((sum, duration) => sum + duration, 0) <
@@ -428,8 +457,8 @@ export function scheduleTrip(
   } | null = null;
   for (const layout of timingLayouts) {
     if (requiredLocalMeals.some((id) => !layout.localMeals.has(id))) continue;
-    for (let first = retained ? 0 : 1; first <= 3; first++)
-      for (let second = retained ? 0 : 1; second <= 3; second++) {
+    for (let first = 0; first <= 3; first++)
+      for (let second = 0; second <= 3; second++) {
         const count = first + second;
         if (
           retained
@@ -473,7 +502,7 @@ export function scheduleTrip(
     return {
       ok: false,
       reason:
-        "네 끼 식사와 왕복 운전, 21:00~07:00 휴식, 양일 30분 여유 및 관광 방문시간을 함께 확보할 수 없어요. 출발을 앞당기거나 복귀를 늦춰 주세요.",
+        "왕복 이동과 여행 중 식사, 07:00~21:00 관광 및 관광하는 날의 30분 여유를 함께 확보할 수 없어요. 출발을 앞당기거나 복귀를 늦춰 주세요.",
     };
   const { layout, slots, visits } = best,
     blocks: TimeBlock[] = [];
@@ -515,16 +544,16 @@ export function scheduleTrip(
       }),
     ),
   );
-  blocks.push(
-    block(
-      { start: 1260, end: 1860 },
-      {
-        id: "overnight-rest",
-        kind: "rest",
-        title: "휴식",
-        reason: "21:00~다음날 07:00 휴식 · 숙소 추천 아님",
-      },
-    ),
+  localRestIntervals(layout.arrival, layout.departure).forEach(
+    (interval, index) =>
+      blocks.push(
+        block(interval, {
+          id: `overnight-rest-${index}`,
+          kind: "rest",
+          title: "휴식",
+          reason: "관광하지 않는 야간 현지 휴식 · 지역 간 이동은 야간에도 가능",
+        }),
+      ),
   );
   let visitIndex = 0;
   for (const day of [0, 1] as const) {
