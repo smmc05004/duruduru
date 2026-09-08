@@ -11,7 +11,10 @@ import {
   RestaurantDetailSheet,
   type RestaurantDetailState,
 } from "@/components/RestaurantDetailSheet";
-import { formatHoursAndMinutes } from "@/lib/format-duration";
+import {
+  formatClockDuration,
+  formatHoursAndMinutes,
+} from "@/lib/format-duration";
 import {
   INTERESTS,
   ORIGINS,
@@ -32,10 +35,11 @@ type View =
   | "candidates"
   | "restaurants"
   | "schedule"
+  | "no-result"
   | "no-itinerary"
   | "error";
 type SearchResponse =
-  | { kind: "success"; candidates: Candidate[] }
+  | { kind: "success"; candidates: Candidate[]; profileGeneratedAt?: string }
   | {
       kind: "input-error" | "no-results" | "data-error";
       message: string;
@@ -47,6 +51,8 @@ const kstClock = new Intl.DateTimeFormat("ko-KR", {
   minute: "2-digit",
   hour12: false,
 });
+// 음식점 목록·프로필 조회일(날짜만). 표시 전용이며 일정 계산에 쓰지 않는다.
+const kstDay = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Seoul" });
 // 음식점 상세 시트의 "조회 시각"용. 표시 전용이며 일정·시간표에 영향을 주지 않는다.
 const detailClockParts = new Intl.DateTimeFormat("ko-KR", {
   timeZone: "Asia/Seoul",
@@ -64,6 +70,227 @@ function formatDetailFetchedAt(date: Date) {
   return `${part("year")}-${part("month")}-${part("day")} ${part("hour")}:${part("minute")}`;
 }
 
+const kstMonthDay = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  month: "long",
+  day: "numeric",
+});
+const kstWeekday = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  weekday: "long",
+});
+/** "2026-09-12T08:00", offset 0|1 → { date: "9월 12일", weekday: "토요일" } */
+function dayHeading(startAt: string, offset: 0 | 1) {
+  const base = new Date(`${startAt}:00+09:00`);
+  if (Number.isNaN(base.getTime())) return null;
+  const day = new Date(base.getTime() + offset * 86_400_000);
+  return { date: kstMonthDay.format(day), weekday: kstWeekday.format(day) };
+}
+
+/* ── 인라인 SVG 아이콘 (이모지 금지, 44px 규칙은 클릭 요소에만) ───────── */
+
+const iconCar = (
+  <svg
+    width="17"
+    height="17"
+    viewBox="0 0 20 20"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.7"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M3 12.5h14M4.5 12.5V9.2l1.8-3.4h7.4l1.8 3.4v3.3" />
+    <circle cx="6.6" cy="14.4" r="1.4" />
+    <circle cx="13.4" cy="14.4" r="1.4" />
+  </svg>
+);
+const iconVisit = (
+  <svg
+    width="17"
+    height="17"
+    viewBox="0 0 20 20"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.7"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M3 16.5h14M5.5 16.5V8.2L10 4.5l4.5 3.7v8.3" />
+    <path d="M8.4 16.5v-4.2h3.2v4.2" />
+  </svg>
+);
+const iconMeal = (
+  <svg
+    width="17"
+    height="17"
+    viewBox="0 0 20 20"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.7"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M6.5 3v6a2 2 0 0 0 4 0V3M8.5 11v6M14 3c1.4 1.2 1.4 4.4 0 5.6V17" />
+  </svg>
+);
+const iconMoon = (
+  <svg
+    width="16"
+    height="16"
+    viewBox="0 0 20 20"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.7"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M7 3.5a6.5 6.5 0 1 0 9.5 8A5.2 5.2 0 0 1 7 3.5z" />
+  </svg>
+);
+const iconCheck = (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 20 20"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M4 10.4l3.6 3.4L16 5.6" />
+  </svg>
+);
+const iconCheckSmall = (
+  <svg
+    width="19"
+    height="19"
+    viewBox="0 0 20 20"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.1"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M4 10.4l3.6 3.4L16 5.6" />
+  </svg>
+);
+const iconChevronDown = (
+  <svg
+    width="13"
+    height="13"
+    viewBox="0 0 20 20"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.9"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M5 8l5 5 5-5" />
+  </svg>
+);
+const iconBack = (
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 20 20"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M11.6 5L6.6 10l5 5" />
+  </svg>
+);
+const iconWarning = (
+  <svg
+    width="26"
+    height="26"
+    viewBox="0 0 20 20"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M10 2.6l7.6 13.6H2.4z" />
+    <path d="M10 7.6v3.8M10 13.8v.2" />
+  </svg>
+);
+const iconWarningSm = (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 20 20"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M10 3.2l7 12.4H3z" />
+    <path d="M10 7.8v3.4M10 13.6v.2" />
+  </svg>
+);
+const iconXCircleSm = (
+  <svg
+    width="15"
+    height="15"
+    viewBox="0 0 20 20"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.9"
+    strokeLinecap="round"
+    aria-hidden="true"
+  >
+    <circle cx="10" cy="10" r="7.2" />
+    <path d="M7.4 7.4l5.2 5.2M12.6 7.4l-5.2 5.2" />
+  </svg>
+);
+const iconInfoCircleSm = (
+  <svg
+    width="15"
+    height="15"
+    viewBox="0 0 20 20"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.9"
+    strokeLinecap="round"
+    aria-hidden="true"
+  >
+    <circle cx="10" cy="10" r="7.2" />
+    <path d="M10 6.2v.2M10 8.8v4.6" />
+  </svg>
+);
+const iconRetry = (
+  <svg
+    width="19"
+    height="19"
+    viewBox="0 0 20 20"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M16.4 10a6.4 6.4 0 1 1-2-4.6" />
+    <path d="M16.6 3.4v3.2h-3.2" />
+  </svg>
+);
+
 const initial = {
   originId: "seoul" as MvpOriginId,
   startAt: "",
@@ -76,8 +303,10 @@ export default function Page() {
   const [view, setView] = useState<View>("input");
   const [message, setMessage] = useState("");
   const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [profileGeneratedAt, setProfileGeneratedAt] = useState<string>("");
   const [selected, setSelected] = useState<Candidate | null>(null);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const [listFetchedAt, setListFetchedAt] = useState("");
   // 음식점 목록 수집 실패(재시도 가능)와 "정상 응답인데 식당이 부족함"을 구분한다.
   // mealFailed=true는 목록 API 장애·네트워크 오류로, 식사 섹션만 재시도 상태로 보인다.
   const [mealFailed, setMealFailed] = useState(false);
@@ -169,8 +398,16 @@ export default function Page() {
       });
       const result = (await response.json()) as SearchResponse;
       if (runIdRef.current !== runId) return;
+      // 정상 응답이지만 조건에 맞는 지역이 없는 경우와 API 장애를 형태로 구분한다.
+      // (DESIGN_TOKENS.md 「결과 없음 · 일정 생성 불가 · 식사 정보 실패 · 데이터 장애」)
+      if (result.kind === "no-results") {
+        setMessage(result.message);
+        setView("no-result");
+        return;
+      }
       if (result.kind !== "success") throw new Error(result.message);
       setCandidates(result.candidates);
+      setProfileGeneratedAt(result.profileGeneratedAt ?? "");
       setView("candidates");
     } catch (error) {
       if (runIdRef.current !== runId || signal.aborted) return;
@@ -227,6 +464,7 @@ export default function Page() {
       return;
     }
     setRestaurants(fetched);
+    setListFetchedAt(kstDay.format(new Date()));
     setMealFailed(failed);
     if (failed) setMealAttemptAt(kstClock.format(new Date()));
     setSchedule(items);
@@ -248,6 +486,7 @@ export default function Page() {
       const fetched = result.restaurants as Restaurant[];
       const items = createSchedule(input, candidate, fetched);
       setRestaurants(fetched);
+      setListFetchedAt(kstDay.format(new Date()));
       setMealFailed(false);
       setMealRetrying(false);
       if (items) setSchedule(items);
@@ -307,12 +546,13 @@ export default function Page() {
   if (view === "restaurants" && selected)
     return (
       <main className="dd-screen">
-        <Header />
+        <Header onBack={() => stopRun("candidates")} />
         <ConditionSummary input={input} destination={selected} />
         <ProgressNotice
           title="선택한 지역의 음식점을 불러오고 있어요"
           detail={`${selected.displayName} 음식점 목록을 받아 점심·저녁을 채우는 중이에요.`}
         />
+        <p className="dd-day-heading">곧 1박 2일 계획이 완성돼요</p>
         <PlanPreview input={input} destination={selected} />
         <div className="dd-result-actions">
           <Button variant="secondary" onClick={() => stopRun("candidates")}>
@@ -328,23 +568,148 @@ export default function Page() {
   if (view === "error")
     return (
       <main className="dd-screen">
-        <Header />
-        <section className="dd-error-summary" role="alert">
-          <p className="dd-error-summary__title">지금은 준비하지 못했어요</p>
-          <p>{message}</p>
+        <div className="dd-alert-band" />
+        <div className="dd-screen__header">
+          <span className="dd-screen__logo">두루두루</span>
+          <span className="dd-screen__badge dd-screen__badge--alert">
+            {iconWarningSm}
+            데이터 장애
+          </span>
+        </div>
+        <section className="dd-failure" role="alert">
+          <div className="dd-failure__head">
+            <span style={{ color: "var(--alert)" }}>{iconWarning}</span>
+            <p className="dd-failure__title">정보를 불러오지 못했어요</p>
+          </div>
+          <p className="dd-failure__text">
+            {message} 임의의 출발지·이동수단·이동시간으로 바꿔서 계산하지
+            않았어요.
+          </p>
+          <div className="dd-failure__diag">
+            <span className="dd-failure__diag-item">
+              <span style={{ color: "var(--alert)" }}>{iconXCircleSm}</span>
+              {selected
+                ? `${selected.displayName} 음식점 목록 — 응답 없음`
+                : "지원 조건·후보 데이터 — 응답 없음"}
+              {mealAttemptAt ? ` (${mealAttemptAt} 시도)` : ""}
+            </span>
+            <span className="dd-failure__diag-item">
+              <span style={{ color: "var(--alert)" }}>{iconInfoCircleSm}</span>
+              마지막으로 정상이던 시점 — 확인할 수 없어요
+            </span>
+          </div>
         </section>
-        <Button
-          variant="primary"
-          onClick={() => (selected ? choose(selected) : setView("input"))}
-        >
-          다시 시도하기
-        </Button>
+        <div className="dd-screen__actions">
+          <button
+            type="button"
+            className="dd-button dd-button--recover"
+            onClick={() => (selected ? choose(selected) : setView("input"))}
+          >
+            {iconRetry}
+            다시 시도하기
+          </button>
+        </div>
+        <p className="dd-failure-note">복구되면 아래 입력이 다시 열려요</p>
+        <div className="dd-failure-preview" aria-hidden="true">
+          <div className="dd-failure-preview__field">
+            <span className="dd-failure-preview__label">어디서 출발해요?</span>
+            <div className="dd-failure-preview__value">
+              <span className="dd-skeleton" />
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 20 20"
+                fill="none"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M5.5 8L10 12.5 14.5 8" />
+              </svg>
+            </div>
+          </div>
+          <div className="dd-failure-preview__field">
+            <span className="dd-failure-preview__label">
+              언제 나가서 언제까지 돌아와요?
+            </span>
+            <div className="dd-failure-preview__value">
+              <span className="dd-skeleton" />
+            </div>
+          </div>
+        </div>
+        <p className="dd-screen__footnote">
+          이 화면은 시스템·데이터 쪽 문제예요. 조건에 맞는 곳이 없는 경우,
+          계획을 못 만든 경우, 음식점 목록만 못 받은 경우와는 다른 상태예요.
+        </p>
+      </main>
+    );
+  if (view === "no-result")
+    return (
+      <main className="dd-screen">
+        <Header />
+        <section className="dd-summary-card" aria-label="입력한 여행 조건">
+          <h1 className="dd-summary-card__title">
+            {"이번 조건에 맞는\n곳을 찾지 못했어요"}
+          </h1>
+          <ConditionChips input={input} />
+        </section>
+        <div className="dd-empty" aria-label="결과 없음">
+          <svg
+            width="96"
+            height="72"
+            viewBox="0 0 120 90"
+            fill="none"
+            stroke="var(--line-dashed)"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M12 22l32-10 32 10 32-10v56l-32 10-32-10-32 10z" />
+            <path d="M44 12v56M76 22v56" />
+            <path d="M52 44h16M60 36v16" stroke="var(--track-move)" />
+          </svg>
+          <p className="dd-empty__title">
+            왕복 시간 안에 들어오는 지역 중에서, 고른 관심사의 공식 분류
+            관광지가 3곳 이상인 곳을 찾지 못했어요.
+          </p>
+          <p className="dd-empty__note">
+            억지로 후보를 만들지 않고 그대로 알려드려요. 아래처럼 조건을 조금만
+            바꾸면 다시 찾아볼 수 있어요.
+          </p>
+        </div>
+        <ul className="dd-suggestions">
+          <li className="dd-suggestions__item">
+            {suggestionIconPlus}
+            관심사를 더 고르기 (예: 역사·문화)
+          </li>
+          <li className="dd-suggestions__item">
+            {suggestionIconClock}
+            복귀 시간을 늦춰보기
+          </li>
+          <li className="dd-suggestions__item">
+            {suggestionIconPin}
+            {input.originId === "seoul"
+              ? "부산광역시 출발로 바꿔보기"
+              : "서울특별시 출발로 바꿔보기"}
+          </li>
+        </ul>
+        <div className="dd-result-actions">
+          <Button variant="primary" onClick={() => setView("input")}>
+            조건 수정하기
+          </Button>
+        </div>
+        <p className="dd-screen__footnote">
+          이동시간은 국가교통DB 기반 일반 예상값이에요. 최소로 머물러야 하는
+          시간 기준은 아직 확정되지 않아, 이 화면의 판단 기준은 확정 후 달라질
+          수 있어요. 시스템·데이터 장애와는 다른 정상 상태예요.
+        </p>
       </main>
     );
   if (view === "no-itinerary" && selected && shortfall)
     return (
       <main className="dd-screen">
-        <Header />
+        <Header onBack={() => stopRun("candidates")} />
         <ConditionSummary input={input} destination={selected} />
         <section className="dd-no-itinerary" aria-label="일정 생성 불가">
           <svg
@@ -405,10 +770,16 @@ export default function Page() {
   if (view === "schedule" && selected && schedule)
     return (
       <main className="dd-screen">
-        <Header />
+        <Header onBack={() => setView("candidates")} />
         <h1 className="dd-screen__title">
           {selected.displayName} 참고용 여행 계획
         </h1>
+        <ConditionSummary
+          input={input}
+          destination={selected}
+          variant="itinerary"
+          fetchedAtLabel={listFetchedAt}
+        />
         {mealFailed ? (
           <MealFailureNotice
             destinationName={selected.displayName}
@@ -416,43 +787,41 @@ export default function Page() {
             retrying={mealRetrying}
             onRetry={retryMeals}
           />
-        ) : null}
-        {([1, 2] as const).map((day) => (
-          <section key={day} className="dd-summary-card">
-            <h2>{day}일차</h2>
-            {schedule
-              .filter((item) => item.day === day)
-              .map((item) => {
-                const isMeal = item.type === "점심" || item.type === "저녁";
-                const title =
-                  mealFailed && isMeal
-                    ? "식사 정보를 다시 불러오면 채워져요"
-                    : item.title;
-                return (
-                  <p key={`${item.day}-${item.time}-${item.type}`}>
-                    {item.time} · {item.type} · {title}
-                  </p>
-                );
-              })}
-          </section>
-        ))}
-        {mealFailed ? null : (
-          <section className="dd-summary-card">
-            <h2>식사 장소</h2>
-            {restaurants.map((restaurant) => (
-              <button
-                className="dd-button dd-button--secondary"
-                key={restaurant.contentId}
-                onClick={() => openRestaurant(restaurant)}
-              >
-                {restaurant.name}
-              </button>
-            ))}
+        ) : (
+          <section className="dd-plan-notice">
+            <span style={{ color: "var(--olive-ink)" }}>{iconCheck}</span>
+            <p>
+              1일차 08:00 출발, 2일차 20:00 복귀에 맞춰 점심·저녁 네 칸과 관광
+              네 곳을 배치했어요.
+            </p>
           </section>
         )}
-        <Button variant="secondary" onClick={() => setView("candidates")}>
-          다른 지역 보기
-        </Button>
+        {([1, 2] as const).map((day) => {
+          const heading = dayHeading(input.startAt, day === 1 ? 0 : 1);
+          return (
+            <div key={day}>
+              <p className="dd-day-heading">
+                {heading ? heading.date : `${day}일차`}
+                {heading ? <span>{heading.weekday}</span> : null}
+              </p>
+              <ScheduleTimeline
+                items={schedule}
+                day={day}
+                destination={selected}
+                restaurants={restaurants}
+                profileGeneratedAt={profileGeneratedAt}
+                listFetchedAt={listFetchedAt}
+                mealFailed={mealFailed}
+                onOpenRestaurant={openRestaurant}
+              />
+            </div>
+          );
+        })}
+        <p className="dd-screen__footnote">
+          이동시간과 체류시간은 국가교통DB·카테고리 기본값 기반 추정치예요.
+          여행지 안에서의 장소 사이 이동시간은 계산하거나 표시하지 않아요. 방문
+          전 운영·휴무·예약 정보를 다시 확인하세요.
+        </p>
         {openedRestaurant && detailState ? (
           <RestaurantDetailSheet
             restaurantName={openedRestaurant.name}
@@ -469,41 +838,113 @@ export default function Page() {
     return (
       <main className="dd-screen">
         <Header />
-        <h1 className="dd-screen__title">{origin.label}에서 갈 수 있는 곳</h1>
+        <ConditionSummary
+          input={input}
+          title={`${origin.label}에서\n갈 수 있는 곳`}
+        />
+        <div className="dd-list-head">
+          <span className="dd-list-head__count">
+            다녀올 수 있는 곳 {candidates.length}군데
+          </span>
+          <span className="dd-list-head__order">시간 적합순</span>
+        </div>
         <ol className="dd-candidates">
-          {candidates.map((candidate) => (
-            <li className="dd-candidate" key={candidate.regionId}>
-              <h2 className="dd-candidate__name">{candidate.displayName}</h2>
-              {candidate.name !== candidate.displayName ? (
-                <p className="dd-candidate__region">{candidate.name}</p>
-              ) : null}
-              <p>
-                왕복 일반 예상{" "}
-                {formatHoursAndMinutes((candidate.oneWayMinutes * 2) / 60)} ·
-                현지 이용 가능{" "}
-                {formatHoursAndMinutes(candidate.localMinutes / 60)}
-              </p>
-              <p>
-                관심사 {candidate.interestLabels.join(" · ")} · 관광지{" "}
-                {candidate.attractions.length}곳
-              </p>
-              <Button variant="primary" onClick={() => choose(candidate)}>
-                {candidate.displayName} 일정 보기
-              </Button>
-            </li>
-          ))}
+          {candidates.map((candidate, index) => {
+            const roundTrip =
+              Math.round((candidate.oneWayMinutes * 2) / 6) / 10;
+            const oneWay = candidate.oneWayMinutes;
+            const local = candidate.localMinutes;
+            const total = oneWay * 2 + local;
+            const movePercent = total > 0 ? (oneWay / total) * 100 : 0;
+            const best = index === 0;
+            return (
+              <li className="dd-candidate" key={candidate.regionId}>
+                {best ? (
+                  <span className="dd-candidate__best">가장 잘 맞아요</span>
+                ) : null}
+                <div
+                  className="dd-candidate__head"
+                  style={best ? { marginTop: 5 } : undefined}
+                >
+                  <h2 className="dd-candidate__name">
+                    {candidate.displayName}
+                  </h2>
+                  {candidate.name !== candidate.displayName ? (
+                    <span className="dd-candidate__region">
+                      {candidate.name}
+                    </span>
+                  ) : null}
+                </div>
+                <div className="dd-timebar">
+                  <div className="dd-timebar__track">
+                    <div
+                      className="dd-timebar__move"
+                      style={{ width: `${movePercent}%` }}
+                    />
+                    <div className="dd-timebar__stay" />
+                    <div
+                      className="dd-timebar__move"
+                      style={{ width: `${movePercent}%` }}
+                    />
+                  </div>
+                  <div className="dd-timebar__labels">
+                    <span>
+                      이동 {formatClockDuration(candidate.oneWayMinutes / 60)}
+                    </span>
+                    <span className="dd-timebar__stay-label">
+                      현지 이용 가능{" "}
+                      {formatHoursAndMinutes(candidate.localMinutes / 60)}
+                    </span>
+                    <span>
+                      이동 {formatClockDuration(candidate.oneWayMinutes / 60)}
+                    </span>
+                  </div>
+                </div>
+                <p className="dd-candidate__reason">
+                  {candidate.interestLabels.join("·")} 여행에 잘 맞고, 왕복 약{" "}
+                  {roundTrip}시간이라 이틀을 쓸 수 있어요.
+                </p>
+                <p className="dd-candidate__meta">
+                  관심사 {candidate.interestLabels.join(" · ")} · 관광지{" "}
+                  {candidate.attractions.length}곳
+                </p>
+                <div className="dd-tag-row">
+                  {candidate.attractions.slice(0, 3).map((attraction) => (
+                    <span className="dd-tag" key={attraction.contentId}>
+                      {attraction.title}
+                    </span>
+                  ))}
+                </div>
+                <Button
+                  variant={best ? "primary" : "secondary"}
+                  onClick={() => choose(candidate)}
+                >
+                  {best ? iconCheckSmall : null}
+                  {candidate.displayName} 일정 보기
+                </Button>
+              </li>
+            );
+          })}
         </ol>
-        <Button variant="secondary" onClick={() => setView("input")}>
-          조건 수정하기
-        </Button>
+        <div className="dd-result-actions">
+          <Button variant="secondary" onClick={() => setView("input")}>
+            조건 수정하기
+          </Button>
+        </div>
+        <p className="dd-screen__footnote">
+          왕복 이동시간은 국가교통DB 2024 기반 지역 간 자동차 일반 예상값이에요.
+          실시간 교통은 반영하지 않아요. 시간 안에 다녀오기 어려운 곳은 목록에
+          넣지 않았어요.
+        </p>
       </main>
     );
   return (
     <main className="dd-screen">
       <Header />
       <h1 className="dd-screen__title">
-        쓸 수 있는 시간을 알려주면
-        <br />갈 곳부터 골라줄게요
+        쓸 수 있는 시간을
+        <br />
+        알려주면 갈 곳부터 골라줄게요
       </h1>
       {visibleErrorCount > 0 ? (
         <div
@@ -539,7 +980,10 @@ export default function Page() {
       ) : null}
       <form onSubmit={search}>
         <div className="dd-screen__fields">
-          <FieldCard label="어디서 출발해요?">
+          <FieldCard
+            label="어디서 출발해요?"
+            hint="지금은 서울·부산 두 곳에서만 출발할 수 있어요."
+          >
             <SegmentedControl
               label="출발지"
               options={ORIGINS.map(({ id, label }) => ({ value: id, label }))}
@@ -551,6 +995,7 @@ export default function Page() {
           </FieldCard>
           <FieldCard
             label="언제 나가서 언제까지 돌아와요?"
+            hint="1박 2일 일정만 만들 수 있어요. 당일치기와 2박 이상은 아직 지원하지 않아요."
             errors={
               visibleErrors.tripDates
                 ? [
@@ -603,7 +1048,13 @@ export default function Page() {
           >
             <SegmentedControl
               label="이동수단"
-              options={[{ value: "car", label: "자차" }]}
+              options={[
+                {
+                  value: "car",
+                  label: "자차",
+                  icon: iconCar,
+                },
+              ]}
               value="car"
               onChange={() => undefined}
             />
@@ -638,29 +1089,123 @@ export default function Page() {
             </div>
           </FieldCard>
         </div>
-        <Button
-          type="submit"
-          variant="primary"
-          disabled={visibleErrorCount > 0}
-        >
-          갈 수 있는 곳 찾기
-        </Button>
-        {visibleErrorCount > 0 ? (
-          <p className="dd-button-note">
-            고쳐야 할 항목이 남아 있어 아직 찾을 수 없어요
-          </p>
-        ) : null}
+        <div className="dd-screen__actions">
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={visibleErrorCount > 0}
+          >
+            갈 수 있는 곳 찾기
+          </Button>
+          {visibleErrorCount > 0 ? (
+            <p className="dd-button-note">
+              고쳐야 할 항목이 남아 있어 아직 찾을 수 없어요
+            </p>
+          ) : null}
+        </div>
+        <p className="dd-screen__footnote">
+          이동시간은 국가교통DB 기반 지역 간 자동차 일반 예상값이에요. 실시간
+          교통 상황은 반영하지 않아요.
+        </p>
       </form>
     </main>
   );
 }
-function Header() {
+
+const suggestionIconPlus = (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 20 20"
+    fill="none"
+    stroke="var(--olive-ink)"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <circle cx="10" cy="10" r="7.2" />
+    <path d="M10 6.4v7.2M6.4 10h7.2" />
+  </svg>
+);
+const suggestionIconClock = (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 20 20"
+    fill="none"
+    stroke="var(--olive-ink)"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <circle cx="10" cy="10" r="7.2" />
+    <path d="M10 6.2V10l2.6 1.8" />
+  </svg>
+);
+const suggestionIconPin = (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 20 20"
+    fill="none"
+    stroke="var(--olive-ink)"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M10 17.2s5.6-5 5.6-9.2A5.6 5.6 0 0 0 4.4 8c0 4.2 5.6 9.2 5.6 9.2z" />
+    <circle cx="10" cy="8" r="2" />
+  </svg>
+);
+
+function Header({ onBack }: { onBack?: () => void }) {
   return (
     <div className="dd-screen__header">
-      <span className="dd-screen__logo">두루두루</span>
-      <span>1박 2일</span>
+      {onBack ? (
+        <button type="button" className="dd-screen__back" onClick={onBack}>
+          {iconBack}
+          추천 목록
+        </button>
+      ) : (
+        <span className="dd-screen__logo">두루두루</span>
+      )}
+      <span className="dd-screen__badge">1박 2일</span>
     </div>
   );
+}
+
+function ConditionChips({ input }: { input: typeof initial }) {
+  const originLabel =
+    ORIGINS.find((item) => item.id === input.originId)?.label ?? "출발지";
+  const interestLabels = input.interests.map(
+    (id) => INTERESTS.find((interest) => interest.id === id)?.label ?? id,
+  );
+  const start = formatTripMoment(input.startAt);
+  const end = formatTripMoment(input.returnBy);
+  return (
+    <div className="dd-summary-card__chips">
+      <span className="dd-pill">{originLabel} 출발</span>
+      <span className="dd-pill">
+        {start} → {end}
+      </span>
+      {interestLabels.map((label) => (
+        <span key={label} className="dd-pill dd-pill--interest">
+          {label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** "2026-09-12T08:00" → "9/12 08:00". 표시 전용 포맷이며 계산에 쓰지 않는다. */
+function formatTripMoment(value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2})/u.exec(value);
+  if (!match) return value || "미입력";
+  const [, , month, day, time] = match;
+  return `${Number(month)}/${Number(day)} ${time}`;
 }
 
 /* 진행 상태를 정상 안내 배너(--olive-soft/--olive)로 알린다. DESIGN_TOKENS.md 「로딩 상태」. */
@@ -767,6 +1312,183 @@ function SkeletonCandidateCard() {
   );
 }
 
+const categoryLabelById = new Map(
+  INTERESTS.map((interest) => [interest.id, interest.label] as const),
+);
+
+/*
+ * 참고 계획 타임라인. 엔진이 낸 ScheduleItem[]을 그대로 표시한다.
+ * 시안: design/screens/Itinerary.dc.html · MealDataFailure.dc.html.
+ * 규칙은 재판단하지 않는다. 여행지 내부 이동시간은 계산·표시하지 않는다.
+ */
+function ScheduleTimeline({
+  items,
+  day,
+  destination,
+  restaurants,
+  profileGeneratedAt,
+  listFetchedAt,
+  mealFailed,
+  onOpenRestaurant,
+}: {
+  items: ScheduleItem[];
+  day: 1 | 2;
+  destination: Candidate;
+  restaurants: Restaurant[];
+  profileGeneratedAt: string;
+  listFetchedAt: string;
+  mealFailed: boolean;
+  onOpenRestaurant: (restaurant: Restaurant) => void;
+}) {
+  const rows = items.filter((item) => item.day === day);
+  const profileBasis = profileGeneratedAt
+    ? ` · ${profileGeneratedAt} 지역 프로필`
+    : "";
+  const listBasis = listFetchedAt ? ` · ${listFetchedAt} 조회` : "";
+  const attractionCategory = new Map(
+    destination.attractions.map(
+      (attraction) => [attraction.title, attraction.categoryId] as const,
+    ),
+  );
+  return (
+    <ol className="dd-timeline">
+      {rows.map((item, index) => {
+        const last = index === rows.length - 1 && day === 2;
+        if (item.type === "이동") {
+          const depart = item.day === 1;
+          return (
+            <li className="dd-tl-row" key={`${item.day}-${item.time}-이동`}>
+              <div className="dd-tl-time">
+                <span className="dd-tl-time__label">{item.time}</span>
+                {last ? null : <span className="dd-tl-time__rail" />}
+              </div>
+              <div className="dd-tl-card">
+                <span className="dd-tl-head__label">
+                  {iconCar}
+                  {depart ? "이동" : "복귀 이동"}
+                </span>
+                <p className="dd-tl-title">{item.title}</p>
+                <p className="dd-tl-meta">
+                  {depart
+                    ? `국가교통DB 일반 예상 이동 약 ${formatHoursAndMinutes(
+                        destination.oneWayMinutes / 60,
+                      )} · 자차 기준`
+                    : `복귀 시각 ${item.time}에 맞춰 일반 예상 이동 약 ${formatHoursAndMinutes(
+                        destination.oneWayMinutes / 60,
+                      )}을 반영했어요`}
+                </p>
+              </div>
+            </li>
+          );
+        }
+        if (item.type === "관광") {
+          const label = categoryLabelById.get(
+            attractionCategory.get(item.title) ?? ("" as MvpCategoryId),
+          );
+          return (
+            <li className="dd-tl-row" key={`${item.day}-${item.time}-관광`}>
+              <div className="dd-tl-time">
+                <span className="dd-tl-time__label">{item.time}</span>
+                {last ? null : <span className="dd-tl-time__rail" />}
+              </div>
+              <div className="dd-tl-card dd-tl-card--stay">
+                <div className="dd-tl-head">
+                  <span className="dd-tl-head__label dd-tl-head__label--stay">
+                    {iconVisit}
+                    {label ? `방문 · ${label}` : "방문"}
+                  </span>
+                  <span className="dd-tl-head__dur">1시간</span>
+                </div>
+                <p className="dd-tl-title">{item.title}</p>
+                <p className="dd-tl-basis">
+                  TourAPI 공식 분류 관광지{profileBasis}
+                </p>
+              </div>
+            </li>
+          );
+        }
+        // 점심 · 저녁
+        const meal = restaurants.find(
+          (restaurant) => restaurant.name === item.title,
+        );
+        const unfilled =
+          mealFailed ||
+          !meal ||
+          item.title === "추천할 식당을 더 찾지 못했어요";
+        if (unfilled) {
+          return (
+            <li className="dd-tl-row" key={`${item.day}-${item.time}-식사`}>
+              <div className="dd-tl-time">
+                <span className="dd-tl-time__label">{item.time}</span>
+                {last ? null : <span className="dd-tl-time__rail" />}
+              </div>
+              <div className="dd-tl-card dd-tl-card--empty">
+                <span className="dd-tl-head__label">
+                  {iconMeal}
+                  {item.type} · 음식점
+                </span>
+                <p className="dd-tl-title dd-tl-title--muted">
+                  {mealFailed
+                    ? "식사 정보를 다시 불러오면 채워져요"
+                    : "추천할 식당을 더 찾지 못했어요"}
+                </p>
+                {mealFailed ? null : (
+                  <p className="dd-tl-basis">
+                    서로 다른 음식점을 4곳까지 확보하지 못해서 이 칸은 비워
+                    뒀어요. 임의·중복 식당은 넣지 않아요.
+                  </p>
+                )}
+              </div>
+            </li>
+          );
+        }
+        return (
+          <li className="dd-tl-row" key={`${item.day}-${item.time}-식사`}>
+            <div className="dd-tl-time">
+              <span className="dd-tl-time__label">{item.time}</span>
+              {last ? null : <span className="dd-tl-time__rail" />}
+            </div>
+            <button
+              type="button"
+              className="dd-tl-card dd-tl-card--stay"
+              onClick={() => onOpenRestaurant(meal)}
+            >
+              <div className="dd-tl-head">
+                <span className="dd-tl-head__label dd-tl-head__label--stay">
+                  {iconMeal}
+                  {item.type} · 음식점
+                </span>
+                <span className="dd-tl-head__dur">1시간</span>
+              </div>
+              <p className="dd-tl-title">{meal.name}</p>
+              <p className="dd-tl-basis">
+                TourAPI 목록에서 배정 · 콘텐츠 ID 순{listBasis}
+              </p>
+              <span className="dd-tl-affordance">
+                {iconChevronDown}
+                눌러서 운영시간·메뉴 확인
+              </span>
+            </button>
+          </li>
+        );
+      })}
+      {day === 1 ? (
+        <li className="dd-tl-row">
+          <div className="dd-tl-time">
+            <span className="dd-tl-time__label dd-tl-time__label--soft">
+              21:00
+            </span>
+          </div>
+          <div className="dd-tl-rest">
+            {iconMoon}
+            <span>21:00부터 다음날 07:00까지는 휴식 (관광·식사 없음)</span>
+          </div>
+        </li>
+      ) : null}
+    </ol>
+  );
+}
+
 type PreviewRow =
   | { key: string; kind: "이동"; title: string; meta?: string }
   | { key: string; kind: "관광"; title: string | null }
@@ -779,14 +1501,21 @@ const skeletonBody = (
   </>
 );
 
-function PlanPreviewRow({ row }: { row: PreviewRow }) {
+function PlanPreviewRow({
+  row,
+  showRail,
+}: {
+  row: PreviewRow;
+  showRail: boolean;
+}) {
+  let cardClass = "dd-timeline-row__card";
   let kindClass = "dd-timeline-row__kind";
   let kindLabel: string;
-  let stay: boolean;
+  let kindIcon: ReactNode = null;
   let body: ReactNode;
   if (row.kind === "이동") {
     kindLabel = "이동";
-    stay = false;
+    kindIcon = iconCar;
     body = (
       <>
         <p className="dd-timeline-row__title">{row.title}</p>
@@ -794,9 +1523,10 @@ function PlanPreviewRow({ row }: { row: PreviewRow }) {
       </>
     );
   } else if (row.kind === "관광") {
+    cardClass += " dd-timeline-row__card--stay";
     kindClass += " dd-timeline-row__kind--visit";
     kindLabel = "방문";
-    stay = true;
+    kindIcon = iconVisit;
     body = row.title ? (
       <>
         <p className="dd-timeline-row__title">{row.title}</p>
@@ -806,24 +1536,31 @@ function PlanPreviewRow({ row }: { row: PreviewRow }) {
       skeletonBody
     );
   } else {
+    cardClass += " dd-timeline-row__card--meal";
     kindClass += " dd-timeline-row__kind--meal";
     kindLabel = row.kind;
-    stay = true;
+    kindIcon = iconMeal;
     body = skeletonBody;
   }
   return (
     <div className="dd-timeline-row">
       <div className="dd-timeline-row__time">
         <div className="dd-skeleton" />
+        {showRail ? <span className="dd-timeline-row__rail" /> : null}
       </div>
-      <div
-        className={
-          stay
-            ? "dd-timeline-row__card dd-timeline-row__card--stay"
-            : "dd-timeline-row__card"
-        }
-      >
-        <span className={kindClass}>{kindLabel}</span>
+      <div className={cardClass}>
+        <span className={kindClass}>
+          <span
+            style={{
+              display: "inline-flex",
+              verticalAlign: "-3px",
+              marginRight: 6,
+            }}
+          >
+            {kindIcon}
+          </span>
+          {kindLabel}
+        </span>
         {body}
       </div>
     </div>
@@ -885,8 +1622,12 @@ function PlanPreview({
       {days.map(({ day, rows }) => (
         <div key={day} className="dd-plan-preview__group">
           <p className="dd-plan-preview__day">{day}일차</p>
-          {rows.map((row) => (
-            <PlanPreviewRow key={row.key} row={row} />
+          {rows.map((row, index) => (
+            <PlanPreviewRow
+              key={row.key}
+              row={row}
+              showRail={!(day === 2 && index === rows.length - 1)}
+            />
           ))}
         </div>
       ))}
