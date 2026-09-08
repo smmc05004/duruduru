@@ -36,6 +36,14 @@ type SearchResponse =
       kind: "input-error" | "no-results" | "data-error";
       message: string;
     };
+// 식사 정보 실패 배너에 적는 "시도 시각"용. 실시간 교통·조회 시각과 무관한 표시 전용.
+const kstClock = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
+
 const initial = {
   originId: "seoul" as MvpOriginId,
   startAt: "",
@@ -50,6 +58,11 @@ export default function Page() {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [selected, setSelected] = useState<Candidate | null>(null);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  // 음식점 목록 수집 실패(재시도 가능)와 "정상 응답인데 식당이 부족함"을 구분한다.
+  // mealFailed=true는 목록 API 장애·네트워크 오류로, 식사 섹션만 재시도 상태로 보인다.
+  const [mealFailed, setMealFailed] = useState(false);
+  const [mealRetrying, setMealRetrying] = useState(false);
+  const [mealAttemptAt, setMealAttemptAt] = useState("");
   const [schedule, setSchedule] = useState<ScheduleItem[] | null>(null);
   const [shortfall, setShortfall] = useState<ItineraryShortfall | null>(null);
   const [detail, setDetail] = useState<string | null>(null);
@@ -139,8 +152,14 @@ export default function Page() {
   }
   async function choose(candidate: Candidate) {
     setSelected(candidate);
+    setMealRetrying(false);
     const { runId, signal } = startRun();
     setView("restaurants");
+    // 음식점 목록 조회는 관광 일정 생성과 분리한다. 목록 API가 실패해도
+    // 목적지 추천·관광 계획은 유지하고 식사 섹션만 재시도 상태로 보인다.
+    // (docs/product/FOOD_DATA_POLICY.md·API_FETCH_FLOW.md 실패 처리 절)
+    let fetched: Restaurant[] = [];
+    let failed = false;
     try {
       const response = await fetch(
         `/api/destinations/${candidate.regionId}/restaurants`,
@@ -148,37 +167,65 @@ export default function Page() {
       );
       const result = await response.json();
       if (runIdRef.current !== runId) return;
-      if (result.kind !== "success") throw new Error(result.message);
-      setRestaurants(result.restaurants);
-      // 시간 경계 산술로 최소 시간표가 나오지 않으면 데이터 장애가 아니라
-      // 정상 예외(일정 생성 불가)로 보낸다. DESIGN_TOKENS.md 「결과 없음 · 일정 생성 불가 · 데이터 장애」.
-      const assessment = assessItinerary(input, candidate);
-      if (!assessment.feasible) {
-        setShortfall(assessment);
-        setView("no-itinerary");
-        return;
-      }
-      const items = createSchedule(input, candidate, result.restaurants);
-      if (!items) {
-        // assessment가 feasible이면 여기 오지 않지만, 방어적으로 정상 예외로 처리한다.
-        setShortfall({
-          reason: "이 조건으로는 겹치지 않는 최소 시간표를 만들지 못했어요.",
-          roundTripHours: Math.round((candidate.oneWayMinutes * 2) / 6) / 10,
-          days: [],
-        });
-        setView("no-itinerary");
-        return;
-      }
-      setSchedule(items);
-      setView("schedule");
-    } catch (error) {
+      // route.ts는 실패 시 kind:"data-error"(502), 정상이면 kind:"success"이며
+      // restaurants가 빈 배열일 수 있다. 전자만 재시도 대상으로 구분한다.
+      if (result.kind === "success")
+        fetched = result.restaurants as Restaurant[];
+      else failed = true;
+    } catch {
       if (runIdRef.current !== runId || signal.aborted) return;
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "음식점 목록을 불러오지 못했어요.",
+      failed = true;
+    }
+    // 시간 경계 산술로 최소 시간표가 나오지 않으면 데이터 장애가 아니라
+    // 정상 예외(일정 생성 불가)로 보낸다. DESIGN_TOKENS.md 「결과 없음 · 일정 생성 불가 · 데이터 장애」.
+    // 음식점 실패는 이 판정보다 뒤 단계다.
+    const assessment = assessItinerary(input, candidate);
+    if (!assessment.feasible) {
+      setShortfall(assessment);
+      setView("no-itinerary");
+      return;
+    }
+    const items = createSchedule(input, candidate, fetched);
+    if (!items) {
+      // assessment가 feasible이면 여기 오지 않지만, 방어적으로 정상 예외로 처리한다.
+      setShortfall({
+        reason: "이 조건으로는 겹치지 않는 최소 시간표를 만들지 못했어요.",
+        roundTripHours: Math.round((candidate.oneWayMinutes * 2) / 6) / 10,
+        days: [],
+      });
+      setView("no-itinerary");
+      return;
+    }
+    setRestaurants(fetched);
+    setMealFailed(failed);
+    if (failed) setMealAttemptAt(kstClock.format(new Date()));
+    setSchedule(items);
+    setView("schedule");
+  }
+  async function retryMeals() {
+    if (!selected) return;
+    const candidate = selected;
+    const { runId, signal } = startRun();
+    setMealRetrying(true);
+    try {
+      const response = await fetch(
+        `/api/destinations/${candidate.regionId}/restaurants`,
+        { signal },
       );
-      setView("error");
+      const result = await response.json();
+      if (runIdRef.current !== runId) return;
+      if (result.kind !== "success") throw new Error();
+      const fetched = result.restaurants as Restaurant[];
+      const items = createSchedule(input, candidate, fetched);
+      setRestaurants(fetched);
+      setMealFailed(false);
+      setMealRetrying(false);
+      if (items) setSchedule(items);
+    } catch {
+      if (runIdRef.current !== runId || signal.aborted) return;
+      setMealFailed(true);
+      setMealRetrying(false);
+      setMealAttemptAt(kstClock.format(new Date()));
     }
   }
   async function openRestaurant(restaurant: Restaurant) {
@@ -321,31 +368,48 @@ export default function Page() {
         <h1 className="dd-screen__title">
           {selected.displayName} 참고용 여행 계획
         </h1>
+        {mealFailed ? (
+          <MealFailureNotice
+            destinationName={selected.displayName}
+            attemptAt={mealAttemptAt}
+            retrying={mealRetrying}
+            onRetry={retryMeals}
+          />
+        ) : null}
         {([1, 2] as const).map((day) => (
           <section key={day} className="dd-summary-card">
             <h2>{day}일차</h2>
             {schedule
               .filter((item) => item.day === day)
-              .map((item) => (
-                <p key={`${item.time}-${item.title}`}>
-                  {item.time} · {item.type} · {item.title}
-                </p>
-              ))}
+              .map((item) => {
+                const isMeal = item.type === "점심" || item.type === "저녁";
+                const title =
+                  mealFailed && isMeal
+                    ? "식사 정보를 다시 불러오면 채워져요"
+                    : item.title;
+                return (
+                  <p key={`${item.day}-${item.time}-${item.type}`}>
+                    {item.time} · {item.type} · {title}
+                  </p>
+                );
+              })}
           </section>
         ))}
-        <section className="dd-summary-card">
-          <h2>식사 장소</h2>
-          {restaurants.map((restaurant) => (
-            <button
-              className="dd-button dd-button--secondary"
-              key={restaurant.contentId}
-              onClick={() => openRestaurant(restaurant)}
-            >
-              {restaurant.name}
-            </button>
-          ))}
-          {detail ? <p>{detail}</p> : null}
-        </section>
+        {mealFailed ? null : (
+          <section className="dd-summary-card">
+            <h2>식사 장소</h2>
+            {restaurants.map((restaurant) => (
+              <button
+                className="dd-button dd-button--secondary"
+                key={restaurant.contentId}
+                onClick={() => openRestaurant(restaurant)}
+              >
+                {restaurant.name}
+              </button>
+            ))}
+            {detail ? <p>{detail}</p> : null}
+          </section>
+        )}
         <Button variant="secondary" onClick={() => setView("candidates")}>
           다른 지역 보기
         </Button>
@@ -569,6 +633,66 @@ function ProgressNotice({ title, detail }: { title: string; detail?: string }) {
         <p>{title}</p>
         {detail ? <p className="dd-calculating__sub">{detail}</p> : null}
       </div>
+    </section>
+  );
+}
+
+/*
+ * 식사 정보 부분 실패 배너 (이슈 #55).
+ * 선택 지역의 음식점 목록만 못 받은 상태다. 추천 지역·관광 계획은 그대로 렌더하고
+ * 식사 섹션만 --alert 2px 실선으로 막는다. 상단 8px 띠·3px 이중 테두리는 쓰지 않는다
+ * (부분 실패이지 화면 전체 데이터 장애가 아님). DESIGN_TOKENS.md
+ * 「결과 없음 · 일정 생성 불가 · 식사 정보 실패 · 데이터 장애」.
+ */
+function MealFailureNotice({
+  destinationName,
+  attemptAt,
+  retrying,
+  onRetry,
+}: {
+  destinationName: string;
+  attemptAt: string;
+  retrying: boolean;
+  onRetry: () => void;
+}) {
+  return (
+    <section className="dd-meal-failure" role="alert">
+      <div className="dd-meal-failure__head">
+        <svg
+          className="dd-meal-failure__icon"
+          width="20"
+          height="20"
+          viewBox="0 0 20 20"
+          fill="none"
+          stroke="var(--alert)"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M10 3.2l7 12.4H3z" />
+          <path d="M10 7.8v3.4M10 13.6v.2" />
+        </svg>
+        <div>
+          <p className="dd-meal-failure__title">
+            식사 정보를 불러오지 못했어요
+          </p>
+          <p className="dd-meal-failure__text">
+            {destinationName} 음식점 목록을 받지 못해 점심·저녁을 채우지
+            못했어요. 추천 지역과 관광 계획은 그대로예요. 임의 음식점으로
+            대체하지 않았어요.
+            {attemptAt ? ` (${attemptAt} 시도)` : ""}
+          </p>
+        </div>
+      </div>
+      <button
+        type="button"
+        className="dd-button dd-button--recover"
+        onClick={onRetry}
+        disabled={retrying}
+      >
+        {retrying ? "식사 정보 다시 불러오는 중" : "식사 정보 다시 불러오기"}
+      </button>
     </section>
   );
 }
