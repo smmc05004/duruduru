@@ -5,6 +5,7 @@ import {
   buildMapSearchUrl,
   holidayWarningForVisit,
   overviewPreview,
+  retainVisitInfoForAttractions,
 } from "@/lib/attraction-visit-info";
 
 const attraction = (contentId: string): Attraction => ({
@@ -193,6 +194,58 @@ describe("E3 방문 정보 요청 조정기", () => {
     expect(coordinator.current(attraction("later")).status).toBe(
       "not-requested",
     );
+  });
+
+  it("부모 취소로 건너뛴 대기 항목을 제거해 다음 시도가 새 요청이 된다", async () => {
+    let releaseActive!: () => void;
+    const active = new Promise<void>((resolve) => (releaseActive = resolve));
+    const fetcher = jest.fn(async (item: Attraction) => {
+      if (item.contentId === "A") await active;
+      return { kind: "success" as const, detail: detail() };
+    });
+    const coordinator = new AttractionVisitInfoCoordinator(fetcher);
+    const first = coordinator.request(attraction("A"), "manual");
+    const parent = new AbortController();
+    const cancelled = coordinator.request(
+      attraction("B"),
+      "manual",
+      parent.signal,
+    );
+    parent.abort();
+    releaseActive();
+    await first;
+    await expect(cancelled).rejects.toThrow("cancelled");
+
+    await expect(
+      coordinator.request(attraction("B"), "manual"),
+    ).resolves.toMatchObject({
+      status: "ready",
+    });
+    expect(fetcher.mock.calls.map(([item]) => item.contentId)).toEqual([
+      "A",
+      "B",
+    ]);
+  });
+
+  it("계획 편집은 유지된 관광지의 완료 방문 정보를 보존하고 삭제된 정보만 제거한다", () => {
+    const retained = attraction("retained");
+    const removed = attraction("removed");
+    const entries = {
+      [`${retained.contentId}:${retained.contentTypeId}`]: {
+        status: "ready" as const,
+        detail: detail("매주 월요일 휴무"),
+      },
+      [`${removed.contentId}:${removed.contentTypeId}`]: {
+        status: "partial" as const,
+        detail: detail(),
+      },
+      "loading:12": { status: "loading" as const },
+    };
+
+    expect(retainVisitInfoForAttractions(entries, [retained])).toEqual({
+      [`${retained.contentId}:${retained.contentTypeId}`]:
+        entries[`${retained.contentId}:${retained.contentTypeId}`],
+    });
   });
 
   it("안전한 지도 링크, 소개 축약 및 KST 단일 요일 휴무만 경고한다", () => {
