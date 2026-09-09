@@ -174,7 +174,17 @@ function blocks(
       return false;
     ids.add(b.id);
     previous = to;
-    if (b.fixedStartAt !== undefined && parseLocalDate(b.fixedStartAt) === null)
+    const localMidnight =
+      Math.floor((start + 540 * 60_000) / 86_400_000) * 86_400_000 -
+      540 * 60_000;
+    const activityStart =
+      localMidnight + (b.day - 1) * 86_400_000 + 420 * 60_000;
+    const activityEnd =
+      localMidnight + (b.day - 1) * 86_400_000 + 1260 * 60_000;
+    if (
+      b.fixedStartAt !== undefined &&
+      (parseLocalDate(b.fixedStartAt) === null || b.fixedStartAt !== b.startAt)
+    )
       return false;
     if (b.kind === "attraction") {
       if (
@@ -204,6 +214,9 @@ function blocks(
       )
         return false;
     } else if (b.personal !== undefined) return false;
+    if (b.kind === "attraction" || b.kind === "personal") {
+      if (from < activityStart || to > activityEnd) return false;
+    } else if (b.fixedStartAt !== undefined) return false;
     if (b.kind === "meal") {
       if (
         (b.mealScope !== "local" && b.mealScope !== "transit") ||
@@ -557,10 +570,35 @@ function storageError(
 }
 function migratedV2(value: unknown): PlanSnapshot | null {
   if (!object(value) || value.schemaVersion !== 2) return null;
+  const withoutUnexpectedTimeLock = (block: unknown) => {
+    if (!object(block)) return block;
+    const legacy = { ...block };
+    delete legacy.fixedStartAt;
+    return legacy;
+  };
+  const destination = object(value.destination)
+    ? {
+        ...value.destination,
+        preview: object(value.destination.preview)
+          ? {
+              ...value.destination.preview,
+              blocks: Array.isArray(value.destination.preview.blocks)
+                ? value.destination.preview.blocks.map(
+                    withoutUnexpectedTimeLock,
+                  )
+                : value.destination.preview.blocks,
+            }
+          : value.destination.preview,
+      }
+    : value.destination;
   const next = {
     ...value,
     schemaVersion: 3,
     itineraryRuleVersion: "e4-v1",
+    destination,
+    blocks: Array.isArray(value.blocks)
+      ? value.blocks.map(withoutUnexpectedTimeLock)
+      : value.blocks,
   } as unknown;
   return isSavedPlan(next) ? next : null;
 }

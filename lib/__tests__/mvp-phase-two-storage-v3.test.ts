@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "@jest/globals";
 import { createPlan, scheduleTrip } from "@/lib/mvp-phase-two-planner";
 import {
   deleteSavedPlan,
+  isSavedPlan,
   readSavedPlans,
   savePlan,
 } from "@/lib/mvp-phase-two-storage";
@@ -78,6 +79,61 @@ describe("E4 v3 저장 이관", () => {
     expect(savePlan(migrated.plans[0]).error).toBeUndefined();
     expect(localStorage.getItem("duruduru.plans.v2")).not.toBeNull();
     expect(readSavedPlans().plans[0].schemaVersion).toBe(3);
+  });
+
+  it("v2의 예기치 않은 시각 고정 필드는 이관하면서 제거한다", () => {
+    const plan = savedPlan();
+    const v2 = { ...plan, schemaVersion: 2, savedAt: "2026-09-01T00:00:00Z" };
+    delete (v2 as Partial<typeof v2>).itineraryRuleVersion;
+    const first = v2.blocks.find((block) => block.kind === "attraction")!;
+    first.fixedStartAt = "2026-09-12T21:00";
+    localStorage.setItem(
+      "duruduru.plans.v2",
+      JSON.stringify({ version: 2, plans: [v2] }),
+    );
+    const migrated = readSavedPlans();
+    expect(
+      migrated.plans[0].blocks.find((block) => block.id === first.id)
+        ?.fixedStartAt,
+    ).toBeUndefined();
+  });
+
+  it("손상된 v3 활동 시각 고정·낮 범위는 저장본 전체를 거절한다", () => {
+    const plan = savedPlan();
+    const activity = plan.blocks.find((block) => block.kind === "attraction")!;
+    const badTimeLock = {
+      ...plan,
+      savedAt: "2026-09-01T00:00:00Z",
+      blocks: plan.blocks.map((block) =>
+        block.id === activity.id
+          ? { ...block, fixedStartAt: "2026-09-12T14:00" }
+          : block,
+      ),
+    };
+    expect(isSavedPlan(badTimeLock)).toBe(false);
+    const night = {
+      ...badTimeLock,
+      blocks: badTimeLock.blocks.map((block) =>
+        block.id === activity.id
+          ? {
+              ...block,
+              startAt: "2026-09-12T21:00",
+              endAt: "2026-09-12T22:00",
+              fixedStartAt: "2026-09-12T21:00",
+            }
+          : block,
+      ),
+    };
+    expect(isSavedPlan(night)).toBe(false);
+  });
+
+  it("숙소 메모를 저장·복원한다", () => {
+    const plan = {
+      ...savedPlan(),
+      accommodation: { name: "한옥", address: "공주", note: "문 앞에 주차" },
+    };
+    expect(savePlan(plan).error).toBeUndefined();
+    expect(readSavedPlans().plans[0].accommodation).toEqual(plan.accommodation);
   });
 
   it("빈 v3과 손상 v3은 v2를 다시 수입해 삭제한 계획을 부활시키지 않는다", () => {
