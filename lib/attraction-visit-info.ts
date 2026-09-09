@@ -24,7 +24,6 @@ const RETRY_COOLDOWN_MS = 30_000;
 const ITEM_TIMEOUT_MS = 12_000;
 const WHOLE_TIMEOUT_MS = 28_000;
 const MAX_AUTOMATIC_ITEMS = 6;
-const MAX_MANUAL_ATTEMPTS = 2;
 
 export const visitInfoKey = (
   attraction: Pick<Attraction, "contentId" | "contentTypeId">,
@@ -34,6 +33,13 @@ type CacheEntry = VisitInfoEntry & { expiresAt: number };
 type InFlight = {
   promise: Promise<VisitInfoEntry>;
   controller: AbortController;
+  identity: symbol;
+};
+type QueuedRequest = InFlight & {
+  attraction: Attraction;
+  mode: "automatic" | "manual";
+  resolve: (entry: VisitInfoEntry) => void;
+  reject: (error: Error) => void;
 };
 
 /**
@@ -44,10 +50,10 @@ type InFlight = {
 export class AttractionVisitInfoCoordinator {
   private readonly cache = new Map<string, CacheEntry>();
   private readonly inFlight = new Map<string, InFlight>();
-  private readonly failures = new Map<
-    string,
-    { attempts: number; failedAt: number }
-  >();
+  private readonly failures = new Map<string, { failedAt: number }>();
+  private readonly queued: QueuedRequest[] = [];
+  private readonly automaticControllers = new Set<AbortController>();
+  private active: QueuedRequest | null = null;
   private readonly now: () => number;
   private readonly itemTimeoutMs: number;
   private readonly wholeTimeoutMs: number;
@@ -75,7 +81,25 @@ export class AttractionVisitInfoCoordinator {
   }
 
   cancelAll() {
-    for (const { controller } of this.inFlight.values()) controller.abort();
+    for (const controller of this.automaticControllers) controller.abort();
+    for (const job of this.queued.splice(0)) {
+      job.controller.abort();
+      if (
+        this.inFlight.get(visitInfoKey(job.attraction))?.identity ===
+        job.identity
+      )
+        this.inFlight.delete(visitInfoKey(job.attraction));
+      job.reject(new Error("cancelled"));
+    }
+    if (this.active) {
+      const job = this.active;
+      job.controller.abort();
+      if (
+        this.inFlight.get(visitInfoKey(job.attraction))?.identity ===
+        job.identity
+      )
+        this.inFlight.delete(visitInfoKey(job.attraction));
+    }
   }
 
   async request(
@@ -90,17 +114,54 @@ export class AttractionVisitInfoCoordinator {
     if (shared) return shared.promise;
 
     const previousFailure = this.failures.get(key);
-    if (mode === "manual" && previousFailure) {
-      if (this.now() - previousFailure.failedAt < RETRY_COOLDOWN_MS)
-        throw new Error("cooldown");
-      if (previousFailure.attempts >= MAX_MANUAL_ATTEMPTS)
-        throw new Error("retry-limit");
-    }
+    if (
+      previousFailure &&
+      this.now() - previousFailure.failedAt < RETRY_COOLDOWN_MS
+    )
+      throw new Error("cooldown");
     const controller = new AbortController();
     const abortForParent = () => controller.abort();
     parentSignal?.addEventListener("abort", abortForParent, { once: true });
-    const timeout = setTimeout(() => controller.abort(), this.itemTimeoutMs);
-    const promise = this.fetcher(attraction, controller.signal)
+    const identity = Symbol(key);
+    let resolve!: (entry: VisitInfoEntry) => void;
+    let reject!: (error: Error) => void;
+    const promise = new Promise<VisitInfoEntry>((done, failed) => {
+      resolve = done;
+      reject = failed;
+    }).finally(() =>
+      parentSignal?.removeEventListener("abort", abortForParent),
+    );
+    const job: QueuedRequest = {
+      attraction,
+      mode,
+      controller,
+      identity,
+      promise,
+      resolve,
+      reject,
+    };
+    this.inFlight.set(key, job);
+    this.queued.push(job);
+    this.runNext();
+    return promise;
+  }
+
+  private runNext() {
+    if (this.active) return;
+    const job = this.queued.shift();
+    if (!job) return;
+    if (job.controller.signal.aborted) {
+      job.reject(new Error("cancelled"));
+      this.runNext();
+      return;
+    }
+    this.active = job;
+    const key = visitInfoKey(job.attraction);
+    const timeout = setTimeout(
+      () => job.controller.abort(),
+      this.itemTimeoutMs,
+    );
+    void this.fetcher(job.attraction, job.controller.signal)
       .then((response) => {
         const entry: CacheEntry = {
           status: response.kind === "success" ? "ready" : "partial",
@@ -112,22 +173,19 @@ export class AttractionVisitInfoCoordinator {
         };
         this.cache.set(key, entry);
         this.failures.delete(key);
-        return entry;
+        job.resolve(entry);
       })
-      .catch((error: unknown) => {
-        if (mode === "manual") {
-          const attempts = (previousFailure?.attempts ?? 0) + 1;
-          this.failures.set(key, { attempts, failedAt: this.now() });
-        }
-        throw error;
+      .catch(() => {
+        this.failures.set(key, { failedAt: this.now() });
+        job.reject(new Error("unavailable"));
       })
       .finally(() => {
         clearTimeout(timeout);
-        parentSignal?.removeEventListener("abort", abortForParent);
-        this.inFlight.delete(key);
+        if (this.inFlight.get(key)?.identity === job.identity)
+          this.inFlight.delete(key);
+        if (this.active?.identity === job.identity) this.active = null;
+        this.runNext();
       });
-    this.inFlight.set(key, { promise, controller });
-    return promise;
   }
 
   async automatically(
@@ -136,9 +194,14 @@ export class AttractionVisitInfoCoordinator {
     onChange?: (attraction: Attraction, entry: VisitInfoEntry) => void,
   ) {
     const controller = new AbortController();
+    this.automaticControllers.add(controller);
+    let wholeTimedOut = false;
     const stop = () => controller.abort();
     parentSignal?.addEventListener("abort", stop, { once: true });
-    const timeout = setTimeout(() => controller.abort(), this.wholeTimeoutMs);
+    const timeout = setTimeout(() => {
+      wholeTimedOut = true;
+      controller.abort();
+    }, this.wholeTimeoutMs);
     const unique = Array.from(
       new Map(
         attractions.map((attraction) => [visitInfoKey(attraction), attraction]),
@@ -160,16 +223,18 @@ export class AttractionVisitInfoCoordinator {
           );
           onChange?.(attraction, entry);
         } catch {
-          if (!controller.signal.aborted)
+          if (!controller.signal.aborted || wholeTimedOut)
             onChange?.(attraction, {
               status: "unavailable",
               message: "방문 정보를 불러오지 못했어요. 방문 전 확인해 주세요.",
             });
+          if (controller.signal.aborted) break;
         }
       }
     } finally {
       clearTimeout(timeout);
       parentSignal?.removeEventListener("abort", stop);
+      this.automaticControllers.delete(controller);
     }
   }
 }

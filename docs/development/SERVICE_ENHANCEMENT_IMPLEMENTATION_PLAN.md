@@ -37,10 +37,10 @@
 - Jest: 호출 수/동시성/12초·28초/캐시 만료·공유·재시도, 부분/오류/시간 초과, stale 결과 차단, 저장 복원 무요청, Type1·안전 HTML/URL, KST 단일 요일 휴무를 검증한다.
 - 통합 Jest: 검색과 E1/E2 실제 엔진을 실행하고 음식·관광 상세 원천만 제한 mock해 선택 후 계획 유지와 비차단 상세 보강을 검증한다.
 - 브라우저·품질: Playwright UI 확인, `npm run verify`, `npm run test:e2e`, `npm run cycle`을 실행한다. 기존 stale `app/__tests__/page.test.tsx` 전체 Jest 실패는 삭제·약화하지 않고 기준선 한계로 분리 기록한다.
-- 로컬 증거: `lib/__tests__/attraction-visit-info.test.ts`, `lib/__tests__/mvp-phase-two-flow-e3.test.ts` 5건 통과. 최대 6개 순차 보강·공유/부분 캐시·수동 재시도 쿨다운·항목 timeout/stale 중단·KST 휴무·안전 지도 URL과 실제 검색→계획→음식 Route Handler→프로필 소속 관광 상세 2원천 정규화를 확인했다. `npm run typecheck`, `git diff --check`도 통과했다.
-- 브라우저: `E2E_PORT=3100 npm run test:e2e -- e2e/home.spec.ts` 5건 통과. 실제 검색 엔진에서 목적지를 선택한 뒤에만 방문정보를 보강하고, 검색 중 상세 호출 0회·안전한 지도 링크 표시를 확인했다. 개발 환경 React Strict Mode가 첫 effect를 취소한 뒤 자동 보강을 영구 생략하던 문제를 수정하고 동일 시나리오로 재검증했다.
+- 로컬 증거: `lib/__tests__/attraction-visit-info.test.ts`, `components/mvp-phase-two/__tests__/AttractionVisitInfo.test.tsx`, `lib/__tests__/mvp-phase-two-flow-e3.test.ts` 9건 통과. 최대 6개 순차 보강·같은/서로 다른 항목의 공통 직렬 큐·공유/부분 캐시·auto/manual 공통 쿨다운·항목/전체 timeout·취소 뒤 예약 중단·StrictMode abort 재시작·KST 휴무·안전 지도 URL·상세 실패 주소 도구를 확인했다. 실제 검색→계획→음식 Route Handler→프로필 소속 관광 상세 2원천 정규화도 포함한다. `npm run typecheck`, `git diff --check`도 통과했다.
+- 브라우저: `E2E_PORT=3105 npm run test:e2e -- e2e/home.spec.ts` 5건 통과. 실제 검색/E1·E2 엔진에서 목적지를 선택한 뒤에만 방문정보를 보강하고, 검색 중 상세 호출 0회·안전한 지도 링크 표시를 확인했다. 개발 환경 React Strict Mode가 첫 effect를 취소한 뒤 자동 보강을 영구 생략하던 문제와 실제 계획 관광지 0개 fixture를 수정하고 동일 시나리오로 재검증했다.
 - `npm run verify`: 통과. format·lint·typecheck·production build를 포함한다. 기존 `scripts/build-region-profile.mjs`의 미사용 변수 ESLint 경고 2건은 유지된다.
-- 전체 Jest: 98건 통과, 19건 실패. 실패는 기존 `app/__tests__/page.test.tsx`가 제거된 PoC-era select·loader props를 전제해 현 `TripPlanner` UI 계약과 맞지 않는 기준선 문제다. E3에서 해당 테스트를 삭제·약화하거나 통과로 처리하지 않았다.
+- 전체 Jest: 102건 통과, 19건 실패. 실패는 기존 `app/__tests__/page.test.tsx`가 제거된 PoC-era select·loader props를 전제해 현 `TripPlanner` UI 계약과 맞지 않는 기준선 문제다. E3에서 해당 테스트를 삭제·약화하거나 통과로 처리하지 않았다.
 - 실제 API 한계: 실 TourAPI 키·외부 호출 성공은 검증 근거로 삼지 않았다. 기존 Route Handler의 서버 키·프로필 소속 검증을 유지하고, 제한 mock으로 success/partial/오류를 재현했다.
 - PR 증거: 커밋/PR/CI 확인 후 번호와 결과를 추가한다.
 

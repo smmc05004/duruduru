@@ -124,6 +124,8 @@ export function TripPlanner() {
   const mealSequence = useRef(0);
   const visitGeneration = useRef(0);
   const automaticVisitPlan = useRef<string | null>(null);
+  const visitWorkController = useRef<AbortController | null>(null);
+  const latestPlanId = useRef<string | null>(null);
   const automaticVisitSnapshot = useRef<{
     planId: string;
     attractions: Attraction[];
@@ -141,6 +143,17 @@ export function TripPlanner() {
     }),
   );
   const closeDetail = useCallback(() => setSelected(null), []);
+  useEffect(() => {
+    latestPlanId.current = plan?.id ?? null;
+  }, [plan?.id]);
+  function cancelVisitInfo(preserveAutomaticPlan = false) {
+    ++visitGeneration.current;
+    visitWorkController.current?.abort();
+    visitWorkController.current = null;
+    visitCoordinator.current.cancelAll();
+    if (!preserveAutomaticPlan) automaticVisitPlan.current = null;
+    setVisitInfo({});
+  }
   const planId = plan?.id;
   useEffect(() => {
     const snapshot = automaticVisitSnapshot.current;
@@ -149,7 +162,9 @@ export function TripPlanner() {
     automaticVisitPlan.current = planId;
     const current = ++visitGeneration.current;
     const controller = new AbortController();
-    void visitCoordinator.current.automatically(
+    const coordinator = visitCoordinator.current;
+    visitWorkController.current = controller;
+    void coordinator.automatically(
       snapshot.attractions,
       controller.signal,
       (attraction, entry) => {
@@ -162,6 +177,9 @@ export function TripPlanner() {
     );
     return () => {
       controller.abort();
+      coordinator.cancelAll();
+      if (visitWorkController.current === controller)
+        visitWorkController.current = null;
       // In development React may mount this effect, clean it up, then mount it
       // again. Do not let the aborted first attempt permanently suppress the
       // second attempt for this plan.
@@ -172,17 +190,26 @@ export function TripPlanner() {
   function requestVisitInfo(
     attraction: NonNullable<PlanSnapshot["blocks"][number]["attraction"]>,
   ) {
-    const currentPlanId = plan?.id;
+    const currentPlanId = latestPlanId.current;
+    const currentGeneration = visitGeneration.current;
     const key = visitInfoKey(attraction);
     setVisitInfo((previous) => ({ ...previous, [key]: { status: "loading" } }));
     void visitCoordinator.current
       .request(attraction, "manual")
       .then((entry) => {
-        if (plan?.id !== currentPlanId) return;
+        if (
+          latestPlanId.current !== currentPlanId ||
+          visitGeneration.current !== currentGeneration
+        )
+          return;
         setVisitInfo((previous) => ({ ...previous, [key]: entry }));
       })
       .catch(() => {
-        if (plan?.id !== currentPlanId) return;
+        if (
+          latestPlanId.current !== currentPlanId ||
+          visitGeneration.current !== currentGeneration
+        )
+          return;
         setVisitInfo((previous) => ({
           ...previous,
           [key]: {
@@ -195,12 +222,16 @@ export function TripPlanner() {
   function requestAllVisitInfo() {
     if (!plan) return;
     const current = ++visitGeneration.current;
+    visitWorkController.current?.abort();
+    visitCoordinator.current.cancelAll();
+    const controller = new AbortController();
+    visitWorkController.current = controller;
     const attractions = plan.blocks.flatMap((block) =>
       block.attraction ? [block.attraction] : [],
     );
     void visitCoordinator.current.automatically(
       attractions,
-      undefined,
+      controller.signal,
       (attraction, entry) => {
         if (visitGeneration.current !== current) return;
         setVisitInfo((previous) => ({
@@ -294,9 +325,7 @@ export function TripPlanner() {
     }
     const current = ++generation.current;
     setPlan(null);
-    ++visitGeneration.current;
-    visitCoordinator.current.cancelAll();
-    setVisitInfo({});
+    cancelVisitInfo();
     clearMeals();
     setSelected(null);
     setMessage("");
@@ -324,9 +353,7 @@ export function TripPlanner() {
       id: crypto.randomUUID(),
     };
     ++generation.current;
-    ++visitGeneration.current;
-    visitCoordinator.current.cancelAll();
-    setVisitInfo({});
+    cancelVisitInfo();
     automaticVisitSnapshot.current = {
       planId: next.id,
       attractions: next.blocks.flatMap((block) =>
@@ -348,6 +375,7 @@ export function TripPlanner() {
       setMessage(result.reason);
       return;
     }
+    cancelVisitInfo(true);
     setPlan(result.plan);
     setMessage(
       command.type === "toggle-fixed"
@@ -379,9 +407,7 @@ export function TripPlanner() {
       return;
     }
     ++generation.current;
-    ++visitGeneration.current;
-    visitCoordinator.current.cancelAll();
-    setVisitInfo({});
+    cancelVisitInfo();
     automaticVisitSnapshot.current = null;
     search.reset();
     setPlan(saved);
@@ -432,9 +458,7 @@ export function TripPlanner() {
       !!meals.data?.failedRegionIds.length);
   function showInput() {
     ++generation.current;
-    ++visitGeneration.current;
-    visitCoordinator.current.cancelAll();
-    setVisitInfo({});
+    cancelVisitInfo();
     search.reset();
     clearMeals();
     setPlan(null);
@@ -446,9 +470,7 @@ export function TripPlanner() {
   }
   function showCandidates() {
     ++generation.current;
-    ++visitGeneration.current;
-    visitCoordinator.current.cancelAll();
-    setVisitInfo({});
+    cancelVisitInfo();
     setPlan(null);
     clearMeals();
     setSelected(null);
