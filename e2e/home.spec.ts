@@ -283,11 +283,17 @@ test("날짜 이동은 대상 날짜의 삽입 위치를 키보드 선택으로 
   await page.goto("/");
   await fillRequired(page);
   await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
+  const results = page.getByRole("region", { name: "목적지 추천" });
+  await results
+    .getByRole("button", { name: /일정 보기$/ })
+    .first()
+    .click();
   const plan = page.getByRole("region", { name: "여행 계획" });
+  await expect(plan).toBeVisible();
   await page
     .locator("details.p2-edit-tools")
     .first()
-    .getByRole("button", { name: "방문 수정" })
+    .locator("summary")
     .click();
   const insertion = plan.getByLabel(/삽입 위치/).first();
   await expect(insertion).toBeVisible();
@@ -317,7 +323,13 @@ test("숙소 메모는 야간 휴식에 보이고 저장 후 불러오기에도 
   await page.goto("/");
   await fillRequired(page);
   await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
+  const results = page.getByRole("region", { name: "목적지 추천" });
+  await results
+    .getByRole("button", { name: /일정 보기$/ })
+    .first()
+    .click();
   const plan = page.getByRole("region", { name: "여행 계획" });
+  await expect(plan).toBeVisible();
   await plan.getByRole("button", { name: "숙소 메모" }).click();
   const editor = page.getByRole("region", { name: "숙소 메모" });
   await editor.getByRole("textbox").nth(0).fill("한옥 숙소");
