@@ -114,6 +114,87 @@ describe("E3 방문 정보 요청 조정기", () => {
     expect(slow).toHaveBeenCalledTimes(2);
   });
 
+  it("자동 A와 수동 B/C도 하나의 직렬 큐를 공유하고 취소 뒤 예약 항목을 시작하지 않는다", async () => {
+    let active = 0;
+    let peak = 0;
+    const started: string[] = [];
+    let release!: () => void;
+    const hold = new Promise<void>((resolve) => (release = resolve));
+    const coordinator = new AttractionVisitInfoCoordinator(async (item) => {
+      active += 1;
+      peak = Math.max(peak, active);
+      started.push(item.contentId);
+      await hold;
+      active -= 1;
+      return { kind: "success" as const, detail: detail() };
+    });
+    const automatic = coordinator.automatically([
+      attraction("A"),
+      attraction("D"),
+    ]);
+    const manualB = coordinator.request(attraction("B"), "manual");
+    const manualC = coordinator.request(attraction("C"), "manual");
+    coordinator.cancelAll();
+    release();
+    await Promise.allSettled([automatic, manualB, manualC]);
+    expect(peak).toBe(1);
+    expect(started).toEqual(["A"]);
+  });
+
+  it("취소 없이도 자동 A와 수동 B/C를 모두 하나씩 완료해 source 동시성 2를 넘지 않는다", async () => {
+    let active = 0;
+    let peak = 0;
+    const started: string[] = [];
+    const coordinator = new AttractionVisitInfoCoordinator(async (item) => {
+      active += 1;
+      peak = Math.max(peak, active);
+      started.push(item.contentId);
+      await Promise.resolve();
+      active -= 1;
+      return { kind: "success" as const, detail: detail() };
+    });
+    const automatic = coordinator.automatically([
+      attraction("A"),
+      attraction("D"),
+    ]);
+    const manualB = coordinator.request(attraction("B"), "manual");
+    const manualC = coordinator.request(attraction("C"), "manual");
+    await Promise.all([automatic, manualB, manualC]);
+    expect(peak).toBe(1);
+    expect(started).toEqual(["A", "B", "C", "D"]);
+  });
+
+  it("취소된 StrictMode 요청은 새 요청과 공유하지 않고, whole timeout은 현재 항목을 재시도 가능 상태로 남긴다", async () => {
+    const fetcher = jest.fn(
+      (_item: Attraction, signal: AbortSignal) =>
+        new Promise<never>((_, reject) =>
+          signal.addEventListener("abort", () => reject(new Error("aborted")), {
+            once: true,
+          }),
+        ),
+    );
+    const coordinator = new AttractionVisitInfoCoordinator(fetcher, {
+      wholeTimeoutMs: 5,
+      itemTimeoutMs: 50,
+    });
+    const first = coordinator.request(attraction("strict"), "automatic");
+    coordinator.cancelAll();
+    const second = coordinator.request(attraction("strict"), "manual");
+    await Promise.allSettled([first, second]);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+
+    const states: string[] = [];
+    await coordinator.automatically(
+      [attraction("whole"), attraction("later")],
+      undefined,
+      (_, entry) => states.push(entry.status),
+    );
+    expect(states).toEqual(["loading", "unavailable"]);
+    expect(coordinator.current(attraction("later")).status).toBe(
+      "not-requested",
+    );
+  });
+
   it("안전한 지도 링크, 소개 축약 및 KST 단일 요일 휴무만 경고한다", () => {
     expect(
       buildMapSearchUrl("서울 <script>alert(1)</script>", "관광지"),

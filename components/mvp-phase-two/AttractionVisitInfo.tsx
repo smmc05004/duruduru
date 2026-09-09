@@ -131,35 +131,32 @@ export function AttractionVisitInfo({
               확인하거나 장소를 바꿔 주세요.
             </p>
           ) : null}
-          <p className="p2-visit-info__address">
-            <strong>주소</strong> ·{" "}
-            {hasAddress ? address : "주소가 없어 이름으로 지도에서 찾아요."}
-          </p>
-          <div className="p2-actions">
-            {hasAddress ? (
-              <button className="p2-control" onClick={() => void copyAddress()}>
-                주소 복사
-              </button>
-            ) : null}
-            <a
-              className="p2-control"
-              href={buildMapSearchUrl(
-                hasAddress ? address : "",
-                attraction.title,
-              )}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              지도에서 장소 찾기
-            </a>
-          </div>
-          {copyMessage ? <p role="status">{copyMessage}</p> : null}
           <p className="p2-muted">
             TourAPI 상세 · {detail.fetchedAt} 조회. 운영 정보는 방문 전 확인해
             주세요.
           </p>
         </div>
       ) : null}
+      <p className="p2-visit-info__address">
+        <strong>주소</strong> ·{" "}
+        {hasAddress ? address : "주소가 없어 이름으로 지도에서 찾아요."}
+      </p>
+      <div className="p2-actions">
+        {hasAddress ? (
+          <button className="p2-control" onClick={() => void copyAddress()}>
+            주소 복사
+          </button>
+        ) : null}
+        <a
+          className="p2-control"
+          href={buildMapSearchUrl(hasAddress ? address : "", attraction.title)}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          지도에서 장소 찾기
+        </a>
+      </div>
+      {copyMessage ? <p role="status">{copyMessage}</p> : null}
     </section>
   );
 }
