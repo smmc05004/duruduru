@@ -73,7 +73,11 @@ export function AttractionVisitInfo({
         <p role="status">{entry.message ?? "제공 정보 없음 · 방문 전 확인"}</p>
       ) : null}
       {entry.status === "not-requested" || entry.status === "unavailable" ? (
-        <button className="p2-control" onClick={onRequest}>
+        <button
+          className="p2-control"
+          onClick={onRequest}
+          disabled={entry.reason === "limit"}
+        >
           방문정보 확인
         </button>
       ) : null}

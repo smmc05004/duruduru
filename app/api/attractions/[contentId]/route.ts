@@ -36,18 +36,8 @@ export async function GET(
       { status: 404 },
     );
   const [common, intro] = await Promise.allSettled([
-    requestTourApi(
-      "detailCommon2",
-      {
-        contentId,
-        contentTypeId,
-        defaultYN: "Y",
-        firstImageYN: "Y",
-        addrinfoYN: "Y",
-        overviewYN: "Y",
-      },
-      request.signal,
-    ),
+    // Common detail accepts contentId; type is validated above and sent to intro.
+    requestTourApi("detailCommon2", { contentId }, request.signal),
     requestTourApi(
       "detailIntro2",
       { contentId, contentTypeId },

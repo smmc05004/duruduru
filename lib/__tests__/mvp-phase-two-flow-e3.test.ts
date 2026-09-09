@@ -75,15 +75,27 @@ describe("E3 실제 검색 → 계획 → 음식 → 제한 상세 흐름", () =
     expect(visit).toBeDefined();
     if (!visit) return;
     requestTourApi.mockClear();
-    const detailResponse = await attraction(
-      new Request(
-        `http://localhost/api/attractions/${visit.contentId}?contentTypeId=${visit.contentTypeId}`,
-      ),
-      { params: Promise.resolve({ contentId: visit.contentId }) },
+    const detailRequest = new Request(
+      `http://localhost/api/attractions/${visit.contentId}?contentTypeId=${visit.contentTypeId}`,
     );
+    const detailResponse = await attraction(detailRequest, {
+      params: Promise.resolve({ contentId: visit.contentId }),
+    });
     const detail = await detailResponse.json();
     expect(detailResponse.status).toBe(200);
     expect(requestTourApi).toHaveBeenCalledTimes(2);
+    // KorService2 common accepts contentId alone; intro still requires type.
+    expect(
+      requestTourApi.mock.calls.map(([endpoint, params]) => [endpoint, params]),
+    ).toEqual([
+      ["detailCommon2", { contentId: visit.contentId }],
+      [
+        "detailIntro2",
+        { contentId: visit.contentId, contentTypeId: visit.contentTypeId },
+      ],
+    ]);
+    for (const call of requestTourApi.mock.calls)
+      expect(call[2]).toBe(detailRequest.signal);
     expect(detail).toMatchObject({
       kind: "success",
       detail: {
@@ -91,5 +103,22 @@ describe("E3 실제 검색 → 계획 → 음식 → 제한 상세 흐름", () =
         image: { license: "Type1", source: "한국관광공사 TourAPI" },
       },
     });
+  });
+
+  it("지원하지 않는 유형과 프로필 밖 ID는 외부 상세를 호출하지 않는다", async () => {
+    requestTourApi.mockClear();
+    for (const [contentId, contentTypeId, status] of [
+      ["809190", "39", 400],
+      ["999999999999", "12", 404],
+    ] as const) {
+      const response = await attraction(
+        new Request(
+          `http://localhost/api/attractions/${contentId}?contentTypeId=${contentTypeId}`,
+        ),
+        { params: Promise.resolve({ contentId }) },
+      );
+      expect(response.status).toBe(status);
+    }
+    expect(requestTourApi).not.toHaveBeenCalled();
   });
 });

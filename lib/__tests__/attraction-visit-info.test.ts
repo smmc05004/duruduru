@@ -40,6 +40,206 @@ const detail = (closedDays = "") => ({
 });
 
 describe("E3 방문 정보 요청 조정기", () => {
+  it("취소를 무시하는 원천 뒤 수동 예약도 12초에 끝나며 미시작 예약은 예산을 쓰지 않는다", async () => {
+    jest.useFakeTimers();
+    try {
+      let release!: () => void;
+      const held = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const fetcher = jest.fn(async (item: Attraction) => {
+        if (item.contentId === "held") await held;
+        throw new Error("offline");
+      });
+      const coordinator = new AttractionVisitInfoCoordinator(fetcher);
+      const first = coordinator.request(attraction("held"), "manual");
+      const firstTimeout = expect(first).rejects.toThrow("timeout");
+      await jest.advanceTimersByTimeAsync(12_000);
+      await firstTimeout;
+      await jest.advanceTimersByTimeAsync(31_000);
+      const queued = coordinator.request(attraction("queued"), "manual");
+      const queuedTimeout = expect(queued).rejects.toThrow("timeout");
+      await jest.advanceTimersByTimeAsync(12_000);
+      // The original transport is still unresolved at this assertion.
+      await queuedTimeout;
+      expect(fetcher).toHaveBeenCalledTimes(1);
+      release();
+      await jest.advanceTimersByTimeAsync(0);
+      expect(fetcher).toHaveBeenCalledTimes(1);
+      await expect(
+        coordinator.request(attraction("queued"), "manual"),
+      ).rejects.toThrow("unavailable");
+      await jest.advanceTimersByTimeAsync(30_000);
+      await expect(
+        coordinator.request(attraction("queued"), "manual"),
+      ).rejects.toThrow("unavailable");
+      expect(fetcher).toHaveBeenCalledTimes(3);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("취소를 무시하는 원천도 12초에 UI를 해제하고 늦은 응답을 버린다", async () => {
+    jest.useFakeTimers();
+    try {
+      let release!: () => void;
+      const held = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const coordinator = new AttractionVisitInfoCoordinator(async () => {
+        await held;
+        return { kind: "success", detail: detail() };
+      });
+      const request = coordinator.request(attraction("late"), "manual");
+      const assertion = expect(request).rejects.toThrow("timeout");
+      await jest.advanceTimersByTimeAsync(12_000);
+      await assertion;
+      release();
+      await jest.advanceTimersByTimeAsync(0);
+      expect(coordinator.current(attraction("late"))).toEqual({
+        status: "not-requested",
+      });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("28초가 지나면 예약 자동 요청을 즉시 해제하고 시작 못한 다음 장소는 미조회로 둔다", async () => {
+    jest.useFakeTimers();
+    try {
+      let release!: () => void;
+      const held = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const fetcher = jest.fn(async () => {
+        await held;
+        return { kind: "success" as const, detail: detail() };
+      });
+      const coordinator = new AttractionVisitInfoCoordinator(fetcher, {
+        itemTimeoutMs: 60_000,
+      });
+      const manual = coordinator.request(attraction("held"), "manual");
+      const states: string[] = [];
+      const automatic = coordinator.automatically(
+        [attraction("queued"), attraction("never")],
+        undefined,
+        (_, entry) => states.push(entry.status),
+      );
+      await jest.advanceTimersByTimeAsync(28_000);
+      await automatic;
+      expect(states).toEqual(["loading", "not-requested"]);
+      expect(coordinator.current(attraction("never"))).toEqual({
+        status: "not-requested",
+      });
+      expect(fetcher).toHaveBeenCalledTimes(1);
+      release();
+      await manual;
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("같은 계획 재열기·취소는 수동 2회 예산을 보존하고 새 계획만 분리한다", async () => {
+    let now = 0;
+    const fetcher = jest.fn(async () => {
+      throw new Error("offline");
+    });
+    const coordinator = new AttractionVisitInfoCoordinator(fetcher, {
+      now: () => now,
+    });
+    coordinator.usePlan("saved-plan");
+    await expect(
+      coordinator.request(attraction("a"), "manual"),
+    ).rejects.toThrow("unavailable");
+    await expect(
+      coordinator.request(attraction("a"), "manual"),
+    ).rejects.toThrow("cooldown");
+    now += 30_000;
+    coordinator.cancelAll();
+    coordinator.usePlan("saved-plan");
+    await expect(
+      coordinator.request(attraction("a"), "manual"),
+    ).rejects.toThrow("unavailable");
+    now += 30_000;
+    await expect(
+      coordinator.request(attraction("a"), "manual"),
+    ).rejects.toThrow("limit");
+    coordinator.usePlan("new-plan");
+    await expect(
+      coordinator.request(attraction("a"), "manual"),
+    ).rejects.toThrow("unavailable");
+    coordinator.usePlan("saved-plan");
+    await expect(
+      coordinator.request(attraction("a"), "manual"),
+    ).rejects.toThrow("limit");
+    expect(fetcher).toHaveBeenCalledTimes(3);
+  });
+
+  it("전체 확인 반복과 취소로 자동 재시도·6항목 예산을 충전하지 않는다", async () => {
+    let now = 0;
+    const fetcher = jest.fn(async () => {
+      throw new Error("offline");
+    });
+    const coordinator = new AttractionVisitInfoCoordinator(fetcher, {
+      now: () => now,
+    });
+    const items = Array.from({ length: 8 }, (_, i) => attraction(String(i)));
+    await coordinator.automatically(items);
+    coordinator.cancelAll();
+    await coordinator.automatically(items.slice(2));
+    now += 31_000;
+    await coordinator.automatically(items);
+    expect(fetcher).toHaveBeenCalledTimes(6);
+    await expect(coordinator.request(items[0], "manual")).rejects.toThrow(
+      "unavailable",
+    );
+    now += 30_000;
+    await expect(coordinator.request(items[0], "manual")).rejects.toThrow(
+      "unavailable",
+    );
+    now += 30_000;
+    await expect(coordinator.request(items[0], "manual")).rejects.toThrow(
+      "limit",
+    );
+    expect(fetcher).toHaveBeenCalledTimes(8);
+  });
+
+  it("시작 전 취소된 예약은 예산을 소비하지 않고 늦은 성공은 캐시를 오염시키지 않는다", async () => {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const fetcher = jest.fn(async (item: Attraction) => {
+      if (item.contentId === "held") await held;
+      return { kind: "success" as const, detail: detail() };
+    });
+    const coordinator = new AttractionVisitInfoCoordinator(fetcher);
+    const started = coordinator.request(attraction("held"), "manual");
+    const parent = new AbortController();
+    const queued = coordinator.request(
+      attraction("queued"),
+      "manual",
+      parent.signal,
+    );
+    parent.abort();
+    coordinator.cancelAll();
+    await expect(started).rejects.toThrow("cancelled");
+    await expect(queued).rejects.toThrow("cancelled");
+    // Keep the transport slot until an abort-ignoring fetcher actually settles.
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    release();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(coordinator.current(attraction("held"))).toEqual({
+      status: "not-requested",
+    });
+    await expect(
+      coordinator.request(attraction("queued"), "manual"),
+    ).resolves.toMatchObject({ status: "ready" });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
   it("서로 다른 계획 관광지 최대 6개를 순차 보강하고 진행 요청을 클릭과 공유한다", async () => {
     let active = 0;
     let peak = 0;
@@ -184,6 +384,7 @@ describe("E3 방문 정보 요청 조정기", () => {
     await Promise.allSettled([first, second]);
     expect(fetcher).toHaveBeenCalledTimes(2);
 
+    coordinator.usePlan("whole-timeout-plan");
     const states: string[] = [];
     await coordinator.automatically(
       [attraction("whole"), attraction("later")],

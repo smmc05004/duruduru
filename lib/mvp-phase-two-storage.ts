@@ -8,6 +8,7 @@ import type {
   TimeBlock,
 } from "./mvp-phase-two-types";
 import { INTERESTS } from "./mvp-phase-two-types";
+import { planTimeError } from "./plan-time-constraints";
 import {
   localRestIntervals,
   tripMealWindows,
@@ -291,7 +292,7 @@ export function isSavedPlan(value: unknown): value is PlanSnapshot {
       !validDate(value.updatedAt) ||
       !validDate(value.savedAt) ||
       typeof value.edited !== "boolean" ||
-      value.itineraryRuleVersion !== "e4-v1" ||
+      !["e4-v1", "e4-v2"].includes(String(value.itineraryRuleVersion)) ||
       !candidate(value.destination) ||
       !metrics(value.metrics) ||
       (value.accommodation !== undefined &&
@@ -397,6 +398,10 @@ export function isSavedPlan(value: unknown): value is PlanSnapshot {
     const arrival = timestamp(value.metrics.arrivalAt),
       departure = timestamp(value.metrics.returnDepartureAt);
     return (
+      !planTimeError(
+        value as unknown as PlanSnapshot,
+        value.itineraryRuleVersion === "e4-v2",
+      ) &&
       arrival >= start &&
       departure <= end &&
       arrival <= departure &&
@@ -553,7 +558,7 @@ function snapshot(plan: PlanSnapshot): PlanSnapshot {
     },
     blocks: plan.blocks.map(cleanBlock),
     metrics: cleanMetrics(plan.metrics),
-    itineraryRuleVersion: "e4-v1",
+    itineraryRuleVersion: plan.itineraryRuleVersion,
     accommodation: plan.accommodation
       ? {
           name: plan.accommodation.name,
@@ -643,27 +648,42 @@ export function readSavedPlans(): StoredResult {
   }
 }
 function writeV3(plans: PlanSnapshot[]): StoredResult {
-  const container = {
-    version: 3,
-    migratedFromV2: localStorage.getItem(STORAGE_KEY_V2) !== null,
-    plans,
-  };
+  let previous: string | null = null;
+  let writeAttempted = false;
   try {
-    localStorage.setItem(STORAGE_KEY_V3, JSON.stringify(container));
+    const container = {
+      version: 3,
+      migratedFromV2: localStorage.getItem(STORAGE_KEY_V2) !== null,
+      plans,
+    };
+    previous = localStorage.getItem(STORAGE_KEY_V3);
+    const expected = JSON.stringify(container);
+    writeAttempted = true;
+    localStorage.setItem(STORAGE_KEY_V3, expected);
     const confirmation = localStorage.getItem(STORAGE_KEY_V3);
-    if (!confirmation)
-      return storageError(
-        "저장 공간이 부족하거나 저장소가 차단되어 저장하지 못했어요.",
-      );
+    if (confirmation !== expected)
+      throw new Error("storage confirmation mismatch");
     const checked = parseContainer(confirmation, 3);
     if (checked.error || checked.plans.length !== plans.length)
-      return storageError(
-        "저장 내용을 확인하지 못했어요. 기존 저장 정보는 보존했어요.",
-      );
+      throw new Error("storage validation failed");
     return checked;
   } catch {
+    if (!writeAttempted)
+      return storageError(
+        "저장소가 차단되어 변경하지 못했어요. 기존 저장 정보는 유지돼요.",
+      );
+    try {
+      if (previous === null) localStorage.removeItem(STORAGE_KEY_V3);
+      else localStorage.setItem(STORAGE_KEY_V3, previous);
+      if (localStorage.getItem(STORAGE_KEY_V3) !== previous)
+        throw new Error("rollback failed");
+    } catch {
+      return storageError(
+        "저장과 이전 정보 복구를 확인하지 못했어요. 현재 계획을 유지한 채 저장소 설정을 확인해 주세요.",
+      );
+    }
     return storageError(
-      "저장 공간이 부족하거나 저장소가 차단되어 저장하지 못했어요.",
+      "저장 내용을 확인하지 못했어요. 기존 저장 정보는 보존했어요.",
     );
   }
 }

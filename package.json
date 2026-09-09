@@ -15,6 +15,7 @@
     "format:check": "prettier --check .",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "jest --passWithNoTests",
+    "test:enhancement": "jest --runInBand --testPathPatterns='mvp-phase-two|attraction-visit-info|AttractionVisitInfo|activity-placement|enhancement-'",
     "test:e2e": "playwright test",
     "setup:e2e": "playwright install chromium",
     "verify": "npm run check:agent-harness && npm run format:check && npm run lint && npm run typecheck && npm run build",
