@@ -879,6 +879,13 @@ function editedAvailability(plan: PlanSnapshot, day: 1 | 2): MinuteInterval[] {
 function activityStart(block: EditableActivity, input: SearchInput) {
   return blockMinute(input, block.startAt);
 }
+function compareMinuteArrays(left: number[], right: number[]): number {
+  for (let index = 0; index < left.length; index++) {
+    const difference = left[index] - right[index];
+    if (difference) return difference;
+  }
+  return 0;
+}
 function arrangeDay(
   plan: PlanSnapshot,
   activities: EditableActivity[],
@@ -926,7 +933,7 @@ function arrangeDay(
         (retained === best.retained &&
           (movement < best.movement ||
             (movement === best.movement &&
-              starts.join(",") < best.starts.join(","))))
+              compareMinuteArrays(starts, best.starts) < 0)))
       )
         best = { slots: new Map(slots), retained, movement, starts };
       return;
@@ -937,6 +944,7 @@ function arrangeDay(
       : null;
     const candidates: Array<{ start: number; interval: number }> = [];
     for (const interval of available) {
+      if (previous && interval.index < previous.interval) continue;
       const requiredStart = Math.max(
         interval.start,
         previous && previous.interval === interval.index
@@ -944,7 +952,21 @@ function arrangeDay(
           : interval.start,
       );
       const preferred = activityStart(activity, plan.input);
-      const starts = fixed === null ? [preferred, requiredStart] : [fixed];
+      const nextFixedBoundaries = activities
+        .slice(index + 1)
+        .flatMap((next) =>
+          next.fixedStartAt
+            ? [
+                blockMinute(plan.input, next.fixedStartAt) -
+                  activity.durationMinutes -
+                  15,
+              ]
+            : [],
+        );
+      const starts =
+        fixed === null
+          ? [preferred, requiredStart, ...nextFixedBoundaries]
+          : [fixed];
       for (const start of starts)
         if (
           start >= requiredStart &&

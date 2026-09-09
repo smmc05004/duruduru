@@ -260,3 +260,76 @@ test("선택한 계획에 개인 일정을 추가해도 음식점 조회를 다�
   await expect(plan).toContainText("친구와 만남");
   expect(restaurantCalls).toBe(1);
 });
+
+test("날짜 이동은 대상 날짜의 삽입 위치를 키보드 선택으로 지정한다", async ({
+  page,
+}) => {
+  await page.route("**/api/phase-two/restaurants", async (route) => {
+    await route.fulfill({
+      json: {
+        kind: "success",
+        restaurants: [],
+        queriedRegionIds: [],
+        failedRegionIds: [],
+        truncated: false,
+        fetchedAt: "2026-09-09T00:00:00.000Z",
+        message: "",
+      },
+    });
+  });
+  await page.route("**/api/attractions/**", async (route) => {
+    await route.fulfill({ status: 503, body: "unavailable" });
+  });
+  await page.goto("/");
+  await fillRequired(page);
+  await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
+  const plan = page.getByRole("region", { name: "여행 계획" });
+  await page
+    .locator("details.p2-edit-tools")
+    .first()
+    .getByRole("button", { name: "방문 수정" })
+    .click();
+  const insertion = plan.getByLabel(/삽입 위치/).first();
+  await expect(insertion).toBeVisible();
+  await insertion.selectOption("0");
+  await expect(insertion).toHaveValue("0");
+});
+
+test("숙소 메모는 야간 휴식에 보이고 저장 후 불러오기에도 남는다", async ({
+  page,
+}) => {
+  await page.route("**/api/phase-two/restaurants", async (route) => {
+    await route.fulfill({
+      json: {
+        kind: "success",
+        restaurants: [],
+        queriedRegionIds: [],
+        failedRegionIds: [],
+        truncated: false,
+        fetchedAt: "2026-09-09T00:00:00.000Z",
+        message: "",
+      },
+    });
+  });
+  await page.route("**/api/attractions/**", async (route) => {
+    await route.fulfill({ status: 503, body: "unavailable" });
+  });
+  await page.goto("/");
+  await fillRequired(page);
+  await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
+  const plan = page.getByRole("region", { name: "여행 계획" });
+  await plan.getByRole("button", { name: "숙소 메모" }).click();
+  const editor = page.getByRole("region", { name: "숙소 메모" });
+  await editor.getByRole("textbox").nth(0).fill("한옥 숙소");
+  await editor.getByRole("textbox").nth(1).fill("공주 시내");
+  await editor.getByRole("textbox").nth(2).fill("문 앞에 주차");
+  await editor.getByRole("button", { name: "숙소 메모 저장" }).click();
+  await expect(plan).toContainText("한옥 숙소");
+  await plan.getByRole("button", { name: "이 기기에 저장" }).click();
+  await page.reload();
+  await page.getByRole("button", { name: "저장한 여행" }).click();
+  await page.getByRole("button", { name: "불러오기" }).click();
+  await expect(page.getByRole("region", { name: "여행 계획" })).toContainText(
+    "한옥 숙소",
+  );
+});

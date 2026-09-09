@@ -115,6 +115,7 @@ export function TripPlanner() {
   const [savedPlans, setSavedPlans] = useState<PlanSnapshot[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [movePosition, setMovePosition] = useState<Record<string, number>>({});
   const [adding, setAdding] = useState<"attraction" | "personal" | null>(null);
   const [personalDraft, setPersonalDraft] = useState<{
     name: string;
@@ -1279,6 +1280,19 @@ export function TripPlanner() {
                         {block.fixed ? (
                           <span className="p2-fixed">장소 고정됨</span>
                         ) : null}
+                        {block.kind === "rest" && plan.accommodation ? (
+                          <div className="p2-accommodation-note">
+                            <strong>
+                              숙소 메모 · {plan.accommodation.name}
+                            </strong>
+                            {plan.accommodation.address ? (
+                              <p>{plan.accommodation.address}</p>
+                            ) : null}
+                            {plan.accommodation.note ? (
+                              <p>{plan.accommodation.note}</p>
+                            ) : null}
+                          </div>
+                        ) : null}
                         {block.kind === "meal" &&
                         block.mealScope === "local" &&
                         !block.restaurant ? (
@@ -1394,6 +1408,39 @@ export function TripPlanner() {
                               >
                                 아래로 이동
                               </button>
+                              <label className="p2-duration">
+                                {block.day === 1 ? "2일차" : "1일차"} 삽입 위치
+                                <select
+                                  aria-label={`${block.title} ${block.day === 1 ? "2일차" : "1일차"} 삽입 위치`}
+                                  value={movePosition[block.id] ?? 0}
+                                  onChange={(event) =>
+                                    setMovePosition((previous) => ({
+                                      ...previous,
+                                      [block.id]: Number(event.target.value),
+                                    }))
+                                  }
+                                >
+                                  {Array.from(
+                                    {
+                                      length:
+                                        plan.blocks.filter(
+                                          (candidate) =>
+                                            (candidate.kind === "attraction" ||
+                                              candidate.kind === "personal") &&
+                                            candidate.day ===
+                                              (block.day === 1 ? 2 : 1),
+                                        ).length + 1,
+                                    },
+                                    (_, position) => (
+                                      <option key={position} value={position}>
+                                        {position === 0
+                                          ? "맨 앞"
+                                          : `${position}번째 뒤`}
+                                      </option>
+                                    ),
+                                  )}
+                                </select>
+                              </label>
                               <button
                                 className="p2-control"
                                 onClick={() =>
@@ -1401,7 +1448,7 @@ export function TripPlanner() {
                                     type: "move-activity",
                                     blockId: block.id,
                                     day: block.day === 1 ? 2 : 1,
-                                    position: 0,
+                                    position: movePosition[block.id] ?? 0,
                                   })
                                 }
                               >
