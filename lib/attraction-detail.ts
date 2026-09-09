@@ -9,6 +9,13 @@ export type NormalizedAttractionDetail = {
   fees: DetailTextField;
   phone: DetailTextField;
   imageUrl: string;
+  /** Present only when the response confirms an approved Type1 TourAPI image. */
+  image?: {
+    license: "Type1";
+    source: "한국관광공사 TourAPI";
+    sourceUrl: "https://www.data.go.kr/data/15101578/openapi.do";
+    fetchedAt: string;
+  };
   fetchedAt: string;
 };
 
@@ -64,6 +71,7 @@ export function normalizeAttractionDetail(
   fallback: { title: string; address: string },
   fetchedAt: string,
 ): NormalizedAttractionDetail {
+  const imageUrl = licensedTourImage(common);
   return {
     title: field(common.title, fallback.title),
     address: field(
@@ -90,7 +98,15 @@ export function normalizeAttractionDetail(
       intro.infocenterculture,
       intro.infocenterleports,
     ),
-    imageUrl: licensedTourImage(common),
+    imageUrl,
+    image: imageUrl
+      ? {
+          license: "Type1",
+          source: "한국관광공사 TourAPI",
+          sourceUrl: "https://www.data.go.kr/data/15101578/openapi.do",
+          fetchedAt,
+        }
+      : undefined,
     fetchedAt,
   };
 }

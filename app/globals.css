@@ -444,6 +444,37 @@ button {
 .p2-fixed {
   display: inline-block;
 }
+.p2-visit-info {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line-dashed);
+}
+.p2-visit-info__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--olive-ink);
+  font-size: 12px;
+}
+.p2-visit-info__head span {
+  color: var(--ink-faint);
+  font-size: 11px;
+}
+.p2-visit-info__body > p {
+  margin: 8px 0;
+}
+.p2-visit-info__warning {
+  padding: 9px 10px;
+  border: 1px solid var(--alert);
+  background: var(--alert-soft);
+  color: var(--alert-ink);
+}
+.p2-visit-info a.p2-control {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
 .p2-edit-tools {
   margin-top: 8px;
   border-top: 1px dashed var(--line-dashed);

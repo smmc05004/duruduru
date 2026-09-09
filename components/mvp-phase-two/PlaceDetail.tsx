@@ -2,9 +2,10 @@
 
 import { useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { tripApi, apiMessage } from "@/lib/mvp-phase-two-client";
+import { tripApi } from "@/lib/mvp-phase-two-client";
 import type { Attraction, Restaurant } from "@/lib/mvp-phase-two-types";
 import type { NormalizedAttractionDetail } from "@/lib/attraction-detail";
+import type { VisitInfoEntry } from "@/lib/attraction-visit-info";
 import type {
   DetailTextField,
   NormalizedRestaurantDetail,
@@ -43,9 +44,13 @@ function Field({
 export function PlaceDetail({
   selected,
   onClose,
+  attractionEntry,
+  onRequestAttraction,
 }: {
   selected: SelectedPlace;
   onClose: () => void;
+  attractionEntry?: VisitInfoEntry;
+  onRequestAttraction?: () => void;
 }) {
   const panel = useRef<HTMLDivElement>(null);
   const contentId = selected.place.contentId;
@@ -75,6 +80,7 @@ export function PlaceDetail({
       };
     },
     staleTime: 0,
+    enabled: selected.kind === "restaurant",
   });
   useEffect(() => {
     if (selected.kind !== "attraction") return;
@@ -133,8 +139,10 @@ export function PlaceDetail({
         onClose={onClose}
       />
     );
-  const detail =
-    query.data?.kind === "attraction" ? query.data.detail : undefined;
+  const detail = attractionEntry?.detail;
+  const attractionLoading = attractionEntry?.status === "loading";
+  const attractionUnavailable = attractionEntry?.status === "unavailable";
+  const attractionNotRequested = attractionEntry?.status === "not-requested";
   return (
     <div className="dd-sheet-overlay">
       <button
@@ -158,31 +166,35 @@ export function PlaceDetail({
         <p className="dd-sheet__region">
           {selected.place.address || "제공 주소 없음"}
         </p>
-        {query.isFetching ? (
+        {attractionLoading ? (
           <div className="dd-detail-fields" role="status">
             <p>관광지 정보를 불러오고 있어요</p>
             <div className="p2-loading-line dd-skeleton" aria-hidden="true" />
             <div className="p2-loading-line dd-skeleton" aria-hidden="true" />
           </div>
-        ) : query.isError ? (
+        ) : attractionUnavailable || attractionNotRequested ? (
           <div className="dd-sheet__error" role="alert">
-            <p>{apiMessage(query.error)}</p>
+            <p>
+              {attractionNotRequested
+                ? "아직 방문 정보를 불러오지 않았어요."
+                : (attractionEntry?.message ?? "제공 정보 없음 · 방문 전 확인")}
+            </p>
             <button
               className="dd-button p2-retry"
-              onClick={() => void query.refetch()}
+              onClick={onRequestAttraction}
             >
               상세 다시 시도
             </button>
           </div>
         ) : detail ? (
           <>
-            {query.data?.kind === "attraction" && query.data.partial ? (
+            {attractionEntry?.status === "partial" ? (
               <p className="p2-notice" role="status">
                 일부 정보만 가져왔어요. 제공되지 않은 항목은 방문 전 확인해
                 주세요.
               </p>
             ) : null}
-            {detail.imageUrl ? (
+            {detail.imageUrl && detail.image?.license === "Type1" ? (
               <figure className="p2-detail-photo">
                 {/* TourAPI Type1 확인 사진만 서버가 반환한다. */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -192,7 +204,7 @@ export function PlaceDetail({
                   loading="lazy"
                 />
                 <figcaption>
-                  사진: 한국관광공사 TourAPI · 공공누리 제1유형
+                  {detail.image.source} · 공공누리 제1유형
                 </figcaption>
               </figure>
             ) : null}

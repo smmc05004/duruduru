@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useRef, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/Button";
@@ -11,6 +17,7 @@ import { SegmentedControl } from "@/components/SegmentedControl";
 import {
   INTERESTS,
   ORIGINS,
+  type Attraction,
   type Candidate,
   type EditCommand,
   type PlanSnapshot,
@@ -37,12 +44,18 @@ import {
   type RestaurantResponse,
 } from "@/lib/mvp-phase-two-client";
 import {
+  AttractionVisitInfoCoordinator,
+  type VisitInfoEntry,
+  visitInfoKey,
+} from "@/lib/attraction-visit-info";
+import {
   deleteSavedPlan,
   isSavedPlan,
   readSavedPlans,
   savePlan,
 } from "@/lib/mvp-phase-two-storage";
 import { PlaceDetail, type SelectedPlace } from "./PlaceDetail";
+import { AttractionVisitInfo } from "./AttractionVisitInfo";
 import {
   NotebookCandidate,
   NotebookConditions,
@@ -99,6 +112,9 @@ export function TripPlanner() {
   const [savedPlans, setSavedPlans] = useState<PlanSnapshot[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [visitInfo, setVisitInfo] = useState<Record<string, VisitInfoEntry>>(
+    {},
+  );
   const [screen, setScreen] = useState<"input" | "results">("input");
   const [attempted, setAttempted] = useState(false);
   const savedOpen = useTripUi((s) => s.savedOpen),
@@ -106,7 +122,94 @@ export function TripPlanner() {
   const generation = useRef(0);
   const activeMealRequest = useRef<MealRequest | null>(null);
   const mealSequence = useRef(0);
+  const visitGeneration = useRef(0);
+  const automaticVisitPlan = useRef<string | null>(null);
+  const automaticVisitSnapshot = useRef<{
+    planId: string;
+    attractions: Attraction[];
+  } | null>(null);
+  const visitCoordinator = useRef(
+    new AttractionVisitInfoCoordinator(async (attraction, signal) => {
+      const { data } = await tripApi.get<{
+        kind: "success" | "partial";
+        detail: import("@/lib/attraction-detail").NormalizedAttractionDetail;
+      }>(`/attractions/${encodeURIComponent(attraction.contentId)}`, {
+        params: { contentTypeId: attraction.contentTypeId },
+        signal,
+      });
+      return data;
+    }),
+  );
   const closeDetail = useCallback(() => setSelected(null), []);
+  const planId = plan?.id;
+  useEffect(() => {
+    const snapshot = automaticVisitSnapshot.current;
+    if (!planId || !snapshot || loaded || automaticVisitPlan.current === planId)
+      return;
+    automaticVisitPlan.current = planId;
+    const current = ++visitGeneration.current;
+    const controller = new AbortController();
+    void visitCoordinator.current.automatically(
+      snapshot.attractions,
+      controller.signal,
+      (attraction, entry) => {
+        if (visitGeneration.current !== current) return;
+        setVisitInfo((previous) => ({
+          ...previous,
+          [visitInfoKey(attraction)]: entry,
+        }));
+      },
+    );
+    return () => {
+      controller.abort();
+      // In development React may mount this effect, clean it up, then mount it
+      // again. Do not let the aborted first attempt permanently suppress the
+      // second attempt for this plan.
+      if (automaticVisitPlan.current === planId)
+        automaticVisitPlan.current = null;
+    };
+  }, [loaded, planId]);
+  function requestVisitInfo(
+    attraction: NonNullable<PlanSnapshot["blocks"][number]["attraction"]>,
+  ) {
+    const currentPlanId = plan?.id;
+    const key = visitInfoKey(attraction);
+    setVisitInfo((previous) => ({ ...previous, [key]: { status: "loading" } }));
+    void visitCoordinator.current
+      .request(attraction, "manual")
+      .then((entry) => {
+        if (plan?.id !== currentPlanId) return;
+        setVisitInfo((previous) => ({ ...previous, [key]: entry }));
+      })
+      .catch(() => {
+        if (plan?.id !== currentPlanId) return;
+        setVisitInfo((previous) => ({
+          ...previous,
+          [key]: {
+            status: "unavailable",
+            message: "방문 정보를 불러오지 못했어요. 방문 전 확인해 주세요.",
+          },
+        }));
+      });
+  }
+  function requestAllVisitInfo() {
+    if (!plan) return;
+    const current = ++visitGeneration.current;
+    const attractions = plan.blocks.flatMap((block) =>
+      block.attraction ? [block.attraction] : [],
+    );
+    void visitCoordinator.current.automatically(
+      attractions,
+      undefined,
+      (attraction, entry) => {
+        if (visitGeneration.current !== current) return;
+        setVisitInfo((previous) => ({
+          ...previous,
+          [visitInfoKey(attraction)]: entry,
+        }));
+      },
+    );
+  }
   const search = useMutation({
     mutationFn: async (variables: {
       input: SearchInput;
@@ -191,6 +294,9 @@ export function TripPlanner() {
     }
     const current = ++generation.current;
     setPlan(null);
+    ++visitGeneration.current;
+    visitCoordinator.current.cancelAll();
+    setVisitInfo({});
     clearMeals();
     setSelected(null);
     setMessage("");
@@ -218,6 +324,15 @@ export function TripPlanner() {
       id: crypto.randomUUID(),
     };
     ++generation.current;
+    ++visitGeneration.current;
+    visitCoordinator.current.cancelAll();
+    setVisitInfo({});
+    automaticVisitSnapshot.current = {
+      planId: next.id,
+      attractions: next.blocks.flatMap((block) =>
+        block.attraction ? [block.attraction] : [],
+      ),
+    };
     setPlan(next);
     setLoaded(false);
     setMessage("");
@@ -264,6 +379,10 @@ export function TripPlanner() {
       return;
     }
     ++generation.current;
+    ++visitGeneration.current;
+    visitCoordinator.current.cancelAll();
+    setVisitInfo({});
+    automaticVisitSnapshot.current = null;
     search.reset();
     setPlan(saved);
     setInput(saved.input);
@@ -313,6 +432,9 @@ export function TripPlanner() {
       !!meals.data?.failedRegionIds.length);
   function showInput() {
     ++generation.current;
+    ++visitGeneration.current;
+    visitCoordinator.current.cancelAll();
+    setVisitInfo({});
     search.reset();
     clearMeals();
     setPlan(null);
@@ -324,6 +446,9 @@ export function TripPlanner() {
   }
   function showCandidates() {
     ++generation.current;
+    ++visitGeneration.current;
+    visitCoordinator.current.cancelAll();
+    setVisitInfo({});
     setPlan(null);
     clearMeals();
     setSelected(null);
@@ -642,6 +767,9 @@ export function TripPlanner() {
               <button className="p2-control" onClick={persist}>
                 이 기기에 저장
               </button>
+              <button className="p2-control" onClick={requestAllVisitInfo}>
+                방문정보 확인
+              </button>
               {candidates.length ? (
                 <button className="p2-control" onClick={showCandidates}>
                   다른 목적지 보기
@@ -804,6 +932,21 @@ export function TripPlanner() {
                                 : block.title}
                           </strong>
                         )}
+                        {block.attraction ? (
+                          <AttractionVisitInfo
+                            key={`${block.id}:${block.attraction.contentId}`}
+                            attraction={block.attraction}
+                            visitAt={block.startAt}
+                            entry={
+                              visitInfo[visitInfoKey(block.attraction)] ?? {
+                                status: "not-requested",
+                              }
+                            }
+                            onRequest={() =>
+                              requestVisitInfo(block.attraction!)
+                            }
+                          />
+                        ) : null}
                         {block.fixed ? (
                           <span className="p2-fixed">장소 고정됨</span>
                         ) : null}
@@ -1045,6 +1188,18 @@ export function TripPlanner() {
           key={`${selected.kind}:${selected.place.contentId}`}
           selected={selected}
           onClose={closeDetail}
+          attractionEntry={
+            selected.kind === "attraction"
+              ? (visitInfo[visitInfoKey(selected.place)] ?? {
+                  status: "not-requested",
+                })
+              : undefined
+          }
+          onRequestAttraction={
+            selected.kind === "attraction"
+              ? () => requestVisitInfo(selected.place)
+              : undefined
+          }
         />
       ) : null}
     </main>
