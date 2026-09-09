@@ -952,17 +952,20 @@ function arrangeDay(
           : interval.start,
       );
       const preferred = activityStart(activity, plan.input);
-      const nextFixedBoundaries = activities
-        .slice(index + 1)
-        .flatMap((next) =>
-          next.fixedStartAt
-            ? [
-                blockMinute(plan.input, next.fixedStartAt) -
-                  activity.durationMinutes -
-                  15,
-              ]
-            : [],
-        );
+      // A later fixed activity constrains every preceding flexible activity,
+      // not only its direct neighbour. Propagate the required durations and
+      // 15-minute activity gaps backwards through the whole intervening chain.
+      const nextFixedBoundaries = activities.flatMap((next, fixedIndex) => {
+        if (fixedIndex <= index || !next.fixedStartAt) return [];
+        const requiredMinutes = activities
+          .slice(index, fixedIndex)
+          .reduce((sum, preceding) => sum + preceding.durationMinutes, 0);
+        return [
+          blockMinute(plan.input, next.fixedStartAt) -
+            requiredMinutes -
+            15 * (fixedIndex - index),
+        ];
+      });
       const starts =
         fixed === null
           ? [preferred, requiredStart, ...nextFixedBoundaries]
