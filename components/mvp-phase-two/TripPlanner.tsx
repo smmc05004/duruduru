@@ -32,6 +32,7 @@ import {
   createPlan,
   editPlan,
   planAccommodation,
+  repeatedFacilityNotice,
   validateSearchInput,
 } from "@/lib/mvp-phase-two-planner";
 import {
@@ -48,6 +49,7 @@ import {
 import {
   AttractionVisitInfoCoordinator,
   retainVisitInfoForAttractions,
+  visitInfoFailure,
   type VisitInfoEntry,
   visitInfoKey,
 } from "@/lib/attraction-visit-info";
@@ -190,16 +192,20 @@ export function TripPlanner() {
     const controller = new AbortController();
     const coordinator = visitCoordinator.current;
     visitWorkController.current = controller;
-    void coordinator.automatically(
-      snapshot.attractions,
-      controller.signal,
-      (attraction, entry) => {
-        if (visitGeneration.current !== current) return;
-        setVisitInfo((previous) => ({
-          ...previous,
-          [visitInfoKey(attraction)]: entry,
-        }));
-      },
+    coordinator.usePlan(planId);
+    // Defer the source start until after StrictMode's setup/cleanup probe.
+    void Promise.resolve().then(() =>
+      coordinator.automatically(
+        snapshot.attractions,
+        controller.signal,
+        (attraction, entry) => {
+          if (visitGeneration.current !== current) return;
+          setVisitInfo((previous) => ({
+            ...previous,
+            [visitInfoKey(attraction)]: entry,
+          }));
+        },
+      ),
     );
     return () => {
       controller.abort();
@@ -230,7 +236,7 @@ export function TripPlanner() {
           return;
         setVisitInfo((previous) => ({ ...previous, [key]: entry }));
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         if (
           latestPlanId.current !== currentPlanId ||
           visitGeneration.current !== currentGeneration
@@ -238,18 +244,13 @@ export function TripPlanner() {
           return;
         setVisitInfo((previous) => ({
           ...previous,
-          [key]: {
-            status: "unavailable",
-            message: "방문 정보를 불러오지 못했어요. 방문 전 확인해 주세요.",
-          },
+          [key]: visitInfoFailure(error),
         }));
       });
   }
   function requestAllVisitInfo() {
     if (!plan) return;
-    const current = ++visitGeneration.current;
-    visitWorkController.current?.abort();
-    visitCoordinator.current.cancelAll();
+    const current = visitGeneration.current;
     const controller = new AbortController();
     visitWorkController.current = controller;
     const attractions = plan.blocks.flatMap((block) =>
@@ -386,6 +387,7 @@ export function TripPlanner() {
         block.attraction ? [block.attraction] : [],
       ),
     };
+    visitCoordinator.current.usePlan(next.id);
     setPlan(next);
     setLoaded(false);
     setMessage("");
@@ -396,6 +398,20 @@ export function TripPlanner() {
   }
   function change(command: EditCommand) {
     if (!plan) return;
+    if (
+      command.type === "add-attraction" ||
+      command.type === "replace-attraction"
+    ) {
+      const notice = repeatedFacilityNotice(
+        plan,
+        command.contentId,
+        command.type === "replace-attraction" ? command.blockId : undefined,
+      );
+      if (notice) {
+        if (!window.confirm(`${notice}. 이 장소를 일정에 넣을까요?`)) return;
+        command = { ...command, allowFacilityRepeat: true };
+      }
+    }
     const result = editPlan(plan, command);
     if (!result.ok) {
       setMessage(result.reason);
@@ -450,6 +466,7 @@ export function TripPlanner() {
     ++generation.current;
     cancelVisitInfo();
     automaticVisitSnapshot.current = null;
+    visitCoordinator.current.usePlan(saved.id);
     search.reset();
     setPlan(saved);
     setInput(saved.input);
@@ -1186,6 +1203,8 @@ export function TripPlanner() {
                   .map((block) => (
                     <li
                       key={block.id}
+                      data-block-id={block.id}
+                      data-content-id={block.contentId}
                       className={`p2-block p2-block--${block.kind}${block.kind === "meal" && block.mealScope === "local" && !block.restaurant ? " p2-block--empty" : ""}${block.restaurant ? " p2-block--restaurant" : ""}`}
                     >
                       <div className="p2-block-time dd-timeline-row__time">

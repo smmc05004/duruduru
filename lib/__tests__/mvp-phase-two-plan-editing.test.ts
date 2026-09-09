@@ -1,5 +1,11 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  fixture as validFixture,
+  placed,
+  saved,
+} from "@/lib/test-support/enhancement-fixture";
+import { isSavedPlan } from "@/lib/mvp-phase-two-storage";
+import {
   createPlan,
   editPlan,
   planAccommodation,
@@ -60,95 +66,86 @@ function plan() {
 
 describe("E4 내 계획 편집", () => {
   it("다음 고정 시각 직전의 15분 여유 경계도 탐색해 기존 시각 이동을 최소화한다", () => {
-    const original = plan();
-    const [first, second] = original.blocks.filter(
-      (block) => block.kind === "attraction",
+    const original = validFixture();
+    const [first, second, third] = original.blocks.filter(
+      (b) => b.kind === "attraction",
     );
-    const prepared = {
-      ...original,
-      blocks: [
-        ...original.blocks.filter(
-          (block) =>
-            block.kind !== "attraction" &&
-            !(block.day === 1 && block.kind === "travel"),
-        ),
-        {
-          ...first,
-          day: 1 as const,
-          startAt: "2026-09-12T09:00",
-          endAt: "2026-09-12T10:00",
-        },
-        {
-          ...second,
-          day: 1 as const,
-          startAt: "2026-09-12T10:00",
-          endAt: "2026-09-12T11:00",
-          fixedStartAt: "2026-09-12T10:00",
-        },
-      ],
-    };
+    const prepared = placed(original, [
+      {
+        ...first,
+        day: 1,
+        startAt: "2026-09-12T09:00",
+        endAt: "2026-09-12T09:30",
+        durationMinutes: 30,
+      },
+      {
+        ...second,
+        day: 1,
+        startAt: "2026-09-12T10:00",
+        endAt: "2026-09-12T11:00",
+        fixedStartAt: "2026-09-12T10:00",
+      },
+      {
+        ...third,
+        day: 2,
+        startAt: "2026-09-13T09:00",
+        endAt: "2026-09-13T10:00",
+      },
+    ]);
     const result = editPlan(prepared, {
       type: "duration",
       blockId: first.id,
       durationMinutes: 60,
     });
     expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(
-      result.plan.blocks.find((block) => block.id === first.id)?.startAt,
-    ).toBe("2026-09-12T08:45");
+    expect(result.plan.blocks.find((b) => b.id === first.id)?.startAt).toBe(
+      "2026-09-12T08:45",
+    );
+    expect(isSavedPlan(saved(result.plan))).toBe(true);
   });
 
   it("고정 활동 앞 유동 활동 사슬도 역방향 여유 경계를 탐색해 이동을 최소화한다", () => {
-    const original = plan();
+    const original = validFixture();
     const [first, second, third] = original.blocks.filter(
-      (block) => block.kind === "attraction",
+      (b) => b.kind === "attraction",
     );
-    const prepared = {
-      ...original,
-      blocks: [
-        ...original.blocks.filter(
-          (block) =>
-            block.kind !== "attraction" &&
-            !(block.day === 1 && block.kind === "travel"),
-        ),
-        {
-          ...first,
-          day: 1 as const,
-          startAt: "2026-09-12T09:30",
-          endAt: "2026-09-12T10:00",
-          durationMinutes: 30,
-        },
-        {
-          ...second,
-          day: 1 as const,
-          startAt: "2026-09-12T10:00",
-          endAt: "2026-09-12T10:30",
-          durationMinutes: 30,
-        },
-        {
-          ...third,
-          day: 1 as const,
-          startAt: "2026-09-12T10:30",
-          endAt: "2026-09-12T11:00",
-          durationMinutes: 30,
-          fixedStartAt: "2026-09-12T10:30",
-        },
-      ],
-    };
+    const prepared = placed(original, [
+      {
+        ...first,
+        day: 1,
+        startAt: "2026-09-12T09:00",
+        endAt: "2026-09-12T09:30",
+        durationMinutes: 30,
+      },
+      {
+        ...second,
+        day: 1,
+        startAt: "2026-09-12T09:45",
+        endAt: "2026-09-12T10:15",
+        durationMinutes: 30,
+      },
+      {
+        ...third,
+        day: 1,
+        startAt: "2026-09-12T10:30",
+        endAt: "2026-09-12T11:00",
+        durationMinutes: 30,
+        fixedStartAt: "2026-09-12T10:30",
+      },
+    ]);
     const result = editPlan(prepared, {
       type: "duration",
       blockId: first.id,
-      durationMinutes: 30,
+      durationMinutes: 60,
     });
     expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(
-      result.plan.blocks.find((block) => block.id === first.id)?.startAt,
-    ).toBe("2026-09-12T09:00");
-    expect(
-      result.plan.blocks.find((block) => block.id === second.id)?.startAt,
-    ).toBe("2026-09-12T09:45");
+    expect(result.plan.blocks.find((b) => b.id === first.id)?.startAt).toBe(
+      "2026-09-12T08:30",
+    );
+    expect(result.plan.blocks.find((b) => b.id === second.id)?.startAt).toBe(
+      "2026-09-12T09:45",
+    );
+    expect(isSavedPlan(saved(result.plan))).toBe(true);
   });
 
   it("날짜 이동·순서 변경·같은 그룹 후보 추가는 식당과 무관한 선택을 보존한다", () => {
@@ -205,9 +202,9 @@ describe("E4 내 계획 편집", () => {
 
   it("고정 시각은 날짜까지 고정하며 식사·야간·날짜 이동 충돌은 원자적으로 거절한다", () => {
     const original = plan();
-    const target = original.blocks.find(
-      (block) => block.kind === "attraction",
-    )!;
+    const target = original.blocks
+      .filter((block) => block.kind === "attraction")
+      .at(-1)!;
     const fixed = editPlan(original, {
       type: "set-fixed-start",
       blockId: target.id,

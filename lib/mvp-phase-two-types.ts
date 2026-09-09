@@ -161,7 +161,7 @@ export type PlanSnapshot = {
   blocks: TimeBlock[];
   metrics: PlanMetrics;
   accommodation?: AccommodationNote;
-  itineraryRuleVersion: "e4-v1";
+  itineraryRuleVersion: "e4-v1" | "e4-v2";
 };
 export type SearchResponse =
   | {
@@ -173,7 +173,12 @@ export type SearchResponse =
   | { kind: "input-error" | "no-results" | "data-error"; message: string };
 export type EditCommand =
   | { type: "toggle-fixed"; blockId: string }
-  | { type: "replace-attraction"; blockId: string; contentId: string }
+  | {
+      type: "replace-attraction";
+      blockId: string;
+      contentId: string;
+      allowFacilityRepeat?: boolean;
+    }
   | { type: "duration"; blockId: string; durationMinutes: VisitDuration }
   | { type: "delete-attraction"; blockId: string }
   | { type: "move-activity"; blockId: string; day: 1 | 2; position: number }
@@ -181,6 +186,7 @@ export type EditCommand =
   | {
       type: "add-attraction";
       contentId: string;
+      allowFacilityRepeat?: boolean;
       day: 1 | 2;
       durationMinutes: VisitDuration;
     }

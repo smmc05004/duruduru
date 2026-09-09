@@ -182,6 +182,7 @@ export function PlaceDetail({
             <button
               className="dd-button p2-retry"
               onClick={onRequestAttraction}
+              disabled={attractionEntry?.reason === "limit"}
             >
               상세 다시 시도
             </button>

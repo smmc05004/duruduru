@@ -1,4 +1,6 @@
 import { INTERESTS, ORIGINS } from "@/lib/mvp-phase-two-types";
+import { localActivityWindow, planTimeError } from "./plan-time-constraints";
+import { placeActivities } from "./activity-placement";
 import type {
   Attraction,
   Candidate,
@@ -480,8 +482,11 @@ function layouts(input: SearchInput, oneWay: number): Layout[] {
     );
     const gaps: [Interval[], Interval[]] = [[], []];
     for (const day of [0, 1] as const) {
-      const lower = Math.max(arrival, day * 1440 + 420),
-        upper = Math.min(departure, day * 1440 + 1260);
+      const { start: lower, end: upper } = localActivityWindow(
+        (day + 1) as 1 | 2,
+        arrival,
+        departure,
+      );
       let cursor = lower;
       for (const meal of meals.filter(
         (item) =>
@@ -799,7 +804,7 @@ export function createPlan(
     destination: candidate,
     blocks: candidate.preview.blocks.map((block) => ({ ...block })),
     metrics: { ...candidate.preview.metrics },
-    itineraryRuleVersion: "e4-v1",
+    itineraryRuleVersion: "e4-v2",
   };
 }
 export function attractionAlternatives(
@@ -807,7 +812,13 @@ export function attractionAlternatives(
   blockId: string,
 ): Attraction[] {
   const target = plan.blocks.find((block) => block.id === blockId);
-  if (!target || target.kind !== "attraction" || target.fixed) return [];
+  if (
+    !target ||
+    target.kind !== "attraction" ||
+    target.fixed ||
+    target.fixedStartAt
+  )
+    return [];
   const used = new Set(
     plan.blocks
       .filter((block) => block.kind === "attraction")
@@ -836,6 +847,62 @@ export function attractionAlternatives(
     );
 }
 type EditableActivity = TimeBlock & { kind: "attraction" | "personal" };
+export function repeatedFacilityNotice(
+  plan: PlanSnapshot,
+  contentId: string,
+  replacedBlockId?: string,
+): string | undefined {
+  const groups = facilityGroups(plan.destination.attractions);
+  const group = groups.get(contentId);
+  if (
+    group &&
+    plan.blocks.some(
+      (block) =>
+        block.kind === "attraction" &&
+        block.id !== replacedBlockId &&
+        groups.get(block.contentId!) === group,
+    )
+  )
+    return "같은 시설 안 장소가 포함될 수 있어요";
+}
+
+function refreshActivityEvidence(
+  plan: PlanSnapshot,
+  activities: EditableActivity[],
+) {
+  const groups = facilityGroups(plan.destination.attractions);
+  const seen = new Set<string>();
+  const firstBySession = new Map<string, Attraction>();
+  for (const activity of [...activities].sort((a, b) =>
+    a.startAt.localeCompare(b.startAt),
+  )) {
+    if (!activity.attraction) continue;
+    const group = groups.get(activity.attraction.contentId);
+    const session = `day-${activity.day}-${Number(activity.startAt.slice(11, 13)) < 12 ? "morning" : "afternoon"}`;
+    const first = firstBySession.get(session);
+    const distance = first
+      ? distanceKm(first.coordinates, activity.attraction.coordinates)
+      : undefined;
+    const notices = [
+      group && seen.has(group)
+        ? "같은 시설 안 장소가 포함될 수 있어요"
+        : undefined,
+      distance === null
+        ? "장소 간 근접성은 확인하지 못했어요"
+        : distance !== undefined && distance > 5
+          ? "장소가 떨어져 있어 위치 확인이 필요해요"
+          : undefined,
+    ].filter(Boolean);
+    activity.facilityGroupId = group;
+    activity.sessionId = session;
+    activity.reason = [
+      "선택 관심사에 맞는 관광지 · 내부 이동시간 미계산",
+      ...notices,
+    ].join(" · ");
+    if (group) seen.add(group);
+    if (!first) firstBySession.set(session, activity.attraction);
+  }
+}
 type MinuteInterval = Interval & { index: number };
 const isDuration = (value: number): value is Visit["durationMinutes"] =>
   [30, 60, 90, 120].includes(value);
@@ -851,8 +918,11 @@ function blockMinute(input: SearchInput, value: string): number {
   return Math.round((parseLocalDate(value)! - planMidnight(input)) / MINUTE);
 }
 function editedAvailability(plan: PlanSnapshot, day: 1 | 2): MinuteInterval[] {
-  const lower = (day - 1) * 1440 + 420;
-  const upper = (day - 1) * 1440 + 1260;
+  const { start: lower, end: upper } = localActivityWindow(
+    day,
+    blockMinute(plan.input, plan.metrics.arrivalAt),
+    blockMinute(plan.input, plan.metrics.returnDepartureAt),
+  );
   const blockers = plan.blocks
     .filter((block) => !isActivity(block) && block.kind !== "free")
     .map((block) => ({
@@ -876,140 +946,40 @@ function editedAvailability(plan: PlanSnapshot, day: 1 | 2): MinuteInterval[] {
     result.push({ start: cursor, end: upper, index: result.length });
   return result.filter((interval) => interval.end > interval.start);
 }
-function activityStart(block: EditableActivity, input: SearchInput) {
-  return blockMinute(input, block.startAt);
-}
-function compareMinuteArrays(left: number[], right: number[]): number {
-  for (let index = 0; index < left.length; index++) {
-    const difference = left[index] - right[index];
-    if (difference) return difference;
-  }
-  return 0;
-}
 function arrangeDay(
   plan: PlanSnapshot,
   activities: EditableActivity[],
   day: 1 | 2,
+  targetId?: string,
 ): { slots: Map<string, Interval>; reason?: string } {
-  const available = editedAvailability(plan, day);
-  if (!activities.length) return { slots: new Map() };
-  let best: {
-    slots: Map<string, Interval>;
-    retained: number;
-    movement: number;
-    starts: number[];
-  } | null = null;
-  const recurse = (
-    index: number,
-    previous: { end: number; interval: number } | null,
-    slots: Map<string, Interval>,
-  ) => {
-    if (index === activities.length) {
-      const free =
-        available.reduce(
-          (sum, interval) => sum + interval.end - interval.start,
-          0,
-        ) -
-        activities.reduce((sum, activity) => sum + activity.durationMinutes, 0);
-      if (free < 30) return;
-      const starts = activities.map(
-        (activity) => slots.get(activity.id)!.start,
-      );
-      const retained = activities.filter(
-        (activity) =>
-          activityStart(activity, plan.input) === slots.get(activity.id)!.start,
-      ).length;
-      const movement = activities.reduce(
-        (sum, activity) =>
-          sum +
-          Math.abs(
-            activityStart(activity, plan.input) - slots.get(activity.id)!.start,
-          ),
-        0,
-      );
-      if (
-        !best ||
-        retained > best.retained ||
-        (retained === best.retained &&
-          (movement < best.movement ||
-            (movement === best.movement &&
-              compareMinuteArrays(starts, best.starts) < 0)))
-      )
-        best = { slots: new Map(slots), retained, movement, starts };
-      return;
-    }
-    const activity = activities[index];
-    const fixed = activity.fixedStartAt
-      ? blockMinute(plan.input, activity.fixedStartAt)
-      : null;
-    const candidates: Array<{ start: number; interval: number }> = [];
-    for (const interval of available) {
-      if (previous && interval.index < previous.interval) continue;
-      const requiredStart = Math.max(
-        interval.start,
-        previous && previous.interval === interval.index
-          ? previous.end + 15
-          : interval.start,
-      );
-      const preferred = activityStart(activity, plan.input);
-      // A later fixed activity constrains every preceding flexible activity,
-      // not only its direct neighbour. Propagate the required durations and
-      // 15-minute activity gaps backwards through the whole intervening chain.
-      const nextFixedBoundaries = activities.flatMap((next, fixedIndex) => {
-        if (fixedIndex <= index || !next.fixedStartAt) return [];
-        const requiredMinutes = activities
-          .slice(index, fixedIndex)
-          .reduce((sum, preceding) => sum + preceding.durationMinutes, 0);
-        return [
-          blockMinute(plan.input, next.fixedStartAt) -
-            requiredMinutes -
-            15 * (fixedIndex - index),
-        ];
-      });
-      const starts =
-        fixed === null
-          ? [preferred, requiredStart, ...nextFixedBoundaries]
-          : [fixed];
-      for (const start of starts)
-        if (
-          start >= requiredStart &&
-          start + activity.durationMinutes <= interval.end
-        )
-          candidates.push({ start, interval: interval.index });
-    }
-    for (const candidate of candidates.toSorted(
-      (left, right) =>
-        left.start - right.start || left.interval - right.interval,
-    )) {
-      if (
-        candidate.start < (day - 1) * 1440 + 420 ||
-        candidate.start + activity.durationMinutes > (day - 1) * 1440 + 1260
-      )
-        continue;
-      slots.set(activity.id, {
-        start: candidate.start,
-        end: candidate.start + activity.durationMinutes,
-      });
-      recurse(
-        index + 1,
-        {
-          end: candidate.start + activity.durationMinutes,
-          interval: candidate.interval,
-        },
-        slots,
-      );
-      slots.delete(activity.id);
-    }
-  };
-  recurse(0, null, new Map());
-  const selected = best as {
-    slots: Map<string, Interval>;
-    retained: number;
-    movement: number;
-    starts: number[];
-  } | null;
-  return selected
-    ? { slots: selected.slots }
+  const starts = placeActivities(
+    activities.map((activity) => {
+      const original = plan.blocks.find((block) => block.id === activity.id);
+      return {
+        duration: activity.durationMinutes,
+        originalStart: original
+          ? blockMinute(plan.input, original.startAt)
+          : undefined,
+        preserveStart: original !== undefined && activity.id !== targetId,
+        fixedStart: activity.fixedStartAt
+          ? blockMinute(plan.input, activity.fixedStartAt)
+          : undefined,
+      };
+    }),
+    editedAvailability(plan, day),
+  );
+  return starts
+    ? {
+        slots: new Map(
+          activities.map((activity, index) => [
+            activity.id,
+            {
+              start: starts[index],
+              end: starts[index] + activity.durationMinutes,
+            },
+          ]),
+        ),
+      }
     : {
         slots: new Map(),
         reason: "식사와 겹치거나 여유시간을 확보할 수 없어요.",
@@ -1018,6 +988,7 @@ function arrangeDay(
 function rebuildActivities(
   plan: PlanSnapshot,
   activities: EditableActivity[],
+  targetId?: string,
 ): EditResult {
   const fail = (reason: string): EditResult => ({ ok: false, plan, reason });
   if (
@@ -1041,8 +1012,29 @@ function rebuildActivities(
             : plan.input.returnBy.slice(0, 10))
       )
         return fail("고정 시각 충돌이 있어 날짜를 바꿀 수 없어요.");
+      const minute = blockMinute(plan.input, activity.fixedStartAt);
+      const window = localActivityWindow(
+        day,
+        blockMinute(plan.input, plan.metrics.arrivalAt),
+        blockMinute(plan.input, plan.metrics.returnDepartureAt),
+      );
+      if (
+        minute < window.start ||
+        minute + activity.durationMinutes > window.end
+      )
+        return fail(
+          "고정 시각이 현지 체류 범위 밖이거나 관광 휴식 시간과 겹쳐요.",
+        );
+      if (
+        !editedAvailability(plan, day).some(
+          (interval) =>
+            minute >= interval.start &&
+            minute + activity.durationMinutes <= interval.end,
+        )
+      )
+        return fail("고정 시각이 식사·운전·휴식과 겹쳐요.");
     }
-    const arranged = arrangeDay(plan, daily, day);
+    const arranged = arrangeDay(plan, daily, day, targetId);
     if (arranged.reason) return fail(arranged.reason);
     for (const activity of daily) {
       const slot = arranged.slots.get(activity.id)!;
@@ -1050,9 +1042,34 @@ function rebuildActivities(
       activity.endAt = stamp(plan.input, slot.end);
     }
   }
-  const staticBlocks = plan.blocks.filter(
-    (block) => !isActivity(block) && block.kind !== "free",
-  );
+  refreshActivityEvidence(plan, activities);
+  const changedDays = new Set<number>();
+  for (const previous of plan.blocks.filter((block) => block.attraction)) {
+    const current = activities.find((activity) => activity.id === previous.id);
+    if (
+      !current ||
+      current.contentId !== previous.contentId ||
+      current.day !== previous.day ||
+      current.startAt !== previous.startAt
+    ) {
+      changedDays.add(previous.day);
+      if (current) changedDays.add(current.day);
+    }
+  }
+  for (const current of activities.filter((activity) => activity.attraction))
+    if (!plan.blocks.some((block) => block.id === current.id))
+      changedDays.add(current.day);
+  const mealNotice = "방문 장소가 바뀌었어요. 식당 위치를 확인해 주세요";
+  const staticBlocks = plan.blocks
+    .filter((block) => !isActivity(block) && block.kind !== "free")
+    .map((block) =>
+      block.kind === "meal" &&
+      block.mealScope === "local" &&
+      changedDays.has(block.day) &&
+      !block.reason.includes(mealNotice)
+        ? { ...block, reason: `${block.reason} · ${mealNotice}` }
+        : block,
+    );
   const freeBlocks: TimeBlock[] = [];
   for (const day of [1, 2] as const) {
     const daily = activities
@@ -1095,22 +1112,21 @@ function rebuildActivities(
   const blocks = [...staticBlocks, ...activities, ...freeBlocks].toSorted(
     (a, b) => a.startAt.localeCompare(b.startAt),
   );
-  return {
-    ok: true,
-    plan: {
-      ...plan,
+  const updated: PlanSnapshot = {
+    ...plan,
+    blocks,
+    metrics: planMetrics(
+      plan.input,
       blocks,
-      metrics: planMetrics(
-        plan.input,
-        blocks,
-        plan.metrics.arrivalAt,
-        plan.metrics.returnDepartureAt,
-      ),
-      edited: true,
-      updatedAt: new Date().toISOString(),
-      itineraryRuleVersion: "e4-v1",
-    },
+      plan.metrics.arrivalAt,
+      plan.metrics.returnDepartureAt,
+    ),
+    edited: true,
+    updatedAt: new Date().toISOString(),
+    itineraryRuleVersion: "e4-v2",
   };
+  const error = planTimeError(updated);
+  return error ? fail(error) : { ok: true, plan: updated };
 }
 export function planAccommodation(
   plan: PlanSnapshot,
@@ -1159,8 +1175,16 @@ export function editPlan(plan: PlanSnapshot, command: EditCommand): EditResult {
   if (command.type === "toggle-fixed") {
     if (target!.kind !== "attraction")
       return fail("관광지만 장소 유지로 고정할 수 있어요.");
-    target!.fixed = !target!.fixed;
-    return rebuildActivities(plan, activities);
+    const updated: PlanSnapshot = {
+      ...plan,
+      blocks: plan.blocks.map((block) =>
+        block.id === target!.id ? { ...block, fixed: !block.fixed } : block,
+      ),
+      edited: true,
+      updatedAt: new Date().toISOString(),
+    };
+    const error = planTimeError(updated, plan.itineraryRuleVersion !== "e4-v1");
+    return error ? fail(error) : { ok: true, plan: updated };
   }
   if (command.type === "set-fixed-start") {
     if (
@@ -1169,7 +1193,37 @@ export function editPlan(plan: PlanSnapshot, command: EditCommand): EditResult {
     )
       return fail("고정 시각을 올바르게 입력해 주세요.");
     target!.fixedStartAt = command.fixedStartAt ?? undefined;
-    return rebuildActivities(plan, activities);
+    if (command.fixedStartAt) {
+      const day =
+        command.fixedStartAt.slice(0, 10) === plan.input.startAt.slice(0, 10)
+          ? 1
+          : command.fixedStartAt.slice(0, 10) ===
+              plan.input.returnBy.slice(0, 10)
+            ? 2
+            : undefined;
+      if (!day) return fail("고정 시각은 여행 날짜 안에서 선택해 주세요.");
+      if (day !== target!.day) {
+        target!.day = day;
+        if (target!.personal) target!.personal.day = day;
+        const otherActivities = activities.filter(
+          (activity) => activity.id !== target!.id,
+        );
+        const before = otherActivities.filter(
+          (activity) =>
+            activity.day < day ||
+            (activity.day === day && activity.startAt < command.fixedStartAt!),
+        );
+        const after = otherActivities.filter(
+          (activity) => !before.includes(activity),
+        );
+        return rebuildActivities(
+          plan,
+          [...before, target!, ...after],
+          target!.id,
+        );
+      }
+    }
+    return rebuildActivities(plan, activities, target!.id);
   }
   if (command.type === "move-activity" || command.type === "reorder-activity") {
     if (target!.fixedStartAt)
@@ -1188,6 +1242,7 @@ export function editPlan(plan: PlanSnapshot, command: EditCommand): EditResult {
     if (position < 0 || position > targetList.length)
       return fail("더 이상 순서를 바꿀 수 없어요.");
     target!.day = nextDay;
+    if (target!.personal) target!.personal.day = nextDay;
     const reordered = [
       ...targetList.slice(0, position),
       target!,
@@ -1196,7 +1251,7 @@ export function editPlan(plan: PlanSnapshot, command: EditCommand): EditResult {
     const others = activities.filter(
       (block) => block.day !== nextDay && block.id !== target!.id,
     );
-    return rebuildActivities(plan, [...others, ...reordered]);
+    return rebuildActivities(plan, [...others, ...reordered], target!.id);
   }
   if (command.type === "add-attraction") {
     if (!isDuration(command.durationMinutes))
@@ -1216,6 +1271,9 @@ export function editPlan(plan: PlanSnapshot, command: EditCommand): EditResult {
     );
     if (!attraction)
       return fail("같은 선택 지역의 미사용 관광 후보만 추가할 수 있어요.");
+    const facilityNotice = repeatedFacilityNotice(plan, command.contentId);
+    if (facilityNotice && !command.allowFacilityRepeat)
+      return fail(`${facilityNotice}. 안내를 확인한 뒤 추가해 주세요.`);
     activities.push({
       id: `activity-${attraction.contentId}`,
       day: command.day,
@@ -1276,32 +1334,45 @@ export function editPlan(plan: PlanSnapshot, command: EditCommand): EditResult {
       activities.filter((block) => block.id !== target!.id),
     );
   }
+  if (command.type === "duration") {
+    if (!isDuration(command.durationMinutes))
+      return fail("방문시간은 30/60/90/120분 중 선택해 주세요.");
+    target!.durationMinutes = command.durationMinutes;
+    if (target!.personal)
+      target!.personal.durationMinutes = command.durationMinutes;
+    return rebuildActivities(plan, activities, target!.id);
+  }
   if (target!.kind !== "attraction" || !target!.attraction)
     return fail("수정할 관광지를 찾지 못했어요.");
   if (
-    target!.fixed &&
+    (target!.fixed || target!.fixedStartAt) &&
     (command.type === "replace-attraction" ||
       command.type === "delete-attraction")
   )
-    return fail("장소 고정을 해제한 뒤 교체하거나 삭제해 주세요.");
+    return fail(
+      target!.fixedStartAt
+        ? "시각 고정을 해제한 뒤 교체하거나 삭제해 주세요."
+        : "장소 고정을 해제한 뒤 교체하거나 삭제해 주세요.",
+    );
   if (command.type === "delete-attraction")
     return rebuildActivities(
       plan,
       activities.filter((block) => block.id !== target!.id),
     );
-  if (command.type === "duration") {
-    if (!isDuration(command.durationMinutes))
-      return fail("방문시간은 30/60/90/120분 중 선택해 주세요.");
-    target!.durationMinutes = command.durationMinutes;
-    return rebuildActivities(plan, activities);
-  }
   const replacement = attractionAlternatives(plan, target!.id).find(
     (place) => place.contentId === command.contentId,
   );
   if (!replacement)
     return fail("같은 지역의 미사용 대체 관광지를 선택해 주세요.");
+  const facilityNotice = repeatedFacilityNotice(
+    plan,
+    command.contentId,
+    target!.id,
+  );
+  if (facilityNotice && !command.allowFacilityRepeat)
+    return fail(`${facilityNotice}. 안내를 확인한 뒤 교체해 주세요.`);
   target!.attraction = replacement;
   target!.contentId = replacement.contentId;
   target!.title = replacement.title;
-  return rebuildActivities(plan, activities);
+  return rebuildActivities(plan, activities, target!.id);
 }

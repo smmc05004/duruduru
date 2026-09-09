@@ -30,6 +30,8 @@ jobs:
         run: npm ci
       - name: Run verification
         run: npm run verify
+      - name: Run enhancement regression tests
+        run: npm run test:enhancement
 
   e2e:
     name: E2E
