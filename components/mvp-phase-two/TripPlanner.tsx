@@ -45,6 +45,7 @@ import {
 } from "@/lib/mvp-phase-two-client";
 import {
   AttractionVisitInfoCoordinator,
+  retainVisitInfoForAttractions,
   type VisitInfoEntry,
   visitInfoKey,
 } from "@/lib/attraction-visit-info";
@@ -146,11 +147,14 @@ export function TripPlanner() {
   useEffect(() => {
     latestPlanId.current = plan?.id ?? null;
   }, [plan?.id]);
-  function cancelVisitInfo(preserveAutomaticPlan = false) {
+  function cancelVisitRequests() {
     ++visitGeneration.current;
     visitWorkController.current?.abort();
     visitWorkController.current = null;
     visitCoordinator.current.cancelAll();
+  }
+  function cancelVisitInfo(preserveAutomaticPlan = false) {
+    cancelVisitRequests();
     if (!preserveAutomaticPlan) automaticVisitPlan.current = null;
     setVisitInfo({});
   }
@@ -375,7 +379,15 @@ export function TripPlanner() {
       setMessage(result.reason);
       return;
     }
-    cancelVisitInfo(true);
+    cancelVisitRequests();
+    setVisitInfo((previous) =>
+      retainVisitInfoForAttractions(
+        previous,
+        result.plan.blocks.flatMap((block) =>
+          block.attraction ? [block.attraction] : [],
+        ),
+      ),
+    );
     setPlan(result.plan);
     setMessage(
       command.type === "toggle-fixed"

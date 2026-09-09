@@ -41,4 +41,40 @@ describe("AttractionVisitInfo", () => {
       expect.stringContaining("https://www.google.com/maps/search/"),
     );
   });
+
+  it("보존된 상세 정보의 휴무 경고를 현재 방문 시각으로 다시 계산한다", () => {
+    const entry = {
+      status: "ready" as const,
+      detail: {
+        title: { status: "confirmed" as const, value: attraction.title },
+        address: { status: "confirmed" as const, value: attraction.address },
+        overview: { status: "confirmed" as const, value: "안전한 방문 소개" },
+        openingHours: { status: "unknown" as const },
+        closedDays: { status: "confirmed" as const, value: "매주 월요일 휴무" },
+        fees: { status: "unknown" as const },
+        phone: { status: "unknown" as const },
+        imageUrl: "",
+        fetchedAt: "2026-09-09T00:00:00.000Z",
+      },
+    };
+    const view = render(
+      <AttractionVisitInfo
+        attraction={attraction}
+        visitAt="2026-09-13T10:00"
+        entry={entry}
+        onRequest={() => {}}
+      />,
+    );
+    expect(screen.queryByText(/방문일이 정기휴무일/)).not.toBeInTheDocument();
+
+    view.rerender(
+      <AttractionVisitInfo
+        attraction={attraction}
+        visitAt="2026-09-14T10:00"
+        entry={entry}
+        onRequest={() => {}}
+      />,
+    );
+    expect(screen.getByText(/방문일이 정기휴무일/)).toBeInTheDocument();
+  });
 });

@@ -29,6 +29,20 @@ export const visitInfoKey = (
   attraction: Pick<Attraction, "contentId" | "contentTypeId">,
 ) => `${attraction.contentId}:${attraction.contentTypeId}`;
 
+/** Keeps completed details through an in-place plan edit. Cancelled loading
+ * entries are deliberately dropped so the UI offers a fresh retry. */
+export function retainVisitInfoForAttractions(
+  entries: Record<string, VisitInfoEntry>,
+  attractions: readonly Pick<Attraction, "contentId" | "contentTypeId">[],
+): Record<string, VisitInfoEntry> {
+  const keys = new Set(attractions.map(visitInfoKey));
+  return Object.fromEntries(
+    Object.entries(entries).filter(
+      ([key, entry]) => keys.has(key) && entry.status !== "loading",
+    ),
+  );
+}
+
 type CacheEntry = VisitInfoEntry & { expiresAt: number };
 type InFlight = {
   promise: Promise<VisitInfoEntry>;
@@ -151,6 +165,9 @@ export class AttractionVisitInfoCoordinator {
     const job = this.queued.shift();
     if (!job) return;
     if (job.controller.signal.aborted) {
+      const key = visitInfoKey(job.attraction);
+      if (this.inFlight.get(key)?.identity === job.identity)
+        this.inFlight.delete(key);
       job.reject(new Error("cancelled"));
       this.runNext();
       return;
