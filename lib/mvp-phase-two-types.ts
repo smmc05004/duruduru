@@ -46,6 +46,21 @@ export type Restaurant = {
   fetchedAt: string;
 };
 export type VisitDuration = 30 | 60 | 90 | 120;
+export type PersonalActivityType = "appointment" | "place";
+export type PersonalActivity = {
+  /** Client-created stable ID. It never imitates a TourAPI content ID. */
+  id: string;
+  name: string;
+  category: PersonalActivityType;
+  day: 1 | 2;
+  durationMinutes: VisitDuration;
+  address: string;
+};
+export type AccommodationNote = {
+  name: string;
+  address: string;
+  note: string;
+};
 export type Visit = {
   attraction: Attraction;
   durationMinutes: VisitDuration;
@@ -59,13 +74,16 @@ export type TimeBlock = {
   day: 1 | 2;
   startAt: string;
   endAt: string;
-  kind: "travel" | "attraction" | "meal" | "free" | "rest";
+  kind: "travel" | "attraction" | "personal" | "meal" | "free" | "rest";
   title: string;
   durationMinutes: number;
   contentId?: string;
   attraction?: Attraction;
   restaurant?: Restaurant;
   fixed?: boolean;
+  /** E4 time lock. Unlike `fixed`, this locks both KST date and start time. */
+  fixedStartAt?: string;
+  personal?: PersonalActivity;
   mealScope?: "local" | "transit";
   mealType?: "lunch" | "dinner";
   direction?: "outbound" | "return";
@@ -131,7 +149,7 @@ export type RecommendedCandidate = Candidate & {
   recommendation: CandidateRecommendation;
 };
 export type PlanSnapshot = {
-  schemaVersion: 2;
+  schemaVersion: 3;
   id: string;
   searchId: string;
   createdAt: string;
@@ -142,6 +160,8 @@ export type PlanSnapshot = {
   destination: Candidate;
   blocks: TimeBlock[];
   metrics: PlanMetrics;
+  accommodation?: AccommodationNote;
+  itineraryRuleVersion: "e4-v1";
 };
 export type SearchResponse =
   | {
@@ -155,7 +175,18 @@ export type EditCommand =
   | { type: "toggle-fixed"; blockId: string }
   | { type: "replace-attraction"; blockId: string; contentId: string }
   | { type: "duration"; blockId: string; durationMinutes: VisitDuration }
-  | { type: "delete-attraction"; blockId: string };
+  | { type: "delete-attraction"; blockId: string }
+  | { type: "move-activity"; blockId: string; day: 1 | 2; position: number }
+  | { type: "reorder-activity"; blockId: string; direction: "up" | "down" }
+  | {
+      type: "add-attraction";
+      contentId: string;
+      day: 1 | 2;
+      durationMinutes: VisitDuration;
+    }
+  | { type: "add-personal"; personal: PersonalActivity }
+  | { type: "delete-personal"; blockId: string }
+  | { type: "set-fixed-start"; blockId: string; fixedStartAt: string | null };
 export type EditResult =
   | { ok: true; plan: PlanSnapshot }
   | { ok: false; plan: PlanSnapshot; reason: string };

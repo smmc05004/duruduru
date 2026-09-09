@@ -15,7 +15,8 @@ import {
   validateSearchInput,
 } from "./mvp-phase-two-planner";
 
-const STORAGE_KEY = "duruduru.plans.v2";
+const STORAGE_KEY_V2 = "duruduru.plans.v2";
+const STORAGE_KEY_V3 = "duruduru.plans.v3";
 const LIMIT = 10;
 type StoredResult = { plans: PlanSnapshot[]; error?: string };
 const object = (v: unknown): v is Record<string, unknown> =>
@@ -139,7 +140,9 @@ function blocks(
       ids.has(b.id) ||
       (b.day !== 1 && b.day !== 2) ||
       typeof b.kind !== "string" ||
-      !["travel", "attraction", "meal", "free", "rest"].includes(b.kind) ||
+      !["travel", "attraction", "personal", "meal", "free", "rest"].includes(
+        b.kind,
+      ) ||
       !text(b.title) ||
       !text(b.reason) ||
       !finite(b.durationMinutes)
@@ -171,6 +174,8 @@ function blocks(
       return false;
     ids.add(b.id);
     previous = to;
+    if (b.fixedStartAt !== undefined && parseLocalDate(b.fixedStartAt) === null)
+      return false;
     if (b.kind === "attraction") {
       if (
         !attraction(b.attraction) ||
@@ -182,6 +187,23 @@ function blocks(
         return false;
       visits.add(b.attraction.contentId);
     } else if (b.attraction !== undefined) return false;
+    if (b.kind === "personal") {
+      if (
+        !object(b.personal) ||
+        !id(b.personal.id) ||
+        !text(b.personal.name) ||
+        b.personal.name.trim().length < 1 ||
+        !["appointment", "place"].includes(String(b.personal.category)) ||
+        (b.personal.day !== 1 && b.personal.day !== 2) ||
+        ![30, 60, 90, 120].includes(Number(b.personal.durationMinutes)) ||
+        !text(b.personal.address) ||
+        b.personal.address.length > 200 ||
+        b.personal.id !== b.id ||
+        b.personal.day !== b.day ||
+        b.personal.durationMinutes !== b.durationMinutes
+      )
+        return false;
+    } else if (b.personal !== undefined) return false;
     if (b.kind === "meal") {
       if (
         (b.mealScope !== "local" && b.mealScope !== "transit") ||
@@ -249,15 +271,25 @@ export function isSavedPlan(value: unknown): value is PlanSnapshot {
   try {
     if (
       !object(value) ||
-      value.schemaVersion !== 2 ||
+      value.schemaVersion !== 3 ||
       !id(value.id) ||
       !id(value.searchId) ||
       !validDate(value.createdAt) ||
       !validDate(value.updatedAt) ||
       !validDate(value.savedAt) ||
       typeof value.edited !== "boolean" ||
+      value.itineraryRuleVersion !== "e4-v1" ||
       !candidate(value.destination) ||
-      !metrics(value.metrics)
+      !metrics(value.metrics) ||
+      (value.accommodation !== undefined &&
+        (!object(value.accommodation) ||
+          !text(value.accommodation.name) ||
+          value.accommodation.name.trim().length < 1 ||
+          value.accommodation.name.length > 80 ||
+          !text(value.accommodation.address) ||
+          value.accommodation.address.length > 200 ||
+          !text(value.accommodation.note) ||
+          value.accommodation.note.length > 500))
     )
       return false;
     const input = validateSearchInput(value.input);
@@ -410,6 +442,17 @@ function cleanBlock(b: TimeBlock): TimeBlock {
     attraction: b.attraction ? cleanAttraction(b.attraction) : undefined,
     restaurant: b.restaurant ? cleanRestaurant(b.restaurant) : undefined,
     fixed: b.fixed,
+    fixedStartAt: b.fixedStartAt,
+    personal: b.personal
+      ? {
+          id: b.personal.id,
+          name: b.personal.name,
+          category: b.personal.category,
+          day: b.personal.day,
+          durationMinutes: b.personal.durationMinutes,
+          address: b.personal.address,
+        }
+      : undefined,
     mealScope: b.mealScope,
     mealType: b.mealType,
     direction: b.direction,
@@ -456,7 +499,7 @@ function snapshot(plan: PlanSnapshot): PlanSnapshot {
   const d = plan.destination,
     m = d.metadata;
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     id: plan.id,
     searchId: plan.searchId,
     createdAt: plan.createdAt,
@@ -497,41 +540,93 @@ function snapshot(plan: PlanSnapshot): PlanSnapshot {
     },
     blocks: plan.blocks.map(cleanBlock),
     metrics: cleanMetrics(plan.metrics),
+    itineraryRuleVersion: "e4-v1",
+    accommodation: plan.accommodation
+      ? {
+          name: plan.accommodation.name,
+          address: plan.accommodation.address,
+          note: plan.accommodation.note,
+        }
+      : undefined,
   };
 }
+function storageError(
+  message = "저장된 계획의 날짜나 장소 정보가 손상되어 불러올 수 없어요. 기존 정보는 보존했어요.",
+): StoredResult {
+  return { plans: [], error: message };
+}
+function migratedV2(value: unknown): PlanSnapshot | null {
+  if (!object(value) || value.schemaVersion !== 2) return null;
+  const next = {
+    ...value,
+    schemaVersion: 3,
+    itineraryRuleVersion: "e4-v1",
+  } as unknown;
+  return isSavedPlan(next) ? next : null;
+}
+function parseContainer(raw: string, version: 2 | 3): StoredResult {
+  const value: unknown = JSON.parse(raw);
+  if (
+    !object(value) ||
+    value.version !== version ||
+    !Array.isArray(value.plans) ||
+    value.plans.length > LIMIT
+  )
+    return storageError(
+      "지원하지 않는 저장 형식이에요. 기존 저장 정보는 변경하지 않았어요.",
+    );
+  const plans =
+    version === 3
+      ? value.plans.filter(isSavedPlan)
+      : value.plans
+          .map(migratedV2)
+          .filter((plan): plan is PlanSnapshot => !!plan);
+  if (
+    plans.length !== value.plans.length ||
+    new Set(plans.map((plan) => plan.id)).size !== plans.length
+  )
+    return storageError();
+  return { plans };
+}
+/** v3 always wins, even when it is empty: deleted v2 plans must not reappear. */
 export function readSavedPlans(): StoredResult {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { plans: [] };
-    const value: unknown = JSON.parse(raw);
-    if (
-      !object(value) ||
-      value.version !== 2 ||
-      !Array.isArray(value.plans) ||
-      value.plans.length > LIMIT
-    )
-      return {
-        plans: [],
-        error:
-          "지원하지 않는 저장 형식이에요. 기존 저장 정보는 변경하지 않았어요.",
-      };
-    const plans = value.plans.filter(isSavedPlan);
-    if (
-      plans.length !== value.plans.length ||
-      new Set(plans.map((p) => p.id)).size !== plans.length
-    )
-      return {
-        plans: [],
-        error:
-          "저장된 계획의 날짜나 장소 정보가 손상되어 불러올 수 없어요. 기존 정보는 보존했어요.",
-      };
-    return { plans };
+    const v3 = localStorage.getItem(STORAGE_KEY_V3);
+    if (v3 !== null) return parseContainer(v3, 3);
+    const v2 = localStorage.getItem(STORAGE_KEY_V2);
+    if (v2 === null) return { plans: [] };
+    return parseContainer(v2, 2);
   } catch {
     return {
       plans: [],
       error:
         "이 기기 저장소를 읽을 수 없어요. 저장소 차단 또는 손상된 정보가 있는지 확인해 주세요.",
     };
+  }
+}
+function writeV3(plans: PlanSnapshot[]): StoredResult {
+  const container = {
+    version: 3,
+    migratedFromV2: localStorage.getItem(STORAGE_KEY_V2) !== null,
+    plans,
+  };
+  try {
+    localStorage.setItem(STORAGE_KEY_V3, JSON.stringify(container));
+    const confirmation = localStorage.getItem(STORAGE_KEY_V3);
+    if (!confirmation)
+      return storageError(
+        "저장 공간이 부족하거나 저장소가 차단되어 저장하지 못했어요.",
+      );
+    const checked = parseContainer(confirmation, 3);
+    if (checked.error || checked.plans.length !== plans.length)
+      return storageError(
+        "저장 내용을 확인하지 못했어요. 기존 저장 정보는 보존했어요.",
+      );
+    return checked;
+  } catch {
+    return storageError(
+      "저장 공간이 부족하거나 저장소가 차단되어 저장하지 못했어요.",
+    );
   }
 }
 export function savePlan(plan: PlanSnapshot): {
@@ -554,14 +649,13 @@ export function savePlan(plan: PlanSnapshot): {
       error: "계획의 날짜나 시간 블록을 확인할 수 없어 저장하지 않았어요.",
     };
   try {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        version: 2,
-        plans: [saved, ...stored.plans.filter((p) => p.id !== saved.id)],
-      }),
-    );
-    return { plan: { ...plan, savedAt: saved.savedAt } };
+    const result = writeV3([
+      saved,
+      ...stored.plans.filter((p) => p.id !== saved.id),
+    ]);
+    return result.error
+      ? { error: result.error }
+      : { plan: { ...plan, savedAt: saved.savedAt } };
   } catch {
     return {
       error: "저장 공간이 부족하거나 저장소가 차단되어 저장하지 못했어요.",
@@ -572,13 +666,6 @@ export function deleteSavedPlan(planId: string): StoredResult {
   const stored = readSavedPlans();
   if (stored.error) return stored;
   const plans = stored.plans.filter((p) => p.id !== planId);
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 2, plans }));
-    return { plans };
-  } catch {
-    return {
-      plans: stored.plans,
-      error: "저장소가 차단되어 삭제하지 못했어요.",
-    };
-  }
+  const result = writeV3(plans);
+  return result.error ? { plans: stored.plans, error: result.error } : result;
 }

@@ -21,6 +21,7 @@ import {
   type Candidate,
   type EditCommand,
   type PlanSnapshot,
+  type PersonalActivity,
   type Restaurant,
   type SearchInput,
   type SearchResponse,
@@ -30,6 +31,7 @@ import {
   attractionAlternatives,
   createPlan,
   editPlan,
+  planAccommodation,
   validateSearchInput,
 } from "@/lib/mvp-phase-two-planner";
 import {
@@ -113,6 +115,25 @@ export function TripPlanner() {
   const [savedPlans, setSavedPlans] = useState<PlanSnapshot[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [adding, setAdding] = useState<"attraction" | "personal" | null>(null);
+  const [personalDraft, setPersonalDraft] = useState<{
+    name: string;
+    category: PersonalActivity["category"];
+    day: 1 | 2;
+    durationMinutes: VisitDuration;
+    address: string;
+  }>({
+    name: "",
+    category: "appointment",
+    day: 1,
+    durationMinutes: 60,
+    address: "",
+  });
+  const [accommodationDraft, setAccommodationDraft] = useState({
+    name: "",
+    address: "",
+    note: "",
+  });
   const [visitInfo, setVisitInfo] = useState<Record<string, VisitInfoEntry>>(
     {},
   );
@@ -392,9 +413,16 @@ export function TripPlanner() {
     setMessage(
       command.type === "toggle-fixed"
         ? "고정은 장소를 보존해요. 방문 시각이나 날짜는 바뀔 수 있어요."
-        : "변경했어요. 관광지역이 바뀌었다면 식당 목록을 다시 조회할 수 있어요.",
+        : "변경했어요. 관광지역이 바뀌었다면 식당 위치를 확인하거나 목록을 다시 조회할 수 있어요.",
     );
     setExpanded(null);
+  }
+  function saveAccommodation() {
+    if (!plan) return;
+    const result = planAccommodation(plan, accommodationDraft);
+    if (!result.ok) return setMessage(result.reason);
+    setPlan(result.plan);
+    setMessage("숙소 메모를 저장했어요. 야간 휴식 시간은 바꾸지 않아요.");
   }
   function openSaved() {
     const result = readSavedPlans();
@@ -804,6 +832,35 @@ export function TripPlanner() {
               <button className="p2-control" onClick={requestAllVisitInfo}>
                 방문정보 확인
               </button>
+              <button
+                className="p2-control"
+                onClick={() =>
+                  setAdding(adding === "attraction" ? null : "attraction")
+                }
+              >
+                관광지 추가
+              </button>
+              <button
+                className="p2-control"
+                onClick={() =>
+                  setAdding(adding === "personal" ? null : "personal")
+                }
+              >
+                개인 일정 추가
+              </button>
+              <button
+                className="p2-control"
+                onClick={() => {
+                  setAccommodationDraft(
+                    plan.accommodation ?? { name: "", address: "", note: "" },
+                  );
+                  setExpanded(
+                    expanded === "accommodation" ? null : "accommodation",
+                  );
+                }}
+              >
+                숙소 메모
+              </button>
               {candidates.length ? (
                 <button className="p2-control" onClick={showCandidates}>
                   다른 목적지 보기
@@ -811,6 +868,238 @@ export function TripPlanner() {
               ) : null}
             </div>
           </div>
+          {adding === "attraction" ? (
+            <section className="p2-panel p2-edit-form" aria-label="관광지 추가">
+              <h3>관광지 추가</h3>
+              <p className="p2-muted">
+                같은 선택 지역의 미사용 관심사 관광지만 추가해요. 하루 관광은
+                최대 3곳이에요.
+              </p>
+              <div className="p2-actions">
+                <label>
+                  날짜{" "}
+                  <select
+                    value={personalDraft.day}
+                    onChange={(event) =>
+                      setPersonalDraft((draft) => ({
+                        ...draft,
+                        day: Number(event.target.value) as 1 | 2,
+                      }))
+                    }
+                  >
+                    <option value={1}>1일차</option>
+                    <option value={2}>2일차</option>
+                  </select>
+                </label>
+                <label>
+                  방문시간{" "}
+                  <select
+                    value={personalDraft.durationMinutes}
+                    onChange={(event) =>
+                      setPersonalDraft((draft) => ({
+                        ...draft,
+                        durationMinutes: Number(
+                          event.target.value,
+                        ) as VisitDuration,
+                      }))
+                    }
+                  >
+                    {[30, 60, 90, 120].map((minutes) => (
+                      <option key={minutes} value={minutes}>
+                        {minutes}분
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div className="p2-alternatives">
+                {plan.destination.attractions
+                  .filter(
+                    (place) =>
+                      !plan.blocks.some(
+                        (block) =>
+                          block.attraction?.contentId === place.contentId,
+                      ) &&
+                      place.categories.some((category) =>
+                        plan.input.interests.includes(category),
+                      ),
+                  )
+                  .map((place) => (
+                    <button
+                      className="p2-control"
+                      key={place.contentId}
+                      onClick={() => {
+                        change({
+                          type: "add-attraction",
+                          contentId: place.contentId,
+                          day: personalDraft.day,
+                          durationMinutes: personalDraft.durationMinutes,
+                        });
+                        setAdding(null);
+                      }}
+                    >
+                      {place.title}
+                      <small>{place.address}</small>
+                    </button>
+                  ))}
+              </div>
+            </section>
+          ) : null}
+          {adding === "personal" ? (
+            <section
+              className="p2-panel p2-edit-form"
+              aria-label="개인 일정 추가"
+            >
+              <h3>개인 일정 추가</h3>
+              <p className="p2-muted">
+                여행 지역 안의 장소를 입력해 주세요. 주소를 좌표로 찾거나 외부
+                조회하지 않아요.
+              </p>
+              <div className="p2-actions">
+                <label>
+                  이름{" "}
+                  <input
+                    maxLength={80}
+                    value={personalDraft.name}
+                    onChange={(event) =>
+                      setPersonalDraft((draft) => ({
+                        ...draft,
+                        name: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label>
+                  유형{" "}
+                  <select
+                    value={personalDraft.category}
+                    onChange={(event) =>
+                      setPersonalDraft((draft) => ({
+                        ...draft,
+                        category: event.target
+                          .value as PersonalActivity["category"],
+                      }))
+                    }
+                  >
+                    <option value="appointment">약속</option>
+                    <option value="place">개인 장소</option>
+                  </select>
+                </label>
+                <label>
+                  날짜{" "}
+                  <select
+                    value={personalDraft.day}
+                    onChange={(event) =>
+                      setPersonalDraft((draft) => ({
+                        ...draft,
+                        day: Number(event.target.value) as 1 | 2,
+                      }))
+                    }
+                  >
+                    <option value={1}>1일차</option>
+                    <option value={2}>2일차</option>
+                  </select>
+                </label>
+                <label>
+                  시간{" "}
+                  <select
+                    value={personalDraft.durationMinutes}
+                    onChange={(event) =>
+                      setPersonalDraft((draft) => ({
+                        ...draft,
+                        durationMinutes: Number(
+                          event.target.value,
+                        ) as VisitDuration,
+                      }))
+                    }
+                  >
+                    {[30, 60, 90, 120].map((minutes) => (
+                      <option key={minutes} value={minutes}>
+                        {minutes}분
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  주소(선택){" "}
+                  <input
+                    maxLength={200}
+                    value={personalDraft.address}
+                    onChange={(event) =>
+                      setPersonalDraft((draft) => ({
+                        ...draft,
+                        address: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+              </div>
+              <button
+                className="p2-control"
+                onClick={() => {
+                  change({
+                    type: "add-personal",
+                    personal: { ...personalDraft, id: crypto.randomUUID() },
+                  });
+                  setAdding(null);
+                }}
+              >
+                개인 일정 추가
+              </button>
+            </section>
+          ) : null}
+          {expanded === "accommodation" ? (
+            <section className="p2-panel p2-edit-form" aria-label="숙소 메모">
+              <h3>숙소 메모</h3>
+              <p className="p2-muted">
+                숙소 추천·예약 정보가 아닌 개인 메모예요.
+              </p>
+              <div className="p2-actions">
+                <label>
+                  이름{" "}
+                  <input
+                    maxLength={80}
+                    value={accommodationDraft.name}
+                    onChange={(event) =>
+                      setAccommodationDraft((draft) => ({
+                        ...draft,
+                        name: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label>
+                  주소(선택){" "}
+                  <input
+                    maxLength={200}
+                    value={accommodationDraft.address}
+                    onChange={(event) =>
+                      setAccommodationDraft((draft) => ({
+                        ...draft,
+                        address: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label>
+                  메모(선택){" "}
+                  <input
+                    maxLength={500}
+                    value={accommodationDraft.note}
+                    onChange={(event) =>
+                      setAccommodationDraft((draft) => ({
+                        ...draft,
+                        note: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+              </div>
+              <button className="p2-control" onClick={saveAccommodation}>
+                숙소 메모 저장
+              </button>
+            </section>
+          ) : null}
           <p className="p2-muted">
             자동차 일반 예상시간 편도 {duration(plan.destination.oneWayMinutes)}{" "}
             · {labels(plan.metrics.fulfilledInterests)} ·{" "}
@@ -918,15 +1207,19 @@ export function TripPlanner() {
                             <NotebookIcon kind={block.kind} />
                             {block.kind === "attraction"
                               ? `방문 · ${labels(block.attraction?.categories ?? [])}`
-                              : block.kind === "meal"
-                                ? `${block.mealType === "lunch" ? "점심" : "저녁"} · ${block.mealScope === "local" ? "음식점" : "이동 중 식사"}`
-                                : block.kind === "travel"
-                                  ? block.direction === "return"
-                                    ? "복귀 이동"
-                                    : "출발 이동"
-                                  : block.kind === "rest"
-                                    ? "휴식"
-                                    : block.title}
+                              : block.kind === "personal"
+                                ? block.personal?.category === "appointment"
+                                  ? "개인 일정 · 약속"
+                                  : "개인 일정 · 개인 장소"
+                                : block.kind === "meal"
+                                  ? `${block.mealType === "lunch" ? "점심" : "저녁"} · ${block.mealScope === "local" ? "음식점" : "이동 중 식사"}`
+                                  : block.kind === "travel"
+                                    ? block.direction === "return"
+                                      ? "복귀 이동"
+                                      : "출발 이동"
+                                    : block.kind === "rest"
+                                      ? "휴식"
+                                      : block.title}
                           </span>
                           <span>{duration(block.durationMinutes)}</span>
                         </div>
@@ -963,7 +1256,9 @@ export function TripPlanner() {
                               ? "이동 중 자유 식사"
                               : block.kind === "meal"
                                 ? "현지 식사"
-                                : block.title}
+                                : block.kind === "personal"
+                                  ? block.title
+                                  : block.title}
                           </strong>
                         )}
                         {block.attraction ? (
@@ -1002,26 +1297,60 @@ export function TripPlanner() {
                             추천하는 구간은 아니에요.
                           </p>
                         ) : null}
-                        {block.attraction ? (
+                        {block.attraction || block.personal ? (
                           <details className="p2-edit-tools">
-                            <summary>방문 수정</summary>
+                            <summary>
+                              {block.attraction
+                                ? "방문 수정"
+                                : "개인 일정 수정"}
+                            </summary>
                             <div className="p2-actions">
-                              <button
-                                className="p2-control"
-                                aria-pressed={!!block.fixed}
-                                onClick={() =>
-                                  change({
-                                    type: "toggle-fixed",
-                                    blockId: block.id,
-                                  })
-                                }
-                              >
-                                {block.fixed
-                                  ? "장소 고정됨 · 해제"
-                                  : "장소 고정"}
-                              </button>
+                              {block.attraction ? (
+                                <button
+                                  className="p2-control"
+                                  aria-pressed={!!block.fixed}
+                                  onClick={() =>
+                                    change({
+                                      type: "toggle-fixed",
+                                      blockId: block.id,
+                                    })
+                                  }
+                                >
+                                  {block.fixed
+                                    ? "장소 고정됨 · 해제"
+                                    : "장소 고정"}
+                                </button>
+                              ) : null}
                               <label className="p2-duration">
-                                방문시간
+                                시작 시각 고정
+                                <input
+                                  type="datetime-local"
+                                  value={block.fixedStartAt ?? ""}
+                                  onChange={(event) =>
+                                    change({
+                                      type: "set-fixed-start",
+                                      blockId: block.id,
+                                      fixedStartAt: event.target.value || null,
+                                    })
+                                  }
+                                />
+                              </label>
+                              {block.fixedStartAt ? (
+                                <button
+                                  className="p2-control"
+                                  onClick={() =>
+                                    change({
+                                      type: "set-fixed-start",
+                                      blockId: block.id,
+                                      fixedStartAt: null,
+                                    })
+                                  }
+                                >
+                                  시각 고정 해제
+                                </button>
+                              ) : null}
+                              <label className="p2-duration">
+                                {block.attraction ? "방문시간" : "일정 시간"}
                                 <select
                                   value={block.durationMinutes}
                                   onChange={(event) =>
@@ -1043,39 +1372,97 @@ export function TripPlanner() {
                               </label>
                               <button
                                 className="p2-control"
-                                onClick={() => {
-                                  if (block.fixed)
-                                    setMessage(
-                                      "교체하려면 먼저 장소 고정을 해제해 주세요.",
-                                    );
-                                  else
-                                    setExpanded(
-                                      expanded === block.id ? null : block.id,
-                                    );
-                                }}
+                                onClick={() =>
+                                  change({
+                                    type: "reorder-activity",
+                                    blockId: block.id,
+                                    direction: "up",
+                                  })
+                                }
                               >
-                                관광지 교체
+                                위로 이동
                               </button>
                               <button
                                 className="p2-control"
-                                onClick={() => {
-                                  if (block.fixed)
-                                    setMessage(
-                                      "삭제하려면 먼저 장소 고정을 해제해 주세요.",
-                                    );
-                                  else if (
-                                    window.confirm(
-                                      `${block.title} 방문을 삭제하고 자유시간으로 바꿀까요?`,
-                                    )
-                                  )
-                                    change({
-                                      type: "delete-attraction",
-                                      blockId: block.id,
-                                    });
-                                }}
+                                onClick={() =>
+                                  change({
+                                    type: "reorder-activity",
+                                    blockId: block.id,
+                                    direction: "down",
+                                  })
+                                }
                               >
-                                삭제
+                                아래로 이동
                               </button>
+                              <button
+                                className="p2-control"
+                                onClick={() =>
+                                  change({
+                                    type: "move-activity",
+                                    blockId: block.id,
+                                    day: block.day === 1 ? 2 : 1,
+                                    position: 0,
+                                  })
+                                }
+                              >
+                                {block.day === 1
+                                  ? "2일차로 이동"
+                                  : "1일차로 이동"}
+                              </button>
+                              {block.personal ? (
+                                <button
+                                  className="p2-control"
+                                  onClick={() =>
+                                    change({
+                                      type: "delete-personal",
+                                      blockId: block.id,
+                                    })
+                                  }
+                                >
+                                  개인 일정 삭제
+                                </button>
+                              ) : null}
+                              {block.attraction ? (
+                                <>
+                                  <button
+                                    className="p2-control"
+                                    onClick={() => {
+                                      if (block.fixed)
+                                        setMessage(
+                                          "교체하려면 먼저 장소 고정을 해제해 주세요.",
+                                        );
+                                      else
+                                        setExpanded(
+                                          expanded === block.id
+                                            ? null
+                                            : block.id,
+                                        );
+                                    }}
+                                  >
+                                    관광지 교체
+                                  </button>
+                                  <button
+                                    className="p2-control"
+                                    onClick={() => {
+                                      if (block.fixed)
+                                        setMessage(
+                                          "삭제하려면 먼저 장소 고정을 해제해 주세요.",
+                                        );
+                                      else if (
+                                        window.confirm(
+                                          `${block.title} 방문을 삭제하고 자유시간으로 바꿀까요?`,
+                                        )
+                                      )
+                                        change({
+                                          type: "delete-attraction",
+                                          blockId: block.id,
+                                        });
+                                    }}
+                                  >
+                                    삭제
+                                  </button>
+                                </>
+                              ) : null}
                             </div>
                           </details>
                         ) : null}
