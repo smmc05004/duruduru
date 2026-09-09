@@ -220,3 +220,43 @@ test("당일 입력은 검색 요청 없이 1박 2일 오류를 표시한다", a
   await expect(page.getByRole("status")).toContainText("다음날");
   expect(origins).toHaveLength(0);
 });
+
+test("선택한 계획에 개인 일정을 추가해도 음식점 조회를 다시 시작하지 않는다", async ({
+  page,
+}) => {
+  let restaurantCalls = 0;
+  await page.route("**/api/phase-two/restaurants", async (route) => {
+    restaurantCalls += 1;
+    await route.fulfill({
+      json: {
+        kind: "success",
+        restaurants: [],
+        queriedRegionIds: [],
+        failedRegionIds: [],
+        truncated: false,
+        fetchedAt: "2026-09-09T00:00:00.000Z",
+        message: "",
+      },
+    });
+  });
+  await page.route("**/api/attractions/**", async (route) => {
+    await route.fulfill({ status: 503, body: "unavailable" });
+  });
+  await page.goto("/");
+  await fillRequired(page);
+  await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
+  const results = page.getByRole("region", { name: "목적지 추천" });
+  await results
+    .getByRole("button", { name: /일정 보기$/ })
+    .first()
+    .click();
+  const plan = page.getByRole("region", { name: "여행 계획" });
+  await expect(plan).toBeVisible();
+  await expect.poll(() => restaurantCalls).toBe(1);
+  await plan.getByRole("button", { name: "개인 일정 추가" }).click();
+  const editor = page.getByRole("region", { name: "개인 일정 추가" });
+  await editor.getByRole("textbox").first().fill("친구와 만남");
+  await editor.getByRole("button", { name: "개인 일정 추가" }).click();
+  await expect(plan).toContainText("친구와 만남");
+  expect(restaurantCalls).toBe(1);
+});

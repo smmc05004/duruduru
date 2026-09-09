@@ -24,6 +24,7 @@ export function NotebookIcon({
     travel: "M3 12.5h14M4.5 12.5V9.2l1.8-3.4h7.4l1.8 3.4v3.3M5 14h3M12 14h3",
     attraction:
       "M3 16.5h14M5.5 16.5V8.2L10 4.5l4.5 3.7v8.3M8.4 16.5v-4.2h3.2v4.2",
+    personal: "M4 4h12v12H4zM7 8h6M7 11h4",
     meal: "M6.5 3v6a2 2 0 0 0 4 0V3M8.5 11v6M14 3c1.4 1.2 1.4 4.4 0 5.6V17",
     rest: "M7 3.5a6.5 6.5 0 1 0 9.5 8A5.2 5.2 0 0 1 7 3.5z",
     free: "M10 3v3M10 14v3M3 10h3M14 10h3M5 5l2 2M13 13l2 2M5 15l2-2M13 7l2-2",
