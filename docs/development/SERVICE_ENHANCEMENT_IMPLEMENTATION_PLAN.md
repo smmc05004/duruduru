@@ -1,6 +1,6 @@
 # 서비스 고도화 구현 계획
 
-> 상태: E1·E2 구현·검증·병합 완료, E3 구현·로컬 검증 완료·PR 준비 중 / 기준일: 2026-09-09 / E3 작업 브랜치: `feat/visit-information`
+> 상태: E1~E4 구현·독립 리뷰·CI·병합 완료 / 기준일: 2026-09-09
 
 ## E4 — 내 계획 편집
 
@@ -36,6 +36,13 @@
 - 저장 Jest: v2→v3 이관, 빈 v3의 재수입 방지, 손상/미지원 저장소, 용량 오류, 저장→새로고침 복원의 ID·고정·시각·식당·숙소 보존을 검증한다.
 - 통합/E2E: 실제 검색·선택·음식 목록 후 편집과 저장/복원을 확인하며, 외부 음식·관광 상세만 제한 mock한다. 기존 stale PoC page 테스트는 삭제·약화하지 않고 전체 Jest에서 분리 보고한다.
 
+### PR 증거
+
+- PR: [#70 E4 내 계획 편집을 구현한다](https://github.com/smmc05004/duruduru/pull/70)
+- 구현·보정 커밋: `32a6c04`, `5e8a771`, `997ada9`, `ea3cef2`.
+- 독립 리뷰에서 재배치의 고정 경계 탐색, v3 저장 검증·v2 이관, 날짜 이동 삽입 위치, 야간 휴식 숙소 메모를 보정했다. 마지막 재검토는 발견 없음이었다.
+- 관련 Jest 4개 suite 17건, `npm run verify`, 신규 Playwright 2건을 통과했다. PR 최신 CI의 Verify·E2E·Vercel·Vercel Preview Comments도 통과한 뒤 main에 병합했다.
+
 ## E3 — 추천 근거와 방문 판단 정보
 
 ### 목표
@@ -62,7 +69,7 @@
 
 ### 상태·의존성·제외
 
-- 상태: 구현·로컬 검증 완료·PR 준비 중. 작업 브랜치 `feat/visit-information`은 E2 병합 뒤 최신 `main`에서 생성했다.
+- 상태: 구현·독립 리뷰·CI·병합 완료.
 - 의존성: 기존 TourAPI `detailCommon2`/`detailIntro2`, 서버 키, 선택 계획·프로필 계약만 사용한다.
 - 제외: 검색 상세 호출, 새 외부 서비스·키·DB·LLM·실시간/경로/지오코딩, 전국 상세 수집, 음식점 상세/선정 변경, E4 편집·저장 스키마 변경은 하지 않는다.
 
@@ -76,7 +83,8 @@
 - `npm run verify`: 통과. format·lint·typecheck·production build를 포함한다. 기존 `scripts/build-region-profile.mjs`의 미사용 변수 ESLint 경고 2건은 유지된다.
 - 전체 Jest: 102건 통과, 19건 실패. 실패는 기존 `app/__tests__/page.test.tsx`가 제거된 PoC-era select·loader props를 전제해 현 `TripPlanner` UI 계약과 맞지 않는 기준선 문제다. E3에서 해당 테스트를 삭제·약화하거나 통과로 처리하지 않았다.
 - 실제 API 한계: 실 TourAPI 키·외부 호출 성공은 검증 근거로 삼지 않았다. 기존 Route Handler의 서버 키·프로필 소속 검증을 유지하고, 제한 mock으로 success/partial/오류를 재현했다.
-- PR 증거: 커밋/PR/CI 확인 후 번호와 결과를 추가한다.
+- PR: [#69 관광지 방문 정보를 보강한다](https://github.com/smmc05004/duruduru/pull/69)
+- 보정 커밋: `dc6bbf8`(요청 경계), `0172fe7`(편집 후 정보 보존). 독립 재검토에서 발견 없음, Verify·E2E·Vercel·Vercel Preview Comments 통과 뒤 main에 병합했다.
 
 ## E2 — 하루 관광 구성과 여유
 
