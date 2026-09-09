@@ -1,6 +1,48 @@
 # 서비스 고도화 구현 계획
 
-> 상태: E1 구현·검증·병합 완료 (`e071fce`, CI 기록 `5dd184a`), E2 구현·로컬 검증 완료, PR 생성 예정 / 기준일: 2026-09-08 / E2 작업 브랜치: `feat/day-itinerary-composition`
+> 상태: E1·E2 구현·검증·병합 완료, E3 구현·로컬 검증 완료·PR 준비 중 / 기준일: 2026-09-09 / E3 작업 브랜치: `feat/visit-information`
+
+## E3 — 추천 근거와 방문 판단 정보
+
+### 목표
+
+선택한 계획의 실제 관광지에만 TourAPI 기존 상세 원천을 제한적으로 보강한다. 일정과 기존 음식점 흐름은 즉시 유지하고, 제공된 소개·Type1 확인 사진·휴무 원문·안전한 주소 도구를 항목별로 덧붙인다. 검색에는 관광 상세 호출을 추가하지 않는다.
+
+### 수용 기준
+
+- 자동 보강은 실제 계획의 서로 다른 관광지 최대 6개에만 하고, 항목별 `detailCommon2`/`detailIntro2` 최대 2회, 전체 최대 12회·원천 동시성 2·항목 12초·작업 28초를 지킨다. 항목은 순차 처리하고 내부 두 요청만 병렬 처리한다.
+- 진행 요청은 `contentId + contentTypeId` 단위로 자동·클릭이 공유한다. 정상 캐시는 30분, 부분 캐시는 5분이며, 자동 재시도는 없고 명시적 재시도는 항목당 최대 2회 및 실패 뒤 30초 쿨다운을 적용한다.
+- 검색/목적지/계획 세대가 바뀌면 이전 자동 결과를 취소 또는 무시한다. 저장본 복원은 자동 상세 호출 0회이고 명시적 `방문정보 확인`만 같은 예산으로 요청한다.
+- 항목별 `loading / ready / partial / unavailable / not-requested`와 부분 성공을 보존한다. 느림·오류·시간 초과는 관광·식사 계획을 막거나 바꾸지 않는다.
+- 소개는 HTML을 실행하지 않는 안전한 첫 160자 요약과 펼치기로, 사진은 `cpyrhtDivCd === Type1` 및 허용 관광공사 이미지 호스트일 때만 출처·조건·조회일과 함께 표시한다. 그 외 이미지·원시 HTML·원시 외부 URL은 쓰지 않는다.
+- 휴무 원문을 보이고, 전체가 단일 `매주 {요일}` 또는 `매주 {요일} 휴무` 형식일 때만 KST 방문일과 비교해 경고한다. 공휴일 예외·복수 조건·부분 일치·결측은 자동 판정하지 않는다.
+- 주소가 있으면 복사와 승인한 HTTPS 지도 검색 링크를 제공하고, 없으면 이름 검색임을 알리며 복사 버튼을 숨긴다. 링크는 URL 인코딩·`noopener noreferrer`를 사용하고 복사 실패는 주소 선택 안내로 처리한다.
+
+### 파일 범위와 구현 순서
+
+1. `lib/attraction-detail.ts`와 관광 상세 Route Handler를 현재 TourAPI 계약·콘텐츠 유형/프로필 소속 검증에 맞춰 확장하고, 안전 정규화·사진·휴무·지도 URL 규칙을 도메인 모듈로 둔다.
+2. client-safe 상세 요청 조정기와 캐시를 추가해 공유·취소·세대 격리·시간 제한·재시도 예산을 적용한다.
+3. `components/mvp-phase-two/Notebook.tsx`, `components/mvp-phase-two/TripPlanner.tsx`의 기존 H 여행 수첩 레일에 비차단 방문 정보 카드와 접근 가능한 상태/동작만 추가한다. 음식 상세·알고리즘과 E1/E2 근거는 바꾸지 않는다.
+4. 먼저 실패하는 Jest로 한도·공유·시간 초과·부분 성공·stale 격리·저장 복원 무요청 및 정규화/휴무/URL을 검증하고, 실제 검색→역할→선택→계획→제한 mock 음식 API 통합 흐름을 유지한다.
+5. Playwright 실제 UI, `npm run verify`, 관련/전체 Jest, `npm run test:e2e`, `npm run cycle`을 실행하고 PR에 실제 TourAPI 확인 결과와 mock 검증을 구분해 기록한다.
+
+### 상태·의존성·제외
+
+- 상태: 구현·로컬 검증 완료·PR 준비 중. 작업 브랜치 `feat/visit-information`은 E2 병합 뒤 최신 `main`에서 생성했다.
+- 의존성: 기존 TourAPI `detailCommon2`/`detailIntro2`, 서버 키, 선택 계획·프로필 계약만 사용한다.
+- 제외: 검색 상세 호출, 새 외부 서비스·키·DB·LLM·실시간/경로/지오코딩, 전국 상세 수집, 음식점 상세/선정 변경, E4 편집·저장 스키마 변경은 하지 않는다.
+
+### 검증·PR 증거
+
+- Jest: 호출 수/동시성/12초·28초/캐시 만료·공유·재시도, 부분/오류/시간 초과, stale 결과 차단, 저장 복원 무요청, Type1·안전 HTML/URL, KST 단일 요일 휴무를 검증한다.
+- 통합 Jest: 검색과 E1/E2 실제 엔진을 실행하고 음식·관광 상세 원천만 제한 mock해 선택 후 계획 유지와 비차단 상세 보강을 검증한다.
+- 브라우저·품질: Playwright UI 확인, `npm run verify`, `npm run test:e2e`, `npm run cycle`을 실행한다. 기존 stale `app/__tests__/page.test.tsx` 전체 Jest 실패는 삭제·약화하지 않고 기준선 한계로 분리 기록한다.
+- 로컬 증거: `lib/__tests__/attraction-visit-info.test.ts`, `lib/__tests__/mvp-phase-two-flow-e3.test.ts` 5건 통과. 최대 6개 순차 보강·공유/부분 캐시·수동 재시도 쿨다운·항목 timeout/stale 중단·KST 휴무·안전 지도 URL과 실제 검색→계획→음식 Route Handler→프로필 소속 관광 상세 2원천 정규화를 확인했다. `npm run typecheck`, `git diff --check`도 통과했다.
+- 브라우저: `E2E_PORT=3100 npm run test:e2e -- e2e/home.spec.ts` 5건 통과. 실제 검색 엔진에서 목적지를 선택한 뒤에만 방문정보를 보강하고, 검색 중 상세 호출 0회·안전한 지도 링크 표시를 확인했다. 개발 환경 React Strict Mode가 첫 effect를 취소한 뒤 자동 보강을 영구 생략하던 문제를 수정하고 동일 시나리오로 재검증했다.
+- `npm run verify`: 통과. format·lint·typecheck·production build를 포함한다. 기존 `scripts/build-region-profile.mjs`의 미사용 변수 ESLint 경고 2건은 유지된다.
+- 전체 Jest: 98건 통과, 19건 실패. 실패는 기존 `app/__tests__/page.test.tsx`가 제거된 PoC-era select·loader props를 전제해 현 `TripPlanner` UI 계약과 맞지 않는 기준선 문제다. E3에서 해당 테스트를 삭제·약화하거나 통과로 처리하지 않았다.
+- 실제 API 한계: 실 TourAPI 키·외부 호출 성공은 검증 근거로 삼지 않았다. 기존 Route Handler의 서버 키·프로필 소속 검증을 유지하고, 제한 mock으로 success/partial/오류를 재현했다.
+- PR 증거: 커밋/PR/CI 확인 후 번호와 결과를 추가한다.
 
 ## E2 — 하루 관광 구성과 여유
 

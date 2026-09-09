@@ -140,6 +140,63 @@ test("실제 검색 엔진의 역할 후보를 선택한 뒤에만 음식점 API
   await expect.poll(() => restaurantCalls).toBe(1);
 });
 
+test("선택 계획의 관광지만 비차단 방문 정보로 보강하고 검색에서는 상세를 호출하지 않는다", async ({
+  page,
+}) => {
+  await page.route("**/api/phase-two/restaurants", async (route) => {
+    await route.fulfill({
+      json: {
+        kind: "success",
+        restaurants: [],
+        queriedRegionIds: [],
+        failedRegionIds: [],
+        truncated: false,
+        fetchedAt: "2026-09-09T00:00:00.000Z",
+        message: "",
+      },
+    });
+  });
+  let detailCalls = 0;
+  await page.route("**/api/attractions/**", async (route) => {
+    detailCalls += 1;
+    await route.fulfill({
+      json: {
+        kind: "success",
+        detail: {
+          title: { status: "confirmed", value: "관광지" },
+          address: { status: "confirmed", value: "서울특별시 중구 세종대로 1" },
+          overview: { status: "confirmed", value: "안전한 방문 소개" },
+          openingHours: { status: "unknown" },
+          closedDays: { status: "confirmed", value: "매주 월요일 휴무" },
+          fees: { status: "unknown" },
+          phone: { status: "unknown" },
+          imageUrl: "",
+          fetchedAt: "2026-09-09T00:00:00.000Z",
+        },
+      },
+    });
+  });
+  await page.goto("/");
+  await fillRequired(page);
+  await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
+  const results = page.getByRole("region", { name: "목적지 추천" });
+  await expect(results.locator(".dd-candidate").first()).toBeVisible();
+  expect(detailCalls).toBe(0);
+
+  await results
+    .getByRole("button", { name: /일정 보기$/ })
+    .first()
+    .click();
+  const plan = page.getByRole("region", { name: "여행 계획" });
+  await expect(plan).toBeVisible();
+  await expect(plan.getByText("안전한 방문 소개").first()).toBeVisible();
+  await expect(
+    plan.getByRole("link", { name: "지도에서 장소 찾기" }).first(),
+  ).toHaveAttribute("rel", "noopener noreferrer");
+  await expect.poll(() => detailCalls).toBeGreaterThan(0);
+  expect(detailCalls).toBeLessThanOrEqual(6);
+});
+
 test("부산 출발 선택은 부산을 검색 입력으로 전송한다", async ({ page }) => {
   const origins: string[] = [];
   await mockSearch(page, origins);
