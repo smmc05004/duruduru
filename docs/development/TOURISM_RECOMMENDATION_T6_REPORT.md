@@ -147,10 +147,27 @@ D4 정렬 규칙 자체의 산출물이 제품 원칙("가용시간 우선", "�
 
 독립 리뷰에서 확인된 결함 3건을 같은 브랜치에서 수정했다. 제품 정책(가중치·역할 순서·목적 점수 공식)은 불변이며, T6 48셀 비교 매트릭스는 수정 전/후 **바이트 동일**이다.
 
-- **결함 1 — 수집 완전성 검증.** 두 수집기가 `totalCount` 대비 실제 고유 건수 부족(`totalCount=100`인데 1건 반환 등), 요청 페이지 범위의 누락, 페이지 간 중복 ID, 페이지별 `totalCount` 변동을 감지하면 정상본 교체를 차단한다(중심: 지역 `status="failed"` + `validateDocument`; 프로필: `document.completeness.blockers` + `validateDocument`). 임시 산출물 `*.next.json`은 남긴다. 공통 로직은 `scripts/lib/paged-collection.mjs`.
+- **결함 1·3 — 수집 완전성과 페이지별 재개(검증 통과 기준).** 공통 로직
+  `scripts/lib/paged-collection.mjs`의 `collectPagedUnit`이 두 수집기(프로필=분류
+  스펙, 중심=지역)를 처리한다.
+  - **통신 성공 ≠ 검증 성공.** 페이지 항목 수가 기대치(마지막 전 페이지 =
+    `pageSize`, 마지막 페이지 = `totalCount % pageSize`, 0이면 `pageSize`)에 못
+    미치면(`totalCount=100`인데 1건 등) 그 페이지는 **불완전**으로 남기고
+    체크포인트에 성공(`complete: true`)으로 저장하지 않는다.
+  - **재개.** `--resume`은 `complete === true` 페이지만 건너뛴다. 불완전·미저장
+    페이지는 다시 조회한다.
+  - **일관성 붕괴 → 단위 재시작.** 페이지별 `totalCount` 변동 또는 페이지 간
+    중복 ID는 수집 도중 스냅샷이 바뀐 징후라 부분 페이지를 신뢰할 수 없다. 그
+    스펙/지역의 저장된 성공 페이지를 전부 무효화하고 1페이지부터 재수집한다(최대
+    2회). 다른 정상 스펙/지역은 유지한다.
+  - **완료 판정과 교체 차단.** 스펙/지역이 "완료"이려면 기대 페이지 전부 검증
+    통과 + 페이지 간 중복 0 + `totalCount` 불변. 하나라도 어긋나면 미완료로 남기고
+    정상본 교체에서 제외한다(중심: 지역 `status="failed"` + `validateDocument`;
+    프로필: `document.completeness.blockers` + `validateDocument`). 임시 산출물
+    `*.next.json`은 남긴다.
 - **결함 2 — 새 세부 분류 적용.** planner의 `detailCategory`가 구 `cat3`/`cat2`만 봐서 새 분류만 있는 서로 다른 역사 명소(공산성 `HS010200` vs 불국사 `HS030100`)를 세부 분류 다양성 지표가 구별하지 못했다. 공통 헬퍼 `detailClassification`(`lib/interest-classification.ts`)로 `lclsSystm3 → lclsSystm2 → cat3 → cat2 → 관심사 조합` 순으로 값을 정한다. 정렬 키·가중치·역할 순서는 불변.
-- **결함 3 — 페이지별 수집 재개.** 체크포인트가 성공 페이지를 실제로 저장하지 않아 재개 시 성공 페이지를 다시 호출했다. 두 수집기 모두 스펙(또는 지역)별 성공 페이지 목록을 체크포인트에 저장하고 `--resume` 시 실패·미수집 페이지만 이어서 조회한다. `baseYm`·분류 버전·매핑 버전 일치 규칙은 유지.
-- **검증.** `npm run verify` 통과. `npm run test:enhancement` 150 통과. `npx jest scripts/__tests__/` 93 통과. `npx jest` 351 통과 / 19 실패(전부 기존 PoC `page.test.tsx`, 신규 회귀 0). `npm run test:e2e -- --repeat-each=2` 24 통과.
+- **회귀 테스트.** 불완전 응답(1/N건) → `--resume`에서 정상 응답으로 **실제 복구**되고 1·2페이지는 재호출하지 않음, 일관성 붕괴 → 1페이지부터 재수집, 검증 통과 페이지만 건너뜀 — 프로필·중심·공통(`collectPagedUnit`) 세 레벨에서.
+- **검증.** `npm run verify` 통과. `npm run test:enhancement` 150 통과. `npx jest scripts/__tests__/` 109 통과. `npx jest` 367 통과 / 19 실패(전부 기존 PoC `page.test.tsx`, 신규 회귀 0). `npm run test:e2e -- --repeat-each=2` 24 통과. T6 48셀 비교 매트릭스 바이트 동일.
 
 ## 부록: 재현 스크립트
 
