@@ -143,6 +143,15 @@ E2E `T6 중심 근거 카드…`도 `/api/search` 실호출 시 `phase-two/resta
 
 D4 정렬 규칙 자체의 산출물이 제품 원칙("가용시간 우선", "실행 가능한 참고용")과 충돌할 여지가 있고, 성능 수정(`facilityGroups` 메모)과 선정 경로 변경이 함께 들어갔다. **구현 세션과 분리된 reviewer 세션의 독립 검토를 권장한다**(특히 6.1의 제품 규칙 판단은 PM, 코드 정합성은 reviewer).
 
+### 6.6 리뷰 후속 수정 (2026-09-10, 같은 PR)
+
+독립 리뷰에서 확인된 결함 3건을 같은 브랜치에서 수정했다. 제품 정책(가중치·역할 순서·목적 점수 공식)은 불변이며, T6 48셀 비교 매트릭스는 수정 전/후 **바이트 동일**이다.
+
+- **결함 1 — 수집 완전성 검증.** 두 수집기가 `totalCount` 대비 실제 고유 건수 부족(`totalCount=100`인데 1건 반환 등), 요청 페이지 범위의 누락, 페이지 간 중복 ID, 페이지별 `totalCount` 변동을 감지하면 정상본 교체를 차단한다(중심: 지역 `status="failed"` + `validateDocument`; 프로필: `document.completeness.blockers` + `validateDocument`). 임시 산출물 `*.next.json`은 남긴다. 공통 로직은 `scripts/lib/paged-collection.mjs`.
+- **결함 2 — 새 세부 분류 적용.** planner의 `detailCategory`가 구 `cat3`/`cat2`만 봐서 새 분류만 있는 서로 다른 역사 명소(공산성 `HS010200` vs 불국사 `HS030100`)를 세부 분류 다양성 지표가 구별하지 못했다. 공통 헬퍼 `detailClassification`(`lib/interest-classification.ts`)로 `lclsSystm3 → lclsSystm2 → cat3 → cat2 → 관심사 조합` 순으로 값을 정한다. 정렬 키·가중치·역할 순서는 불변.
+- **결함 3 — 페이지별 수집 재개.** 체크포인트가 성공 페이지를 실제로 저장하지 않아 재개 시 성공 페이지를 다시 호출했다. 두 수집기 모두 스펙(또는 지역)별 성공 페이지 목록을 체크포인트에 저장하고 `--resume` 시 실패·미수집 페이지만 이어서 조회한다. `baseYm`·분류 버전·매핑 버전 일치 규칙은 유지.
+- **검증.** `npm run verify` 통과. `npm run test:enhancement` 150 통과. `npx jest scripts/__tests__/` 93 통과. `npx jest` 351 통과 / 19 실패(전부 기존 PoC `page.test.tsx`, 신규 회귀 0). `npm run test:e2e -- --repeat-each=2` 24 통과.
+
 ## 부록: 재현 스크립트
 
 | 목적                       | 명령                                                                                         |
