@@ -127,10 +127,11 @@ describe("E1 목적지 역할 선택", () => {
       [...input],
     );
 
-    expect(selected.map((item) => item.groupId)).toEqual(["A", "B", "C"]);
+    // 표시 순서는 interest → easy → relaxed (D4): 관심사가 다양한 B가 먼저다.
+    expect(selected.map((item) => item.groupId)).toEqual(["B", "A", "C"]);
     expect(selected.map((item) => item.recommendation.role)).toEqual([
-      "easy",
       "interest",
+      "easy",
       "relaxed",
     ]);
   });
@@ -153,8 +154,8 @@ describe("E1 목적지 역할 선택", () => {
 
     expect(selected.map((item) => item.groupId)).toEqual(["A", "B"]);
     expect(selected.map((item) => item.recommendation.role)).toEqual([
-      "easy",
       "interest",
+      "easy",
     ]);
   });
 
@@ -229,7 +230,7 @@ describe("E1 목적지 역할 선택", () => {
       result.candidates.length,
     );
     expect(result.candidates.map((item) => item.recommendation?.role)).toEqual(
-      ["easy", "interest", "relaxed"].slice(0, result.candidates.length),
+      ["interest", "easy", "relaxed"].slice(0, result.candidates.length),
     );
 
     const selected = result.candidates[0];
@@ -264,5 +265,63 @@ describe("E1 목적지 역할 선택", () => {
     expect(withFood.destination.preview.blocks).toEqual(
       selected.preview.blocks,
     );
+  });
+});
+
+describe("T5 목적 근거 점수의 초안 일치·결정성", () => {
+  const request = {
+    originId: "seoul" as const,
+    startAt: "2026-09-12T08:00",
+    returnBy: "2026-09-13T20:00",
+    transport: "car" as const,
+    interests: ["history", "culture"] as const,
+  };
+
+  it("점수 기여 장소는 모두 실제 초안에 배치된 관광지다", () => {
+    const result = searchPhaseTwo(request, "s", "2026-09-08T00:00:00.000Z");
+    expect(result.kind).toBe("success");
+    if (result.kind !== "success") return;
+    let scoredWithContribution = 0;
+    for (const candidate of result.candidates) {
+      const purpose = candidate.recommendation?.purpose;
+      expect(purpose).toBeDefined();
+      if (!purpose) continue;
+      expect(purpose.version).not.toBe("");
+      expect(["scored", "no-central-data"]).toContain(purpose.status);
+      if (purpose.score !== null) expect(purpose.score).toBeLessThanOrEqual(1);
+      const placedIds = new Set(
+        candidate.preview.blocks.flatMap((block) =>
+          block.kind === "attraction" && block.contentId
+            ? [block.contentId]
+            : [],
+        ),
+      );
+      for (const contentId of purpose.contributingContentIds)
+        expect(placedIds.has(contentId)).toBe(true);
+      // 근거 장소가 후보 지역의 전체 원천 명소가 아니라 배치된 부분집합임을 확인
+      expect(purpose.contributingContentIds.length).toBeLessThanOrEqual(
+        placedIds.size,
+      );
+      if (purpose.status === "scored" && purpose.contributingContentIds.length)
+        scoredWithContribution++;
+    }
+    expect(scoredWithContribution).toBeGreaterThan(0);
+  });
+
+  it("같은 입력·데이터 버전은 같은 후보·근거 점수를 만든다", () => {
+    const a = searchPhaseTwo(request, "s1", "2026-09-08T00:00:00.000Z");
+    const b = searchPhaseTwo(request, "s2", "2026-09-08T00:00:00.000Z");
+    if (a.kind !== "success" || b.kind !== "success") throw new Error("no");
+    expect(a.candidates.map((c) => c.groupId)).toEqual(
+      b.candidates.map((c) => c.groupId),
+    );
+    expect(a.candidates.map((c) => c.recommendation?.purpose?.score)).toEqual(
+      b.candidates.map((c) => c.recommendation?.purpose?.score),
+    );
+    expect(a.candidates.map((c) => c.recommendation?.role)).toEqual([
+      "interest",
+      "easy",
+      "relaxed",
+    ]);
   });
 });

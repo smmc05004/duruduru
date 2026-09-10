@@ -17,7 +17,7 @@
 | T2   | 완료(2026-09-10) | 프로필 수집기 교체·전국 재수집                    | 페이지 완전성·중복·분류/법정동/좌표 품질 보고와 정상본 교체, 대표 명소 포함         |
 | T3   | 완료(2026-09-10) | 중심 관광지 수집기·체크포인트                     | 202608 동일월·유효 지역·예산·제한 재시도·인증 중단·재개·정상본 보존 검증            |
 | T4   | 완료(2026-09-10) | 보수적 원천 연결·데이터 묶음                      | 연결 상태별 집계, 본체/부분 금지 사례·동일 시설 중복 점수 검증                      |
-| T5   | 미착수           | 실제 방문 선정·목적 근거 점수·역할 순서           | 기획 D4와 초안/카드 근거 일치, 시간·편집·저장 호환 유지                             |
+| T5   | 완료(2026-09-10) | 실제 방문 선정·목적 근거 점수·역할 순서           | 기획 D4와 초안/카드 근거 일치, 시간·편집·저장 호환 유지                             |
 | T6   | 미착수           | 결과 비교·통합 검증·인계                          | 변경 전후 비교 보고, 검색 외부 호출 0회, Jest/Playwright/verify 및 PR 근거          |
 
 T1→T2→T3→T4→T5→T6 순서로 진행한다. 앞 단계 실패를 임의 데이터·도시 가점으로 우회하지 않는다. 일정 생성 개선만 먼저 넣고 데이터 교체가 끝났다고 표시하지 않는다.
@@ -118,6 +118,18 @@ T1→T2→T3→T4→T5→T6 순서로 진행한다. 앞 단계 실패를 임의 
 - 기존 저장본에서 새 근거 필드가 없으면 이전 상태로 복원한다. 새 필드를 얻기 위한 자동 검색/외부 조회를 하지 않는다. 새로운 계획의 버전·근거 필드를 저장한다.
 - Next.js/React 변경 전 설치된 관련 Next.js 가이드와 Vercel 성능 스킬을 읽는다. UI 재디자인·추가 입력·거리 하한은 범위 밖이다.
 
+#### T5 완료 기록 (2026-09-10)
+
+- **파일 범위(조사 결과).** 소비 경로는 `lib/mvp-phase-two-search.ts`(그룹·초안·역할) → `lib/mvp-phase-two-planner.ts`(`scheduleTrip`/`scheduleBaseTrip`/`selectPlaces`, 초안 선정) → `lib/mvp-phase-two-types.ts`(계약) → `lib/mvp-phase-two-storage.ts`(저장 검증·정리) → `components/mvp-phase-two/Notebook.tsx`(`NotebookCandidate` 카드)다. `rg`로 확인: `scheduleTrip`은 검색과 테스트 픽스처만 호출하고 편집(`editPlan`/`rebuildActivities`/`arrangeDay`)은 `scheduleLocalDay`만 써 관광을 재선정하지 않는다 → 초안 선정 변경이 사용자 편집·저장 복원을 건드리지 않는다. `activity-placement.ts`는 분(minute) DP만 담당해 근거 무관, 그대로 둠. 레거시 `lib/recommendation*.ts`·`components/CandidateCard.tsx`는 phase-two가 import하지 않아 제외.
+- **새 모듈** `lib/tourism-evidence.ts`: `data/tourism-evidence.json`의 `regions[regionId].matched[contentId]`를 O(1) 조회. `nonItineraryCategory`(숙박·쇼핑·교통) 매치와 `hubRank ∉ [1,100]`은 연결 없음으로 취급(근거·점수·선정 신호 전부 제외). `computePurposeEvidence(placed, interests, memberRegionIds)`가 D4 점수를 만든다.
+- **"실제 초안 배치 장소만 점수 근거" 보장.** `searchPhaseTwo`가 `scheduleTrip` 반환 후 `preview.blocks`의 `kind === "attraction"` 블록에서만 `attraction`을 뽑아 `computePurposeEvidence`에 넘긴다. 후보 지역의 `group.places`(전체 원천 명소)나 `candidate.attractions`는 넘기지 않는다. 관심사별로 `attraction.categories` 교집합 → `facilityGroups`로 중복 시설 제거(가장 낮은 hubRank 하나) → `1/log2(1+hubRank)` 상위 3개 합 ÷ 3 → 요청 관심사 평균. 상한 1. Jest가 `contributingContentIds ⊆ 배치 블록 contentId`를 검증한다.
+- **선정 반영(D4).** `selectPlaces` 정렬에 미충족 관심사 다음, 세부 분류·근접성 앞 순서로 중심 근거 동점 규칙 추가(연결 있는 장소 우선 → 낮은 hubRank 우선). `scheduleTrip`/`scheduleBaseTrip`에 선택적 `centralHubRank` 콜백을 뚫었고 검색만 `hubRankForSelection`을 넘긴다. 편집·픽스처는 undefined → 기존 동작. 초안 알고리즘 버전 `e2-v1 → e2-v2`.
+- **역할 순서.** 선택·표시 순서 `easy→interest→relaxed` → `interest→easy→relaxed`. `interest` 정렬 키: 충족 관심사 수 ↓ → 목적 근거 점수 ↓ → 세부 분류 다양성 ↓ → 실제 관광 수 ↓ → 왕복시간 ↑ → groupId ↑. `easy`/`relaxed`는 기존 이동 부담/여유 정렬 유지, 선행 선택 그룹 제외. 저장본·픽스처의 근거 결측(`unavailable`)과 `no-central-data`는 정렬에서 0으로 처리(결정적). `algorithmVersion` `e1-v1 → e1-v2`.
+- **카드.** 대표 장소·추천 이유는 본문 유지. 원천명(티맵 기반)·기준월·연결 수·목적 점수는 `방문 미리보기·추천 근거`(근거 펼치기)에만 표시. 중심 근거가 없으면(`contributingContentIds` 빈 값·`no-central-data`) 중심 관광지 문구를 넣지 않고 "지역 매력 0 아님" 안내만 남긴다. `전국 역사 1위`·`가장 인기`·`영업 보장` 문구 없음.
+- **저장 하위호환.** `recommendation` 검증: `algorithmVersion ∈ {e1-v1, e1-v2}`, `purpose`는 선택 필드(누락 시 그대로 복원 — 재계산·외부 조회 없음). `itineraryAlgorithmVersion ∈ {e2-v1, e2-v2}`. `cleanRecommendation`이 `purpose`를 화이트리스트로 통과, 손상된 `purpose`(점수>1 등)는 저장본 거절.
+- **검증.** `npm run verify` 통과. `npm run test:enhancement` 97/97. 신규 `lib/__tests__/enhancement-tourism-evidence.test.ts`(9) + `mvp-phase-two-search.test.ts` T5 블록(2) + `mvp-phase-two-storage-v3.test.ts` T5 블록(3), 기존 역할 순서 테스트 갱신. 전체 `npx jest`는 `app/__tests__/page.test.tsx` 19실패(작업 전부터 깨진 PoC)만 남고 그 외 272 통과. 검색 경로 외부 fetch 0회(flow-e2가 tour-api mock 미호출 확인).
+- **T6로 넘길 사항.** (1) 서울·부산·비광역시 출발 변경 전/후 후보·대표 명소·근거 점수 비교 보고. (2) 전국 연결률 16%(숙박·쇼핑 분모 포함)가 `interest` 역할 순위에 주는 영향 — 중심 자료 있는 지역이 동점에서 유리, `no-central-data` 28개 지역은 목적 점수 0. (3) Playwright 입력→3지역→선택→음식→계획→저장/복원과 중심 근거 실제 방문 일치. (4) `hubRankForSelection`이 허브 관심사와 장소 관심사 일치를 엄밀히 대조하지 않고 "matched면 신호"로 단순화한 점(원천 `interestCategories`가 같은 분류기 산출이라 실무상 일치).
+
 ### T6: 검증·완료
 
 - 단위: 새 분류/하위 호환, 수집 오류·재개·완전성, 매칭 정확성, 시설 중복, 점수 상한/결측, 역할 순서·동점, 시간 불가 및 사용자 계획 보존을 Jest로 검증한다.
@@ -130,4 +142,4 @@ T1→T2→T3→T4→T5→T6 순서로 진행한다. 앞 단계 실패를 임의 
 
 ## 다음 세션 시작점
 
-T1·T2·T3·T4 완료(2026-09-10). 다음은 **T5 — 추천·계획 소비**다. `data/tourism-evidence.json`(schemaVersion 1, dataVersion·`regions[regionId].matched[contentId]` 인덱스)을 `lib/mvp-phase-two-search.ts`·`lib/mvp-phase-two-planner.ts`의 실제 초안 지표에 반영해 D4 목적 근거 점수와 interest/easy/relaxed 역할 순서를 구현한다. T4 완료 기록의 "T5로 넘길 사항"과 기획서 D4를 먼저 읽는다. 후보 지역의 모든 원천 명소로 점수를 계산한 뒤 다른 장소를 일정에 넣는 구현은 금지다. 사용자가 고정·편집한 계획은 새 순위로 재생성하지 않는다. 전국 추천 품질은 구현 후 검증 대상이며 검증 완료라고 보고하지 않는다.
+T1·T2·T3·T4·T5 완료(2026-09-10). 다음은 **T6 — 결과 비교·통합 검증·인계**다. T5 완료 기록의 "T6로 넘길 사항"과 기획서 수용 기준 4·5를 먼저 읽는다. 서울·부산·비광역시 출발의 변경 전/후 후보·대표 명소·근거 점수·왕복/현지시간·배제 이유를 비교 보고하고, 검색 중 외부 fetch를 감시/실패시켜도 추천이 동작함을 확인한다. 특정 도시 순위를 통과 조건으로 하드코딩하지 않는다. 전국 추천 품질(연결률 16%)은 T6 검증 대상이며 임의 튜닝을 반복하지 말고 원인·제품 규칙 변경안을 보고한다.
