@@ -85,11 +85,20 @@ export function regionCentralStatus(
   return regions[regionId]?.centralStatus ?? "unknown";
 }
 
-/** 초안 선정 시 사용하는 가벼운 신호: 배치 후보의 최적 hubRank 또는 null. */
+/**
+ * 초안 선정 시 사용하는 가벼운 신호: 배치 후보의 최적 hubRank 또는 null.
+ *
+ * `selectPlaces`의 정렬 비교자가 후보마다 반복 호출한다(그룹·슬롯·비교마다). 정상본
+ * JSON은 불변이라 (regionId, contentId)별 결과를 메모이즈해도 결정성이 유지된다.
+ */
+const selectionRankCache = new Map<string, number | null>();
 export function hubRankForSelection(attraction: Attraction): number | null {
-  return (
-    hubEvidenceFor(attraction.regionId, attraction.contentId)?.hubRank ?? null
-  );
+  const key = `${attraction.regionId} ${attraction.contentId}`;
+  if (selectionRankCache.has(key)) return selectionRankCache.get(key) ?? null;
+  const rank =
+    hubEvidenceFor(attraction.regionId, attraction.contentId)?.hubRank ?? null;
+  selectionRankCache.set(key, rank);
+  return rank;
 }
 
 const scoreValue = (hubRank: number) => 1 / Math.log2(1 + hubRank);

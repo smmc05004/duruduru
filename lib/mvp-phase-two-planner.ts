@@ -87,10 +87,21 @@ function facilitySignal(left: Attraction, right: Attraction): boolean {
  * Conservative, client-safe grouping signal. It keeps original attractions and
  * checks a new member against the representative and every current member.
  */
+/**
+ * `facilityGroups`는 O(n²) 시설 신호 비교라 큰 후보 풀에서 비싸다. `selectPlaces`가
+ * 한 스케줄링 안에서 같은 `places` 배열 참조로 수십 번 재호출하므로, 기본 보정
+ * 목록(빈 배열 상수)일 때만 배열 참조로 메모이즈한다. 순수 함수라 결정성은 유지된다.
+ */
+const facilityGroupCache = new WeakMap<Attraction[], Map<string, string>>();
 export function facilityGroups(
   places: Attraction[],
   corrections: readonly FacilityCorrection[] = FACILITY_CORRECTIONS,
 ): Map<string, string> {
+  const cacheable = corrections === FACILITY_CORRECTIONS;
+  if (cacheable) {
+    const cached = facilityGroupCache.get(places);
+    if (cached) return cached;
+  }
   const groups: Attraction[][] = [];
   for (const place of [...places].toSorted((a, b) =>
     compareId(a.contentId, b.contentId),
@@ -120,6 +131,7 @@ export function facilityGroups(
       result.set(second, `facility-independent-${second}`);
     }
   }
+  if (cacheable) facilityGroupCache.set(places, result);
   return result;
 }
 export function parseLocalDate(value: unknown): number | null {
