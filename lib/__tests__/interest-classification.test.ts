@@ -37,7 +37,7 @@ describe("공식 분류 목록 동기화", () => {
   it("규칙이 참조하는 lcls 코드는 모두 공식 목록에 있다", () => {
     for (const id of MVP_CATEGORY_IDS) {
       const rule = INTEREST_CLASSIFICATION_RULES[id];
-      for (const code of [...(rule.lcls ?? []), ...(rule.lclsPending ?? [])]) {
+      for (const code of rule.lcls ?? []) {
         expect(KNOWN_LCLS_CODES.has(code)).toBe(true);
       }
     }
@@ -79,14 +79,42 @@ describe("classifyInterests — 새 분류 존재", () => {
     ).toEqual([]);
   });
 
-  it("휴양은 새 분류에 활성 매핑이 없어 EX05 로도 판정되지 않는다(구현 보류)", () => {
+  it("휴양은 새 분류 EX05 웰니스관광으로 판정된다(2026-09-10 PM 결정)", () => {
     const result = classifyInterests({
       lclsSystm1: "EX",
       lclsSystm2: "EX05",
       lclsSystm3: "EX050100",
     });
-    expect(result.categories).toEqual([]);
+    expect(result.categories).toEqual(["rest"]);
     expect(result.basis).toBe("lcls");
+  });
+
+  it("NA04 자연공원은 자연이면서 휴양으로 판정된다", () => {
+    const result = classifyInterests({
+      lclsSystm1: "NA",
+      lclsSystm2: "NA04",
+      lclsSystm3: "NA040600",
+    });
+    expect(result.categories).toEqual(["nature", "rest"]);
+    expect(result.basis).toBe("lcls");
+  });
+
+  it("VE03 도시공원은 휴양으로 판정되고 문화로는 판정되지 않는다", () => {
+    const result = classifyInterests({
+      lclsSystm1: "VE",
+      lclsSystm2: "VE03",
+      lclsSystm3: "VE030400",
+    });
+    expect(result.categories).toEqual(["rest"]);
+  });
+
+  it("VE02 테마파크·VE05 복합관광시설은 휴양으로 보지 않는다", () => {
+    expect(
+      classifyInterests({ lclsSystm1: "VE", lclsSystm2: "VE02" }).categories,
+    ).toEqual([]);
+    expect(
+      classifyInterests({ lclsSystm1: "VE", lclsSystm2: "VE05" }).categories,
+    ).toEqual([]);
   });
 });
 
@@ -145,6 +173,37 @@ describe("classifyInterests — 미해석 코드", () => {
     });
     expect(result.categories).toEqual([]);
     expect(result.unresolvedLcls).toEqual([]);
+  });
+
+  it("공식 L1이 숙박(AC)이면 contentTypeId=28 신호가 있어도 레저로 보지 않는다", () => {
+    const result = classifyInterests({
+      lclsSystm1: "AC",
+      lclsSystm2: "AC05",
+      lclsSystm3: "AC050100",
+      contentTypeId: "28",
+    });
+    expect(result.categories).toEqual([]);
+    expect(result.basis).toBe("lcls");
+  });
+
+  it("공식 L1이 쇼핑(SH)이면 contentTypeId 신호가 있어도 관심사로 보지 않는다", () => {
+    expect(
+      classifyInterests({
+        lclsSystm1: "SH",
+        lclsSystm2: "SH01",
+        contentTypeId: "14",
+      }).categories,
+    ).toEqual([]);
+  });
+
+  it("공식 L1이 관심사 버킷(LS)이면 contentTypeId=28 신호는 그대로 유지된다", () => {
+    expect(
+      classifyInterests({
+        lclsSystm1: "LS",
+        lclsSystm2: "LS01",
+        contentTypeId: "28",
+      }).categories,
+    ).toEqual(["leisure"]);
   });
 });
 

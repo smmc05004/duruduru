@@ -378,11 +378,6 @@ type InterestRule = {
   contentTypeId?: string[];
   /** 하위 호환 경로: 새 분류가 전혀 없을 때만 본다. */
   legacyCat?: string[];
-  /**
-   * 새 공식 분류에 확정 매핑이 없어 PM 확인 대기 중인 관심사.
-   * `docs/product/TOURISM_RECOMMENDATION_UPGRADE.md` D1의 「구현 보류」 표 참조.
-   */
-  lclsPending?: string[];
 };
 
 /**
@@ -391,15 +386,18 @@ type InterestRule = {
  * - nature/history/leisure 는 공식 L1 명칭이 1:1(자연관광/역사관광/레저스포츠)이라 활성화한다.
  * - culture 는 새 `VE 문화관광`이 구 `A0206 문화시설`보다 넓어, 의미를 보존하는 하위
  *   코드(공연·전시·교육 시설과 서점)만 활성화한다.
- * - rest(휴양)는 새 체계에 대응 L1이 없다. 활성 매핑 없이 하위 호환(A0202)만 쓰며,
- *   후보 `EX05 웰니스관광`은 `lclsPending`으로만 표시하고 판정에 쓰지 않는다.
+ * - rest(휴양)는 새 체계에 대응 L1이 없다. PM 결정(2026-09-10)에 따라 의미가 가장
+ *   근접한 L2 세 개 — `EX05 웰니스관광`(온천·스파·찜질방·힐링), `NA04 자연공원`
+ *   (국립·도립공원·지질공원·자연휴양림·수목원), `VE03 도시공원` — 로 활성화한다.
+ *   `VE02 테마파크`·`VE05 복합관광시설`·리조트(놀이공원·리조트)는 휴양으로 보지 않는다.
+ *   구 `cat2=A0202`는 새 분류가 없을 때만 fallback으로 유지한다.
  */
 export const INTEREST_CLASSIFICATION_RULES: Readonly<
   Record<MvpCategoryId, InterestRule>
 > = {
   nature: { lcls: ["NA"], legacyCat: ["A01"] },
   history: { lcls: ["HS"], legacyCat: ["A0201"] },
-  rest: { legacyCat: ["A0202"], lclsPending: ["EX05"] },
+  rest: { lcls: ["EX05", "NA04", "VE03"], legacyCat: ["A0202"] },
   culture: {
     lcls: ["VE06", "VE07", "VE09", "VE120100"],
     contentTypeId: ["14"],
@@ -445,9 +443,23 @@ export function hasOfficialClassification(input: ClassificationInput): boolean {
 }
 
 /**
+ * 5개 관심사에 매핑되지 않는 공식 L1. 레코드가 이 버킷으로 공식 분류되면
+ * `contentTypeId` 신호가 있어도 관심사로 보지 않는다(공식 분류가 신호를 이긴다).
+ * 예: `AC 숙박` + `contentTypeId=28`(수영장 있는 리조트)을 레저로 넣지 않는다.
+ */
+export const NON_INTEREST_LCLS1: ReadonlySet<string> = new Set([
+  "AC",
+  "SH",
+  "FD",
+  "EV",
+  "C01",
+]);
+
+/**
  * TourAPI 분류를 5개 관심사로 해석한다.
  *
- * - 새 분류가 있으면 새 분류 + `contentTypeId`만 본다.
+ * - 새 분류가 있으면 새 분류 + `contentTypeId`만 본다. 단, 공식 L1이 관심사 밖
+ *   버킷(`AC`/`SH`/`FD`/`EV`/`C01`)이면 `contentTypeId` 신호도 무시한다.
  * - 새 분류가 없으면 구 `cat` + `contentTypeId`만 본다.
  * - 공식 목록에 없는 새 코드는 `unresolvedLcls`로 분리한다.
  */
@@ -467,10 +479,17 @@ export function classifyInterests(
     ? lcls.filter((code) => !KNOWN_LCLS_CODES.has(code))
     : [];
 
+  const officialNonInterest =
+    usesOfficial && NON_INTEREST_LCLS1.has(clean(input.lclsSystm1));
+
   for (const id of MVP_CATEGORY_IDS) {
     const rule = INTEREST_CLASSIFICATION_RULES[id];
     let matched = false;
-    if (rule.contentTypeId && rule.contentTypeId.includes(contentTypeId))
+    if (
+      !officialNonInterest &&
+      rule.contentTypeId &&
+      rule.contentTypeId.includes(contentTypeId)
+    )
       matched = true;
     if (usesOfficial) {
       if (rule.lcls && rule.lcls.some((code) => lcls.includes(code)))
