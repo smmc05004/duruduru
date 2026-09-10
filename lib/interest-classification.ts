@@ -513,3 +513,31 @@ export function classifyInterests(
 
   return { categories, basis, unresolvedLcls };
 }
+
+export type DetailClassificationInput = {
+  lclsSystm2?: string | null;
+  lclsSystm3?: string | null;
+  cat2?: string | null;
+  cat3?: string | null;
+  categories?: readonly string[];
+};
+
+/**
+ * 세부 분류 다양성 지표의 "값" 계산 근거 (결함 2).
+ *
+ * 새 공식 세부 분류(`lclsSystm3` → 없으면 `lclsSystm2`)를 우선하고, 없을 때만 구
+ * `cat3` → `cat2`, 마지막으로 해석된 관심사 조합 문자열로 물러난다. 수집·검색·planner
+ * 가 세부 분류 다양성을 같은 기준으로 세도록 이 헬퍼 하나만 쓴다.
+ *
+ * 정렬 키 순서·가중치·역할 순서는 이 변경으로 바뀌지 않는다. 이 함수가 돌려주는
+ * 문자열의 계산 근거만 새 분류 우선으로 교체한다.
+ */
+export function detailClassification(input: DetailClassificationInput): string {
+  return (
+    clean(input.lclsSystm3) ||
+    clean(input.lclsSystm2) ||
+    clean(input.cat3) ||
+    clean(input.cat2) ||
+    (input.categories ?? []).join("+")
+  );
+}

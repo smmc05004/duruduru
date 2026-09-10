@@ -3,6 +3,7 @@ import lclsCodes from "@/data/tourapi-lcls-systm-codes.json";
 import {
   CLASSIFICATION_VERSION,
   classifyInterests,
+  detailClassification,
   hasOfficialClassification,
   INTEREST_CLASSIFICATION_RULES,
   KNOWN_LCLS_CODES,
@@ -230,5 +231,52 @@ describe("classifyInterests — 구 분류 충돌", () => {
       cat2: "A0201",
     });
     expect(result.categories).toEqual(["history", "culture"]);
+  });
+});
+
+describe("detailClassification — 결함 2 (새 세부 분류 우선)", () => {
+  it("새 분류만 있고 구 cat 이 빈 서로 다른 역사 명소가 다른 값을 갖는다", () => {
+    // 공산성 HS010200 vs 불국사 HS030100 — 실측 회귀 표본.
+    const gongsanseong = detailClassification({
+      lclsSystm2: "HS01",
+      lclsSystm3: "HS010200",
+      cat2: "",
+      cat3: "",
+      categories: ["history"],
+    });
+    const bulguksa = detailClassification({
+      lclsSystm2: "HS03",
+      lclsSystm3: "HS030100",
+      cat2: "",
+      cat3: "",
+      categories: ["history"],
+    });
+    expect(gongsanseong).toBe("HS010200");
+    expect(bulguksa).toBe("HS030100");
+    expect(gongsanseong).not.toBe(bulguksa);
+  });
+
+  it("lclsSystm3 → lclsSystm2 → cat3 → cat2 → 관심사 조합 순으로 물러난다", () => {
+    expect(
+      detailClassification({ lclsSystm3: "HS010200", lclsSystm2: "HS01" }),
+    ).toBe("HS010200");
+    expect(detailClassification({ lclsSystm2: "HS01" })).toBe("HS01");
+    expect(detailClassification({ cat3: "A02010100", cat2: "A0201" })).toBe(
+      "A02010100",
+    );
+    expect(detailClassification({ cat2: "A0201" })).toBe("A0201");
+    expect(detailClassification({ categories: ["history", "culture"] })).toBe(
+      "history+culture",
+    );
+  });
+
+  it("구 수집본(새 분류 없음)은 구 cat 기준을 그대로 쓴다", () => {
+    expect(
+      detailClassification({
+        cat2: "A0201",
+        cat3: "A02010200",
+        categories: ["history"],
+      }),
+    ).toBe("A02010200");
   });
 });

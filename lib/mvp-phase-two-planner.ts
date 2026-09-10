@@ -1,4 +1,5 @@
 import { INTERESTS } from "@/lib/mvp-phase-two-types";
+import { detailClassification } from "@/lib/interest-classification";
 import { originRegion } from "@/lib/origin-regions";
 import { scheduleLocalDay } from "@/lib/local-travel-schedule";
 import { localActivityWindow, planTimeError } from "./plan-time-constraints";
@@ -200,8 +201,11 @@ export function distanceKm(
       Math.sin(((b.longitude - a.longitude) * rad) / 2) ** 2;
   return 6371 * 2 * Math.asin(Math.sqrt(Math.min(1, h)));
 }
-const detailCategory = (place: Attraction) =>
-  place.cat3 || place.cat2 || place.categories.join("+");
+/**
+ * 세부 분류 다양성 지표의 값. 새 공식 세부 분류(`lclsSystm3`→`lclsSystm2`)를
+ * 우선하고 없을 때만 구 `cat3`→`cat2`를 본다(결함 2). 공통 헬퍼로 통일한다.
+ */
+const detailCategory = (place: Attraction) => detailClassification(place);
 export function distinctAttractions(places: Attraction[]): Attraction[] {
   const result: Attraction[] = [],
     seen = new Set<string>();
