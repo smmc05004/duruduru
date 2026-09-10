@@ -26,6 +26,7 @@
     "build:region-mapping": "node --env-file-if-exists=.env.local scripts/build-region-mapping.mjs",
     "build:region-profiles": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --env-file-if-exists=.env.local scripts/build-region-profile.mjs",
     "build:central-attractions": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --env-file-if-exists=.env.local scripts/build-central-attractions.mjs",
+    "build:tourism-evidence": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/build-tourism-evidence.mjs",
     "build:food-culture": "node scripts/build-food-culture-keywords.mjs",
     "build:excellent-restaurants": "node --env-file-if-exists=.env.local scripts/build-excellent-restaurant-cache.mjs",
     "prepare": "husky"

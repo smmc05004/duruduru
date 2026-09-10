@@ -26,3 +26,8 @@ data/central-attractions.checkpoint.json
 data/central-attractions.checkpoint.json.tmp
 data/central-attractions.quality-report.json
 data/central-attractions.lock
+
+# 관광 근거 연결 중간 산출물 (재생성 가능)
+data/tourism-evidence.next.json
+data/tourism-evidence.next.json.tmp
+data/tourism-evidence.quality-report.json

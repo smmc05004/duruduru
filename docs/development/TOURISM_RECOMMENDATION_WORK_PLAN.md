@@ -16,7 +16,7 @@
 | T1   | 완료(2026-09-10) | 공식 분류 코드 원본 확인·새 분류 계약·공통 해석기 | 5개 관심사에 대한 공식 코드 표, 새/구 우선순위, 미해석 집계, 네 대표 명소 회귀 검증 |
 | T2   | 완료(2026-09-10) | 프로필 수집기 교체·전국 재수집                    | 페이지 완전성·중복·분류/법정동/좌표 품질 보고와 정상본 교체, 대표 명소 포함         |
 | T3   | 완료(2026-09-10) | 중심 관광지 수집기·체크포인트                     | 202608 동일월·유효 지역·예산·제한 재시도·인증 중단·재개·정상본 보존 검증            |
-| T4   | 미착수           | 보수적 원천 연결·데이터 묶음                      | 연결 상태별 집계, 본체/부분 금지 사례·동일 시설 중복 점수 검증                      |
+| T4   | 완료(2026-09-10) | 보수적 원천 연결·데이터 묶음                      | 연결 상태별 집계, 본체/부분 금지 사례·동일 시설 중복 점수 검증                      |
 | T5   | 미착수           | 실제 방문 선정·목적 근거 점수·역할 순서           | 기획 D4와 초안/카드 근거 일치, 시간·편집·저장 호환 유지                             |
 | T6   | 미착수           | 결과 비교·통합 검증·인계                          | 변경 전후 비교 보고, 검색 외부 호출 0회, Jest/Playwright/verify 및 PR 근거          |
 
@@ -87,6 +87,29 @@ T1→T2→T3→T4→T5→T6 순서로 진행한다. 앞 단계 실패를 임의 
 - 동일 시설 수동 보정은 실제 확인한 근거가 있을 때만 추가한다. 매칭률을 올리려고 기준을 느슨하게 바꾸지 않는다.
 - 프로필·중심 원본·연결 결과를 schemaVersion/dataVersion/기준월/생성일/원천 버전 참조로 묶는다. 전체가 검증됐을 때만 배포 대상 정상본을 교체한다. 기존 정상 묶음으로 재배포할 수 있게 한다.
 
+#### T4 완료 기록 (2026-09-10)
+
+- **산출물.** `scripts/build-tourism-evidence.mjs`(CLI, 외부 호출 0) + `scripts/lib/tourism-evidence-core.mjs`(순수 로직, Jest 공유) + `package.json` `build:tourism-evidence`. 정상본 `data/tourism-evidence.json`(schemaVersion 1). 중간 산출물(`*.next.json`·`*.quality-report.json`)은 `.gitignore`. 안전 배포: 항상 `*.next.json`으로만 쓰고 `validateDocument` 통과 시 `--promote`/`--promote-only`로만 정상본 교체 → 기존 정상 묶음으로 재배포 가능.
+- **연결 대상·격리.** `data/central-attractions.json`의 `hubTatsCd`(32자리 해시) ↔ `data/region-profiles.json`의 `contentId`(숫자). 두 ID를 `matched` 항목에 분리 보존. 대조는 **동일 `regionId` 안에서만** 수행 — 지역 그룹이 같아도 다른 구의 동명 장소는 연결하지 않는다.
+- **이름 정규화(허용/금지).**
+  - 제거: 공백과 구분 기호 `/ · ㆍ | , ~ - – —`, 그리고 유네스코 병기 토큰(`[유네스코세계유산]` 등 정확 일치). 괄호·대괄호와 그 내용은 제거하지 않는다.
+  - 허용 접두: 지역 도(道) 정식 명칭·축약(`충청남도`/`충남`), 시군구명(`공주시`), 시군구명에서 끝의 시/군/구를 뗀 형태(`공주`). **한 번만** 제거.
+  - 허용 접미: 끝의 `(지역명)`/`[지역명]` — 괄호 안이 위 지역명과 **정확히 같을 때만** 제거(`동학사(공주)`→`동학사`).
+  - 금지: 임의의 일반 괄호 삭제(`천마총(대릉원)` 유지), 부분 문자열 매칭, 지역명이 아닌 접미 토큰 제거.
+  - 파생형별 "느슨함" 등급(0 exact → 1 unesco → 2 region-paren → 3 region-prefix)을 매치 방법으로 기록.
+- **자동 확정 3조건(전부 충족).** ① 정규화 파생형이 **동일**(부분 문자열 X) ② 좌표 500m 이내(제품 휴리스틱, 공식 동일 장소 보증 아님 — 주석·문서·JSON에 명시) ③ 유일 후보. 후보가 여럿이면 원문 exact 등급 후보가 유일할 때만 확정(`exact-unique`), 아니면 `ambiguous`. **좌표 결측은 자동 확정하지 않는다**(허브·후보 어느 쪽이든 `ambiguous`).
+- **연결 결과 스키마.** 지역별 `matched`(contentId→근거: hubTatsCd·hubRank·method·distanceM·hubCategory·nonItineraryCategory·interestCategories, **런타임 O(1) 조회용**) / `unmatched` / `ambiguous` / `rejected`(사유·거리) / `superseded`. 상태별·사유별·방법별 집계는 `summary`.
+- **동일 시설 중복.** 같은 `contentId`에 여러 허브가 걸리면 가장 높은 순위(작은 `hubRank`) 하나만 `matched`, 나머지는 `superseded`(reason `same-facility-lower-rank`).
+- **카테고리.** 허브 `categoryLcls=숙박`·`categoryMcls=쇼핑/숙박`은 `nonItineraryCategory:true`로 표시만 하고 **실제 일정 제외는 T5**. 장소의 관심사는 D1 TourAPI 분류(`interestCategories`)를 그대로 보존하고 중심 카테고리로 재분류하지 않는다.
+- **데이터 묶음.** `bundle.consistent` + `versionRefs`(mappingVersion `2026-09-06T23:46:42.853Z`, classificationVersion `lcls-2026-09-10`, baseYm `202608`) + 세 원천의 schemaVersion·generatedAt 참조. 셋의 버전이 하나라도 어긋나면 `buildEvidenceDocument`가 throw(섞지 않음). `dataVersion`은 세 원천 generatedAt + 스키마의 sha256 앞 16자.
+- **수동 별칭.** 이번엔 넣지 않음(모델 추측 별칭 금지). 넣을 경우 실제 확인한 명칭·주소·공식 자료·확인일·두 원천 ID를 파일에 남기도록 스키마에 자리 확보.
+- **전국 집계(baseYm 202608).** 중심 항목 20,705개 검토 → matched **3,317** · unmatched 16,311(전부 `no-name-match`) · ambiguous 11(`candidate-coord-missing` 7 · `multiple-candidates` 4) · rejected 1,064(`main-part-distinction` 781 · `distance-over-heuristic` 277 · `region-affix-not-normalized` 6) · superseded 2. 방법 분포 exact 2,863 · region-paren 270 · region-prefix 166 · unesco 13 · exact-unique 5. 전체 연결률 0.16(허브 분모에 숙박 6,893·쇼핑 1,439 포함). 보수적 게이트가 의도적으로 미연결을 많이 남긴다 — 기준을 느슨하게 바꾸지 않았다.
+- **표본 지역 연결률.** 공주 28/100 · 경주 29/100 · 익산 20/100 · 과천 11/63 · 광명 12/93 · 파주 30/100. 미연결 주원인: 숙박·쇼핑·교통(역/터미널) 허브, 산·하천·대형 공원처럼 두 원천의 대표점이 500m 넘게 어긋나는 경우, 프로필에 없는 상호(체인·전망대 등).
+- **금지 회귀 사례 판정.** ① 공주 `공산성`(허브 r2) → `공주 공산성 [유네스코 세계유산]`(125949)에 matched, `공산성연지`(2916020)에는 연결 안 됨. ② `동학사`(r8) → `동학사(공주)`(125893)에 matched, `동학사계곡`(129558)에는 연결 안 됨(허브 `동학사계곡`은 좌표 1,071m로 rejected). ③ 경주 `천마총`(r26) → `천마총(대릉원)`(126214)·`대릉원 일원`(1492402) 어디에도 연결 안 됨(rejected `main-part-distinction`). ④ `무령왕릉`(r3) → rejected(별칭/부분), `공주무령왕릉과왕릉원`(r7)만 126681에 matched 하여 별칭 중복 없음. `validateDocument`가 이 네 쌍을 정상본 교체 차단 조건으로 고정.
+- **동일 시설 중복 → 최고순위 1개 예.** 청송 `송소고택`(129051): `청송송소고택`(r10)만 인정, `청송 송소고택`(r31)은 superseded. 당진 도비도(2750341): r27만 인정, `도비도항`(r42) superseded.
+- **검증.** `scripts/__tests__/build-tourism-evidence.test.js` 35케이스(이름 정규화 허용/금지, 500m·유일성, 본체/부분, 좌표 결측, 복수 후보, exact-unique, 동일 시설 최고순위, 버전 정합·불일치 시 throw, 동명 지역 격리, 상태별 집계, 실제 원천 회귀 4쌍) 통과. `npm run verify` 통과, `npm run test:enhancement` 84/84 회귀 없음. 검색 경로는 JSON import만 사용해 외부 호출 0회.
+- **T5로 넘길 사항.** (1) `regions[regionId].matched[contentId]`를 실제 초안에 배치된 관광지에 한해 조회해 `1/log2(1+hubRank)` 목적 근거 점수 계산(D4). (2) `nonItineraryCategory:true` 항목의 실제 일정 제외. (3) 중심 근거 없는 카드에 중심 문구 금지, `superseded`/`ambiguous`/미연결 상태 보존 표시. (4) 광주·전남·화성 등 중심 `empty` 28개 지역은 근거 0 — 카드에서 중심 문구 금지. (5) `data/tourism-evidence.json`은 `JSON.stringify` 출력이 prettier의 단일 원소 배열 축약과 달라, 재생성 후 `prettier --write` 한 번 필요(다른 데이터 정상본과 동일).
+
 ### T5: 추천·계획 소비
 
 - lib/mvp-phase-two-search.ts, lib/mvp-phase-two-planner.ts 및 실제 연결된 activity-placement/타입/저장 모듈을 조사해 파일 범위를 확정한다. 사용자가 고정·편집한 기존 계획은 새 순위로 재생성하지 않는다.
@@ -107,4 +130,4 @@ T1→T2→T3→T4→T5→T6 순서로 진행한다. 앞 단계 실패를 임의 
 
 ## 다음 세션 시작점
 
-T1·T2·T3 완료(2026-09-10). 다음은 **T4 — 보수적 원천 연결·배포 묶음**이다. `data/region-profiles.json`(schemaVersion 2)과 `data/central-attractions.json`(schemaVersion 1, baseYm 202608)을 입력으로 새 `scripts/build-tourism-evidence.mjs`(또는 동등 모듈)에서 `hubTatsCd`↔`contentId` 연결을 만든다. T3 완료 기록의 "T4로 넘길 사항"을 먼저 읽는다. 전국 연결률·새 가중치 품질은 구현 후 검증 대상이며 검증 완료라고 보고하지 않는다.
+T1·T2·T3·T4 완료(2026-09-10). 다음은 **T5 — 추천·계획 소비**다. `data/tourism-evidence.json`(schemaVersion 1, dataVersion·`regions[regionId].matched[contentId]` 인덱스)을 `lib/mvp-phase-two-search.ts`·`lib/mvp-phase-two-planner.ts`의 실제 초안 지표에 반영해 D4 목적 근거 점수와 interest/easy/relaxed 역할 순서를 구현한다. T4 완료 기록의 "T5로 넘길 사항"과 기획서 D4를 먼저 읽는다. 후보 지역의 모든 원천 명소로 점수를 계산한 뒤 다른 장소를 일정에 넣는 구현은 금지다. 사용자가 고정·편집한 계획은 새 순위로 재생성하지 않는다. 전국 추천 품질은 구현 후 검증 대상이며 검증 완료라고 보고하지 않는다.
