@@ -435,18 +435,32 @@ describe("collectRegion — 결함 1 (수집 완전성)", () => {
     expect(result.error).toMatch(/불완전 수집/);
   });
 
-  it("페이지별 totalCount 가 흔들리면 status failed", async () => {
+  it("불완전 페이지(3페이지 1/50건) → status failed, 그 페이지는 미저장", async () => {
     const fetchImpl = fetchByPage({
       1: okBody(hubPage(1, 100), 250, 1),
       2: okBody(hubPage(101, 100), 250, 2),
-      3: okBody(hubPage(201, 50), 240, 3),
+      3: okBody(hubPage(201, 1), 250, 3), // 기대 50, 실제 1
     });
     const result = await collectorFor(fetchImpl).collectRegion(m);
     expect(result.status).toBe("failed");
+    expect(result.done).toBe(false);
+    expect(Object.keys(result.validatedPages).sort()).toEqual(["1", "2"]);
     expect(
-      result.completenessBlockers.some((b) =>
-        b.includes("페이지별 totalCount 변동"),
-      ),
+      result.completenessBlockers.some((b) => b.includes("건수 부족")),
+    ).toBe(true);
+  });
+
+  it("페이지별 totalCount 가 계속 흔들리면 재시작 소진 후 status failed", async () => {
+    const fetchImpl = fetchByPage({
+      1: okBody(hubPage(1, 100), 250, 1),
+      2: okBody(hubPage(101, 100), 250, 2),
+      3: okBody(hubPage(201, 50), 240, 3), // 매번 드리프트
+    });
+    const result = await collectorFor(fetchImpl).collectRegion(m);
+    expect(result.status).toBe("failed");
+    expect(result.restarted).toBeGreaterThanOrEqual(2);
+    expect(
+      result.completenessBlockers.some((b) => b.includes("일관성 붕괴")),
     ).toBe(true);
   });
 
@@ -458,6 +472,7 @@ describe("collectRegion — 결함 1 (수집 완전성)", () => {
     });
     const result = await collectorFor(fetchImpl).collectRegion(m);
     expect(result.status).toBe("ok");
+    expect(result.done).toBe(true);
     expect(result.collected).toBe(250);
     expect(result.completenessBlockers).toEqual([]);
   });
@@ -465,25 +480,44 @@ describe("collectRegion — 결함 1 (수집 완전성)", () => {
 
 describe("collectRegion — 결함 3 (페이지 재개)", () => {
   const m = mapping("z1", "44", "150", "공주시");
+  const validated = (from, count, totalCount) => ({
+    totalCount,
+    items: hubPage(from, count),
+    complete: true,
+  });
 
-  it("저장된 1·2페이지는 다시 호출하지 않고 3페이지만 조회한다", async () => {
+  it("검증 통과한 1·2페이지는 다시 호출하지 않고 3페이지만 조회한다", async () => {
     const fetchImpl = fetchByPage({ 3: okBody(hubPage(201, 50), 250, 3) });
-    const savedPages = {
-      1: { totalCount: 250, items: hubPage(1, 100) },
-      2: { totalCount: 250, items: hubPage(101, 100) },
-    };
-    const persisted = [];
     const result = await collectorFor(fetchImpl).collectRegion(m, {
-      savedPages,
-      onPage: async (pageNo) => persisted.push(pageNo),
+      savedPages: { 1: validated(1, 100, 250), 2: validated(101, 100, 250) },
     });
     expect(fetchImpl.calls).toEqual([3]);
-    expect(persisted).toEqual([3]);
     expect(result.status).toBe("ok");
     expect(result.collected).toBe(250);
   });
 
-  it("3페이지 실패 후 재개하면 1·2페이지를 다시 부르지 않는다", async () => {
+  it("불완전 응답 → 재개 시 정상 응답으로 실제 복구된다(1·2페이지 재호출 안 함)", async () => {
+    // 1차: 1·2 정상, 3페이지 1/50건.
+    const first = fetchByPage({
+      1: okBody(hubPage(1, 100), 250, 1),
+      2: okBody(hubPage(101, 100), 250, 2),
+      3: okBody(hubPage(201, 1), 250, 3),
+    });
+    const run1 = await collectorFor(first).collectRegion(m);
+    expect(run1.status).toBe("failed");
+    expect(Object.keys(run1.validatedPages).map(Number).sort()).toEqual([1, 2]);
+
+    // 2차 --resume: 3페이지가 정상 50건.
+    const second = fetchByPage({ 3: okBody(hubPage(201, 50), 250, 3) });
+    const run2 = await collectorFor(second).collectRegion(m, {
+      savedPages: run1.validatedPages,
+    });
+    expect(second.calls).toEqual([3]);
+    expect(run2.status).toBe("ok");
+    expect(run2.collected).toBe(250);
+  });
+
+  it("네트워크 실패 후 재개하면 검증 통과 1·2페이지를 다시 부르지 않는다", async () => {
     const first = fetchByPage({
       1: okBody(hubPage(1, 100), 250, 1),
       2: okBody(hubPage(101, 100), 250, 2),
@@ -492,22 +526,39 @@ describe("collectRegion — 결함 3 (페이지 재개)", () => {
           throw Object.assign(new Error("boom"), { code: "ECONNRESET" });
         })(),
     });
-    const saved = {};
-    const failed = await collectorFor(first).collectRegion(m, {
-      onPage: async (pageNo, page) => {
-        saved[pageNo] = page;
-      },
-    });
+    const failed = await collectorFor(first).collectRegion(m);
     expect(failed.status).toBe("failed");
-    expect(Object.keys(failed.pages).map(Number).sort()).toEqual([1, 2]);
+    expect(Object.keys(failed.validatedPages).map(Number).sort()).toEqual([
+      1, 2,
+    ]);
 
     const second = fetchByPage({ 3: okBody(hubPage(201, 50), 250, 3) });
     const resumed = await collectorFor(second).collectRegion(m, {
-      savedPages: failed.pages,
+      savedPages: failed.validatedPages,
     });
     expect(second.calls).toEqual([3]);
     expect(resumed.status).toBe("ok");
     expect(resumed.collected).toBe(250);
+  });
+
+  it("재개 중 totalCount 변동 → 저장 페이지 무효화하고 1페이지부터 재수집", async () => {
+    let page3 = 0;
+    const fetchImpl = fetchByPage({
+      1: () => okBody(hubPage(1, 100), 250, 1),
+      2: () => okBody(hubPage(101, 100), 250, 2),
+      3: () => {
+        page3 += 1;
+        return page3 === 1
+          ? okBody(hubPage(201, 40), 240, 3) // 재개 시 드리프트
+          : okBody(hubPage(201, 50), 250, 3); // 재시작 후 정상
+      },
+    });
+    const result = await collectorFor(fetchImpl).collectRegion(m, {
+      savedPages: { 1: validated(1, 100, 250), 2: validated(101, 100, 250) },
+    });
+    expect(result.restarted).toBe(1);
+    expect(fetchImpl.calls).toEqual([3, 1, 2, 3]);
+    expect(result.status).toBe("ok");
   });
 });
 

@@ -227,14 +227,14 @@ async function main() {
   const completenessBlockers = [];
   const rawById = new Map();
 
+  let currentSpec = null;
   try {
     for (const spec of QUERY_SPECS) {
+      currentSpec = spec;
       const cpSpec = checkpoint.specs[spec.label];
       if (cpSpec?.done) {
         console.log(`[skip] ${spec.label} (체크포인트 완료)`);
         specReports.push(cpSpec.report);
-        for (const blocker of cpSpec.report?.blockers ?? [])
-          completenessBlockers.push(`[${spec.label}] ${blocker}`);
         for (const item of cpSpec.items ?? []) {
           const id = text(item.contentid);
           if (id && !rawById.has(id)) rawById.set(id, item);
@@ -243,50 +243,68 @@ async function main() {
       }
 
       console.log(`[collect] ${spec.label} …`);
-      checkpoint.specs[spec.label] ??= { done: false, wip: { pages: {} } };
-      checkpoint.specs[spec.label].wip ??= { pages: {} };
+      // 결함 3: 재개 시 **검증까지 통과한(complete)** 페이지만 건너뛴다.
       const result = await collector.collectSpec(spec, {
-        savedPages: checkpoint.specs[spec.label].wip.pages,
-        onPage: async (pageNo, page) => {
-          checkpoint.specs[spec.label].wip.pages[String(pageNo)] = page;
-          await persistCheckpoint();
-        },
+        savedPages: cpSpec?.pages ?? {},
       });
 
       const report = {
         label: result.label,
         totalCount: result.totalCount,
         pageCount: result.pageCount,
-        fetchedPageNos: result.fetchedPageNos,
-        missingPages: result.missingPages,
-        perPageTotals: result.perPageTotals,
         receivedUnique: result.receivedUnique,
         duplicateInSpec: result.duplicateInSpec,
         crossPageDuplicates: result.crossPageDuplicates,
-        emptyPages: result.emptyPages,
+        incompletePages: result.incompletePages,
+        perPageTotals: result.perPageTotals,
+        restarts: result.restarts,
+        restartReasons: result.restartReasons,
         drift: result.drift,
+        done: result.done,
         blockers: result.blockers,
       };
       console.log(
-        `[collect] ${spec.label} total=${result.totalCount} pages=${result.pageCount} unique=${result.receivedUnique} dupInSpec=${result.duplicateInSpec} drift=${result.drift}` +
+        `[collect] ${spec.label} total=${result.totalCount} pages=${result.pageCount} unique=${result.receivedUnique} dupInSpec=${result.duplicateInSpec} drift=${result.drift} done=${result.done}` +
+          (result.restarts ? ` restart=${result.restarts}` : "") +
           (result.blockers.length ? ` BLOCKERS=${result.blockers.length}` : ""),
       );
+
+      // 완료(done=false)되지 않은 스펙은 정상본 교체에서 제외한다.
+      if (!result.done) {
+        const reason =
+          result.blockers.join(" · ") ||
+          result.restartReasons.join(" · ") ||
+          "기대 페이지가 전부 검증되지 않음";
+        completenessBlockers.push(`[${spec.label}] ${reason}`);
+      }
       for (const blocker of result.blockers)
-        completenessBlockers.push(`[${spec.label}] ${blocker}`);
+        if (result.done)
+          completenessBlockers.push(`[${spec.label}] ${blocker}`);
 
       specReports.push(report);
       for (const item of result.items) {
         const id = text(item.contentid);
         if (id && !rawById.has(id)) rawById.set(id, item);
       }
+      // 검증 통과 페이지만 체크포인트에 남긴다. done=false 면 재개가 불완전·
+      // 미저장 페이지만 이어서 조회한다. 일관성 붕괴로 재시작된 스펙은
+      // validatedPages 가 비어 넘어와 1페이지부터 다시 수집된다.
       checkpoint.specs[spec.label] = {
-        done: true,
+        done: result.done,
         report,
+        pages: result.validatedPages,
         items: result.items,
       };
       await persistCheckpoint();
     }
   } catch (error) {
+    // 치명 오류 직전까지 검증 통과한 페이지를 남겨 재개가 재사용하게 한다.
+    if (error.validatedPages && currentSpec) {
+      checkpoint.specs[currentSpec.label] = {
+        done: false,
+        pages: error.validatedPages,
+      };
+    }
     await persistCheckpoint();
     if (error instanceof FatalApiError) {
       console.error(`\n[치명적 중단] ${error.message}`);

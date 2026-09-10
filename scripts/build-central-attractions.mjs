@@ -433,29 +433,15 @@ async function main() {
 
   let processed = 0;
   let preflightConfirmed = pending.length === 0;
+  let currentMapping = null;
   try {
     for (const mapping of pending) {
+      currentMapping = mapping;
       const { areaCd, signguCd } = centralApiCodesFor(mapping);
       const priorRecord = checkpoint.regions[mapping.regionId];
+      // 결함 3: 재개 시 **검증까지 통과한(complete)** 페이지만 건너뛴다.
       const result = await collector.collectRegion(mapping, {
         savedPages: priorRecord?.pages ?? {},
-        // 결함 3: 페이지가 성공할 때마다 체크포인트에 저장한다. 프로세스가 중간에
-        // 죽거나 지역이 실패해도 성공한 페이지는 재개 시 다시 호출하지 않는다.
-        onPage: async (pageNo, page) => {
-          const record = (checkpoint.regions[mapping.regionId] ??= {
-            regionId: mapping.regionId,
-            name: mapping.name,
-            province: mapping.province,
-            district: mapping.district,
-            areaCd,
-            signguCd,
-            status: "in-progress",
-          });
-          record.pages = { ...(record.pages ?? {}), [pageNo]: page };
-          syncStats();
-          checkpoint.updatedAt = new Date().toISOString();
-          await writeJsonAtomic(CHECKPOINT_PATH, checkpoint);
-        },
       });
       checkpoint.regions[mapping.regionId] = {
         regionId: mapping.regionId,
@@ -470,12 +456,13 @@ async function main() {
         duplicateHubCds: result.duplicateHubCds,
         rankRange: result.rankRange,
         hubs: result.hubs,
-        // 실패(불완전 포함) 지역만 성공 페이지를 남겨 재개가 이어서 조회한다.
-        ...(result.status === "failed" &&
-        result.pages &&
-        Object.keys(result.pages).length
-          ? { pages: result.pages }
+        // 완료되지 않은 지역만 검증 통과 페이지를 남겨 재개가 이어서 조회한다.
+        // 완료 지역은 페이지 기록을 남기지 않는다. 일관성 붕괴로 재시작된
+        // 단위는 validatedPages 가 비어(=1페이지부터 재수집) 넘어온다.
+        ...(!result.done && Object.keys(result.validatedPages ?? {}).length
+          ? { pages: result.validatedPages }
           : {}),
+        ...(result.restarted ? { restarted: result.restarted } : {}),
         ...(result.completenessBlockers?.length
           ? { completenessBlockers: result.completenessBlockers }
           : {}),
@@ -497,10 +484,26 @@ async function main() {
       console.log(
         `[${processed}/${pending.length}] ${mapping.regionId} ${mapping.district} ` +
           `status=${result.status} total=${result.totalCount} collected=${result.collected} ` +
-          `dup=${result.duplicateHubCds} ${rank}`,
+          `dup=${result.duplicateHubCds}${result.restarted ? ` restart=${result.restarted}` : ""} ${rank}`,
       );
     }
   } catch (error) {
+    // 치명 오류 직전까지 검증 통과한 페이지를 남겨 재개가 재사용하게 한다.
+    if (error instanceof FatalApiError && error.savedPages && currentMapping) {
+      const { areaCd, signguCd } = centralApiCodesFor(currentMapping);
+      checkpoint.regions[currentMapping.regionId] = {
+        ...(checkpoint.regions[currentMapping.regionId] ?? {
+          regionId: currentMapping.regionId,
+          name: currentMapping.name,
+          province: currentMapping.province,
+          district: currentMapping.district,
+          areaCd,
+          signguCd,
+        }),
+        status: "failed",
+        pages: error.savedPages,
+      };
+    }
     syncStats();
     await writeJsonAtomic(CHECKPOINT_PATH, checkpoint);
     await releaseLock();

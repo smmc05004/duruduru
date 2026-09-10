@@ -19,7 +19,7 @@
  *   - 미래월/미지원 코드도 resultCode 0000 + totalCount 0
  */
 
-import { assessCompleteness, expectedPageCount } from "./paged-collection.mjs";
+import { collectPagedUnit } from "./paged-collection.mjs";
 
 export const SCHEMA_VERSION = 1;
 export const BASE_YM = "202608";
@@ -437,137 +437,32 @@ export function createCollector({
   /**
    * 한 지역의 중심 관광지를 수집한다.
    *
-   * `opts.savedPages`(체크포인트에 저장된 `{ [pageNo]: { totalCount, items } }`)를
-   * 주면 그 페이지는 다시 호출하지 않고 실패·미수집 페이지만 잇는다(결함 3).
-   * `opts.onPage(pageNo, { totalCount, items })`는 페이지 성공마다 호출한다(체크포인트 저장).
-   *
-   * 수집 완전성(건수 부족·페이지 누락·페이지 간 중복·페이지별 totalCount 변동)을
-   * 검증해, 불완전하면 `status: "failed"` + `completenessBlockers`로 반환한다(결함 1).
-   * 이때 성공한 페이지는 `pages`로 함께 반환해 재개가 그 페이지를 건너뛰게 한다.
+   * 페이지별 검증·재개·일관성 붕괴 시 단위 재시작은 공통 로직 `collectPagedUnit`이
+   * 처리한다. `opts.savedPages` 의 **검증 통과(`complete === true`)** 페이지만
+   * 재사용한다.
    *
    * 반환: { status: "ok"|"empty"|"failed", totalCount, collected, hubs,
-   *        duplicateHubCds, rankRange, pages, completenessBlockers, error? }
+   *        duplicateHubCds, rankRange, done, validatedPages, completenessBlockers,
+   *        restarted, error? }
+   *   - `done`: 기대 페이지 전부 검증 통과 + 페이지 간 중복 0 + totalCount 불변.
+   *   - `status`가 `failed`이면 재개에 쓸 검증 통과 페이지를 `validatedPages`로 준다.
    */
   async function collectRegion(mapping, opts = {}) {
-    const { savedPages = {}, onPage } = opts;
+    const { savedPages = {} } = opts;
     const { areaCd, signguCd } = centralApiCodesFor(mapping);
     const label = `${mapping.regionId}(${signguCd})`;
 
-    /** pageNo -> { totalCount, items } */
-    const fetched = new Map();
-    for (const [key, value] of Object.entries(savedPages)) {
-      const pageNo = Number(key);
-      if (
-        Number.isInteger(pageNo) &&
-        pageNo >= 1 &&
-        value &&
-        Array.isArray(value.items)
-      ) {
-        fetched.set(pageNo, {
-          totalCount: Number(value.totalCount) || 0,
-          items: value.items,
-        });
-      }
-    }
-    const savedPagesOut = () =>
-      Object.fromEntries([...fetched.entries()].sort((a, b) => a[0] - b[0]));
-
+    let unit;
     try {
-      if (!fetched.has(1)) {
-        const first = await requestPage(label, areaCd, signguCd, 1);
-        fetched.set(1, { totalCount: first.totalCount, items: first.items });
-        if (onPage) await onPage(1, fetched.get(1));
-      }
-      const declaredTotal = fetched.get(1).totalCount;
-      const pageCount = expectedPageCount(declaredTotal, PAGE_SIZE);
-      for (let pageNo = 2; pageNo <= pageCount; pageNo += 1) {
-        if (fetched.has(pageNo)) continue;
-        const page = await requestPage(label, areaCd, signguCd, pageNo);
-        fetched.set(pageNo, { totalCount: page.totalCount, items: page.items });
-        if (onPage) await onPage(pageNo, fetched.get(pageNo));
-        if (page.items.length === 0) break; // 페이지 종료(완전성 평가가 누락으로 잡는다)
-      }
-
-      const orderedPages = [...fetched.entries()].sort((a, b) => a[0] - b[0]);
-      const seen = new Set();
-      let duplicateHubCds = 0;
-      const hubs = [];
-      for (const [, page] of orderedPages) {
-        for (const raw of page.items) {
-          const hub = normalizeHub(raw);
-          if (!hub.hubTatsCd) continue;
-          if (seen.has(hub.hubTatsCd)) {
-            duplicateHubCds += 1;
-            continue;
-          }
-          seen.add(hub.hubTatsCd);
-          hubs.push(hub);
-        }
-      }
-      hubs.sort((a, b) => {
-        const ra = a.hubRank ?? Number.MAX_SAFE_INTEGER;
-        const rb = b.hubRank ?? Number.MAX_SAFE_INTEGER;
-        if (ra !== rb) return ra - rb;
-        return a.hubTatsCd.localeCompare(b.hubTatsCd);
-      });
-
-      const ranks = hubs
-        .map((h) => h.hubRank)
-        .filter((r) => Number.isFinite(r));
-      const rankRange = ranks.length
-        ? { min: Math.min(...ranks), max: Math.max(...ranks) }
-        : null;
-
-      if (declaredTotal === 0 && hubs.length === 0) {
-        return {
-          status: "empty",
-          totalCount: 0,
-          collected: 0,
-          hubs: [],
-          duplicateHubCds: 0,
-          rankRange: null,
-          pages: {},
-          completenessBlockers: [],
-        };
-      }
-
-      const completeness = assessCompleteness({
-        declaredTotal,
+      unit = await collectPagedUnit({
+        requestPage: (pageNo) => requestPage(label, areaCd, signguCd, pageNo),
+        idOf: (raw) => text(raw.hubTatsCd),
         pageSize: PAGE_SIZE,
-        pages: orderedPages.map(([pageNo, page]) => ({
-          pageNo,
-          totalCount: page.totalCount,
-          ids: page.items.map((raw) => text(raw.hubTatsCd)).filter(Boolean),
-        })),
+        savedPages,
       });
-
-      if (completeness.blockers.length) {
-        return {
-          status: "failed",
-          totalCount: declaredTotal,
-          collected: hubs.length,
-          hubs: [],
-          duplicateHubCds,
-          rankRange: null,
-          pages: savedPagesOut(),
-          completenessBlockers: completeness.blockers,
-          error: `불완전 수집: ${completeness.blockers.join(" · ")}`,
-        };
-      }
-
-      return {
-        status: "ok",
-        totalCount: declaredTotal,
-        collected: hubs.length,
-        hubs,
-        duplicateHubCds,
-        rankRange,
-        pages: {},
-        completenessBlockers: [],
-      };
     } catch (error) {
       if (error instanceof FatalApiError) {
-        error.savedPages = savedPagesOut();
+        error.savedPages = error.validatedPages ?? {};
         throw error;
       }
       return {
@@ -577,11 +472,73 @@ export function createCollector({
         hubs: [],
         duplicateHubCds: 0,
         rankRange: null,
-        error: String(error.message),
-        pages: savedPagesOut(),
+        done: false,
+        validatedPages: error.validatedPages ?? {},
         completenessBlockers: [],
+        restarted: 0,
+        error: String(error.message),
       };
     }
+
+    const hubs = [];
+    for (const raw of unit.items) {
+      const hub = normalizeHub(raw);
+      if (hub.hubTatsCd) hubs.push(hub);
+    }
+    hubs.sort((a, b) => {
+      const ra = a.hubRank ?? Number.MAX_SAFE_INTEGER;
+      const rb = b.hubRank ?? Number.MAX_SAFE_INTEGER;
+      if (ra !== rb) return ra - rb;
+      return a.hubTatsCd.localeCompare(b.hubTatsCd);
+    });
+    const ranks = hubs.map((h) => h.hubRank).filter((r) => Number.isFinite(r));
+    const rankRange = ranks.length
+      ? { min: Math.min(...ranks), max: Math.max(...ranks) }
+      : null;
+
+    if (unit.done && unit.declaredTotal === 0 && hubs.length === 0) {
+      return {
+        status: "empty",
+        totalCount: 0,
+        collected: 0,
+        hubs: [],
+        duplicateHubCds: 0,
+        rankRange: null,
+        done: true,
+        validatedPages: {},
+        completenessBlockers: [],
+        restarted: unit.restarts,
+      };
+    }
+
+    if (!unit.done) {
+      return {
+        status: "failed",
+        totalCount: unit.declaredTotal,
+        collected: hubs.length,
+        hubs: [],
+        duplicateHubCds: unit.duplicateItems,
+        rankRange: null,
+        done: false,
+        validatedPages: unit.validatedPages,
+        completenessBlockers: unit.blockers,
+        restarted: unit.restarts,
+        error: `불완전 수집: ${unit.blockers.join(" · ") || unit.restartReasons.join(" · ")}`,
+      };
+    }
+
+    return {
+      status: "ok",
+      totalCount: unit.declaredTotal,
+      collected: hubs.length,
+      hubs,
+      duplicateHubCds: unit.duplicateItems,
+      rankRange,
+      done: true,
+      validatedPages: {},
+      completenessBlockers: [],
+      restarted: unit.restarts,
+    };
   }
 
   return { stats, collectRegion, requestPage, buildUrl };

@@ -12,7 +12,7 @@
  * (`contentTypeId` 14·28)로 전국 목록을 페이지 끝까지 받는다.
  */
 
-import { assessCompleteness, expectedPageCount } from "./paged-collection.mjs";
+import { collectPagedUnit } from "./paged-collection.mjs";
 
 export const TOUR_API_BASE_URL = "https://apis.data.go.kr/B551011/KorService2";
 export const REQUEST_TIMEOUT_MS = 20_000;
@@ -213,91 +213,39 @@ export function createProfileCollector({
   }
 
   /**
-   * 한 스펙을 페이지 끝까지 조회한다.
+   * 한 분류 스펙을 페이지 단위로 수집한다. 페이지별 검증·재개·일관성 붕괴 시
+   * 단위 재시작은 공통 로직 `collectPagedUnit`이 처리한다.
    *
-   * `savedPages`(`{ [pageNo]: { totalCount, items } }` 또는 `{ [pageNo]: items[] }`)를
-   * 주면 그 페이지는 다시 호출하지 않는다(결함 3). `onPage(pageNo, { totalCount, items })`
-   * 는 페이지 성공마다 호출한다.
-   *
-   * 완전성(건수 부족·페이지 누락·페이지 간 중복·페이지별 totalCount 변동)을 평가해
-   * `completeness.blockers`로 돌려준다(결함 1).
+   * `savedPages`(`{ [pageNo]: { totalCount, items, complete } }`)의 **검증 통과
+   * (`complete === true`)** 페이지만 재사용한다. 불완전 페이지·일관성 붕괴는
+   * `done: false`로 반환하고, `validatedPages`에는 검증 통과 페이지만 담는다.
    */
   async function collectSpec(spec, opts = {}) {
-    const { savedPages = {}, onPage } = opts;
-    /** pageNo -> { totalCount, items } */
-    const fetched = new Map();
-    for (const [key, value] of Object.entries(savedPages)) {
-      const pageNo = Number(key);
-      if (!Number.isInteger(pageNo) || pageNo < 1) continue;
-      if (Array.isArray(value)) {
-        fetched.set(pageNo, { totalCount: null, items: value });
-      } else if (value && Array.isArray(value.items)) {
-        fetched.set(pageNo, {
-          totalCount: Number.isFinite(Number(value.totalCount))
-            ? Number(value.totalCount)
-            : null,
-          items: value.items,
-        });
-      }
-    }
-
-    if (!fetched.has(1)) {
-      const first = await requestPage(spec, 1);
-      fetched.set(1, { totalCount: first.totalCount, items: first.items });
-      if (onPage) await onPage(1, fetched.get(1));
-    }
-    const declaredTotal = fetched.get(1).totalCount ?? 0;
-    const pageCount = expectedPageCount(declaredTotal, PAGE_SIZE);
-
-    for (let pageNo = 2; pageNo <= pageCount; pageNo += 1) {
-      if (fetched.has(pageNo)) continue;
-      const page = await requestPage(spec, pageNo);
-      fetched.set(pageNo, { totalCount: page.totalCount, items: page.items });
-      if (onPage) await onPage(pageNo, fetched.get(pageNo));
-    }
-
-    const orderedPages = [...fetched.entries()].sort((a, b) => a[0] - b[0]);
-    const items = [];
-    const seen = new Set();
-    let duplicateInSpec = 0;
-    for (const [, page] of orderedPages) {
-      for (const item of page.items) {
-        const id = text(item.contentid);
-        if (!id) continue;
-        if (seen.has(id)) {
-          duplicateInSpec += 1;
-          continue;
-        }
-        seen.add(id);
-        items.push(item);
-      }
-    }
-
-    const completeness = assessCompleteness({
-      declaredTotal,
+    const { savedPages = {} } = opts;
+    const unit = await collectPagedUnit({
+      requestPage: (pageNo) => requestPage(spec, pageNo),
+      idOf: (item) => item.contentid,
       pageSize: PAGE_SIZE,
-      pages: orderedPages.map(([pageNo, page]) => ({
-        pageNo,
-        totalCount: page.totalCount,
-        ids: page.items.map((item) => text(item.contentid)).filter(Boolean),
-      })),
+      savedPages,
     });
-
     return {
       label: spec.label,
-      totalCount: declaredTotal,
-      pageCount,
-      fetchedPageNos: completeness.fetchedPageNos,
-      missingPages: completeness.missingPages,
-      perPageTotals: completeness.totalCountValues,
-      receivedUnique: items.length,
-      duplicateInSpec,
-      crossPageDuplicates: completeness.crossPageDuplicateCount,
-      emptyPages: completeness.missingPages.length,
-      drift: completeness.shortfall,
-      blockers: completeness.blockers,
-      savedPages: Object.fromEntries(orderedPages),
-      items,
+      totalCount: unit.declaredTotal,
+      pageCount: unit.expectedPageCount,
+      receivedUnique: unit.items.length,
+      duplicateInSpec: unit.duplicateItems,
+      crossPageDuplicates: unit.crossPageDuplicates,
+      incompletePages: unit.incompletePages,
+      perPageTotals: unit.perPageTotals,
+      restarts: unit.restarts,
+      restartReasons: unit.restartReasons,
+      drift: unit.declaredTotal
+        ? unit.declaredTotal - unit.items.length - unit.duplicateItems
+        : 0,
+      blockers: unit.blockers,
+      done: unit.done,
+      validatedPages: unit.validatedPages,
+      items: unit.items,
     };
   }
 
