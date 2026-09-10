@@ -1,4 +1,7 @@
 "use client";
+import { LOCAL_TRAVEL_NOTICE } from "@/lib/local-travel-time";
+import { OriginSearch } from "./OriginSearch";
+import { originRegion } from "@/lib/origin-regions";
 
 import {
   useCallback,
@@ -79,6 +82,7 @@ const labels = (values: SearchInput["interests"]) =>
     .join(" · ");
 type MealRequest = {
   planId: string;
+  planUpdatedAt: string;
   groupId: string;
   visits: { contentId: string; regionId: string }[];
   nonce: number;
@@ -86,6 +90,7 @@ type MealRequest = {
 function requestFor(plan: PlanSnapshot): MealRequest {
   return {
     planId: plan.id,
+    planUpdatedAt: plan.updatedAt,
     groupId: plan.destination.groupId,
     visits: plan.blocks.flatMap((b) =>
       b.attraction
@@ -141,6 +146,7 @@ export function TripPlanner() {
     {},
   );
   const [screen, setScreen] = useState<"input" | "results">("input");
+  const [previousDraft, setPreviousDraft] = useState<PlanSnapshot | null>(null);
   const [attempted, setAttempted] = useState(false);
   const savedOpen = useTripUi((s) => s.savedOpen),
     setSavedOpen = useTripUi((s) => s.setSavedOpen);
@@ -309,7 +315,8 @@ export function TripPlanner() {
           },
         ) ?? data.restaurants;
       setPlan((current) =>
-        current?.id === request.planId
+        current?.id === request.planId &&
+        current.updatedAt === request.planUpdatedAt
           ? assignRestaurants(current, restaurants)
           : current,
       );
@@ -367,9 +374,21 @@ export function TripPlanner() {
         generation: current,
       });
       if (generation.current !== current) return;
-      if (data.kind !== "success") setMessage(data.message);
+      if (data.kind !== "success") {
+        if (previousDraft) {
+          setPlan(previousDraft);
+          setInput(previousDraft.input);
+        }
+        setMessage(data.message);
+      }
     } catch (error) {
-      if (generation.current === current) setMessage(apiMessage(error));
+      if (generation.current === current) {
+        if (previousDraft) {
+          setPlan(previousDraft);
+          setInput(previousDraft.input);
+        }
+        setMessage(apiMessage(error));
+      }
     }
   }
   function choose(candidate: Candidate) {
@@ -494,7 +513,7 @@ export function TripPlanner() {
     if (!result.error && plan?.id === saved.id)
       setPlan({ ...plan, savedAt: undefined });
   }
-  const restaurants = mealRequest?.planId === plan?.id ? (pool.data ?? []) : [];
+  const restaurants = pool.data ?? [];
   const candidates =
     search.data?.kind === "success" ? search.data.candidates : [];
   const changedAfterSave =
@@ -515,6 +534,7 @@ export function TripPlanner() {
       meals.data?.kind === "data-error" ||
       !!meals.data?.failedRegionIds.length);
   function showInput() {
+    if (plan) setPreviousDraft(plan);
     ++generation.current;
     cancelVisitInfo();
     search.reset();
@@ -527,6 +547,7 @@ export function TripPlanner() {
     window.scrollTo(0, 0);
   }
   function showCandidates() {
+    if (plan) setPreviousDraft(plan);
     ++generation.current;
     cancelVisitInfo();
     setPlan(null);
@@ -559,6 +580,23 @@ export function TripPlanner() {
         </span>
       </header>
       <div className="p2-storage-link">
+        {!plan && previousDraft ? (
+          <button
+            className="p2-text-button"
+            onClick={() => {
+              ++generation.current;
+              search.reset();
+              cancelVisitInfo();
+              clearMeals();
+              setPlan(previousDraft);
+              setInput(previousDraft.input);
+              setScreen("results");
+              setMessage("이전 편집 계획을 그대로 복원했어요.");
+            }}
+          >
+            변경 취소 · 이전 편집 계획으로 돌아가기
+          </button>
+        ) : null}
         <button
           className="p2-text-button"
           onClick={openSaved}
@@ -629,7 +667,7 @@ export function TripPlanner() {
         <form className="p2-form" onSubmit={submit}>
           <FieldCard
             label="어디서 출발해요?"
-            hint="지금은 서울·부산 두 곳에서만 출발할 수 있어요."
+            hint="표준 지역을 검색하거나 시도별로 선택해 주세요. 서울·부산은 기존 대표점 빠른 선택이에요."
           >
             <SegmentedControl
               label="출발지"
@@ -644,6 +682,10 @@ export function TripPlanner() {
                   originId: value as SearchInput["originId"],
                 })
               }
+            />
+            <OriginSearch
+              value={input.originId}
+              onChange={(originId) => setInput({ ...input, originId })}
             />
           </FieldCard>
           <FieldCard
@@ -766,7 +808,7 @@ export function TripPlanner() {
       {screen === "results" && !plan && search.variables ? (
         <NotebookConditions
           input={search.variables.input}
-          title={`${ORIGINS.find((origin) => origin.id === search.variables?.input.originId)?.label}에서 갈 수 있는 곳`}
+          title={`${originRegion(search.variables?.input.originId)?.label ?? "선택 지역"}에서 갈 수 있는 곳`}
         />
       ) : null}
       {screen === "results" && !plan && search.isPending ? (
@@ -1234,9 +1276,11 @@ export function TripPlanner() {
                                 : block.kind === "meal"
                                   ? `${block.mealType === "lunch" ? "점심" : "저녁"} · ${block.mealScope === "local" ? "음식점" : "이동 중 식사"}`
                                   : block.kind === "travel"
-                                    ? block.direction === "return"
-                                      ? "복귀 이동"
-                                      : "출발 이동"
+                                    ? block.localTravel
+                                      ? "현지 이동"
+                                      : block.direction === "return"
+                                        ? "복귀 이동"
+                                        : "출발 이동"
                                     : block.kind === "rest"
                                       ? "휴식"
                                       : block.title}
@@ -1587,15 +1631,22 @@ export function TripPlanner() {
                                   className="p2-control"
                                   key={alternative.contentId}
                                   onClick={() => {
-                                    setPlan(
-                                      replaceRestaurant(
-                                        plan,
-                                        block.id,
-                                        alternative,
-                                      ),
+                                    const next = replaceRestaurant(
+                                      plan,
+                                      block.id,
+                                      alternative,
                                     );
+                                    if (next === plan) {
+                                      setMessage(
+                                        "장소 간 이동시간을 확보할 수 없어 기존 식당과 일정을 유지했어요.",
+                                      );
+                                      return;
+                                    }
+                                    setPlan(next);
                                     setExpanded(null);
-                                    setMessage("이 식사 칸의 식당만 바꿨어요.");
+                                    setMessage(
+                                      "식당을 바꾸고 주변 이동시간과 일정을 다시 계산했어요.",
+                                    );
                                   }}
                                 >
                                   {alternative.name}
@@ -1621,6 +1672,17 @@ export function TripPlanner() {
               </ol>
             </section>
           ))}
+          <section className="p2-panel" aria-label="이동시간 안내">
+            <p>
+              {plan.localTravelVersion
+                ? LOCAL_TRAVEL_NOTICE
+                : "이전에 저장한 계획은 장소 간 이동시간이 반영되지 않았어요. 새 검색 또는 편집 시 새 이동 규칙을 적용해요."}
+            </p>
+            <p>
+              지역 대표점과 첫·마지막 장소, 숙소까지의 이동은 확인하지 않았어요.
+              좌표가 없는 장소 사이에는 이동 확인 전 15분을 임시 확보해요.
+            </p>
+          </section>
           <details className="p2-panel">
             <summary>추천·시간 계산의 근거</summary>
             <p>
@@ -1630,8 +1692,9 @@ export function TripPlanner() {
               {duration(plan.metrics.freeMinutes)}
             </p>
             <p>
-              활동 사이 여유는 이동·주차·대기에 쓸 수 있는 자유시간이며, 실제
-              장소 간 이동시간을 계산한 값은 아니에요.
+              {plan.localTravelVersion
+                ? "장소 간 예상 이동과 순수 자유시간은 별도로 계산해요."
+                : "기존 계획의 여유는 실제 장소 간 이동시간을 계산한 값이 아니에요."}
             </p>
             <p>
               {plan.destination.metadata.travelTimeSource} · 기준연도{" "}
@@ -1649,7 +1712,7 @@ export function TripPlanner() {
             </p>
             <p>
               지역 대표점 기준 일반 예상시간이며 실시간 교통이나 개별 주소까지의
-              시간은 아니에요. 여행지 내부 이동시간은 계산하지 않아요. 주변
+              시간은 아니에요. 현지 이동의 원천은 이 KTDB 시간표와 달라요. 주변
               장소는 좌표 근접성으로 함께 구성했으며 도로 동선이나 도보 가능
               여부를 보장하지 않아요.
             </p>

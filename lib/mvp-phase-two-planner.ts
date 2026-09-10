@@ -1,6 +1,7 @@
-import { INTERESTS, ORIGINS } from "@/lib/mvp-phase-two-types";
+import { INTERESTS } from "@/lib/mvp-phase-two-types";
+import { originRegion } from "@/lib/origin-regions";
+import { scheduleLocalDay } from "@/lib/local-travel-schedule";
 import { localActivityWindow, planTimeError } from "./plan-time-constraints";
-import { placeActivities } from "./activity-placement";
 import type {
   Attraction,
   Candidate,
@@ -141,11 +142,8 @@ export function validateSearchInput(
   if (!value || typeof value !== "object" || Array.isArray(value))
     return fail("출발지, 자차, 1박 2일 일정과 관심사를 입력해 주세요.");
   const input = value as Record<string, unknown>;
-  if (
-    !ORIGINS.some((origin) => origin.id === input.originId) ||
-    input.transport !== "car"
-  )
-    return fail("서울 또는 부산 출발·자차 여행만 지원해요.");
+  if (!originRegion(input.originId)?.supported || input.transport !== "car")
+    return fail("자동차 시간 데이터가 있는 표준 출발 지역을 선택해 주세요.");
   if (
     !Array.isArray(input.interests) ||
     input.interests.length < 1 ||
@@ -576,6 +574,7 @@ export function planMetrics(
         (block) =>
           block.kind === "attraction" ||
           block.kind === "personal" ||
+          Boolean(block.localTravel) ||
           block.kind === "free" ||
           (block.kind === "meal" && block.mealScope === "local"),
       )
@@ -603,7 +602,7 @@ export function planMetrics(
 }
 
 /** The same layout engine serves search, previews and retained-place editing. */
-export function scheduleTrip(
+function scheduleBaseTrip(
   input: SearchInput,
   oneWay: number,
   pool: Attraction[],
@@ -787,6 +786,91 @@ export function scheduleTrip(
     ),
   };
 }
+export function scheduleTrip(
+  input: SearchInput,
+  oneWay: number,
+  pool: Attraction[],
+  retained?: Visit[],
+  requiredLocalMeals: string[] = [],
+  timingCache?: SchedulingCache,
+): ScheduleResult {
+  let result = scheduleBaseTrip(
+    input,
+    oneWay,
+    pool,
+    retained,
+    requiredLocalMeals,
+    timingCache,
+  );
+  while (result.ok) {
+    const { blocks, metrics } = result;
+    const first = scheduleLocalDay(
+      input,
+      blocks,
+      1,
+      metrics.arrivalAt,
+      metrics.returnDepartureAt,
+      { fast: true },
+    );
+    const second = scheduleLocalDay(
+      input,
+      blocks,
+      2,
+      metrics.arrivalAt,
+      metrics.returnDepartureAt,
+      { fast: true },
+    );
+    if (first && second) {
+      const merged = [
+        ...blocks.filter(
+          (b) =>
+            b.kind === "rest" ||
+            (b.kind === "travel" && !b.localTravel) ||
+            (b.kind === "meal" && b.mealScope === "transit"),
+        ),
+        ...first,
+        ...second,
+      ].toSorted((a, b) => a.startAt.localeCompare(b.startAt));
+      refreshActivityEvidence(
+        { destination: { attractions: pool } },
+        merged.filter(isActivity),
+      );
+      return {
+        ok: true,
+        blocks: merged,
+        metrics: planMetrics(
+          input,
+          merged,
+          metrics.arrivalAt,
+          metrics.returnDepartureAt,
+        ),
+      };
+    }
+    const visits = blocks
+      .filter((b) => b.attraction)
+      .map((b) => ({
+        attraction: b.attraction!,
+        durationMinutes: b.durationMinutes as Visit["durationMinutes"],
+        fixed: Boolean(b.fixed),
+      }));
+    if (retained || visits.length <= 3) break;
+    result = scheduleBaseTrip(
+      input,
+      oneWay,
+      pool,
+      visits.slice(0, -1),
+      requiredLocalMeals,
+      timingCache,
+    );
+  }
+  return result.ok
+    ? {
+        ok: false,
+        reason: "장소 간 이동과 식사·여유시간을 함께 확보할 수 없어요.",
+      }
+    : result;
+}
+
 export function createPlan(
   input: SearchInput,
   candidate: Candidate,
@@ -805,6 +889,7 @@ export function createPlan(
     blocks: candidate.preview.blocks.map((block) => ({ ...block })),
     metrics: { ...candidate.preview.metrics },
     itineraryRuleVersion: "e4-v2",
+    localTravelVersion: "straight-line-v1",
   };
 }
 export function attractionAlternatives(
@@ -867,7 +952,7 @@ export function repeatedFacilityNotice(
 }
 
 function refreshActivityEvidence(
-  plan: PlanSnapshot,
+  plan: { destination: Pick<Candidate, "attractions"> },
   activities: EditableActivity[],
 ) {
   const groups = facilityGroups(plan.destination.attractions);
@@ -896,7 +981,7 @@ function refreshActivityEvidence(
     activity.facilityGroupId = group;
     activity.sessionId = session;
     activity.reason = [
-      "선택 관심사에 맞는 관광지 · 내부 이동시간 미계산",
+      "선택 관심사에 맞는 관광지 · 장소 간 직선거리 이동 추정",
       ...notices,
     ].join(" · ");
     if (group) seen.add(group);
@@ -924,7 +1009,10 @@ function editedAvailability(plan: PlanSnapshot, day: 1 | 2): MinuteInterval[] {
     blockMinute(plan.input, plan.metrics.returnDepartureAt),
   );
   const blockers = plan.blocks
-    .filter((block) => !isActivity(block) && block.kind !== "free")
+    .filter(
+      (block) =>
+        !isActivity(block) && block.kind !== "free" && !block.localTravel,
+    )
     .map((block) => ({
       start: blockMinute(plan.input, block.startAt),
       end: blockMinute(plan.input, block.endAt),
@@ -951,36 +1039,36 @@ function arrangeDay(
   activities: EditableActivity[],
   day: 1 | 2,
   targetId?: string,
-): { slots: Map<string, Interval>; reason?: string } {
-  const starts = placeActivities(
-    activities.map((activity) => {
-      const original = plan.blocks.find((block) => block.id === activity.id);
-      return {
-        duration: activity.durationMinutes,
-        originalStart: original
-          ? blockMinute(plan.input, original.startAt)
-          : undefined,
-        preserveStart: original !== undefined && activity.id !== targetId,
-        fixedStart: activity.fixedStartAt
-          ? blockMinute(plan.input, activity.fixedStartAt)
-          : undefined,
-      };
-    }),
-    editedAvailability(plan, day),
+): { slots: Map<string, Interval>; blocks: TimeBlock[]; reason?: string } {
+  const scheduled = scheduleLocalDay(
+    plan.input,
+    [...activities, ...plan.blocks.filter((b) => b.kind === "meal")],
+    day,
+    plan.metrics.arrivalAt,
+    plan.metrics.returnDepartureAt,
+    { original: plan.blocks, targetId },
   );
-  return starts
+  return scheduled
     ? {
+        blocks: scheduled,
         slots: new Map(
-          activities.map((activity, index) => [
+          activities.map((activity) => [
             activity.id,
             {
-              start: starts[index],
-              end: starts[index] + activity.durationMinutes,
+              start: blockMinute(
+                plan.input,
+                scheduled.find((b) => b.id === activity.id)!.startAt,
+              ),
+              end: blockMinute(
+                plan.input,
+                scheduled.find((b) => b.id === activity.id)!.endAt,
+              ),
             },
           ]),
         ),
       }
     : {
+        blocks: [],
         slots: new Map(),
         reason: "식사와 겹치거나 여유시간을 확보할 수 없어요.",
       };
@@ -997,6 +1085,7 @@ function rebuildActivities(
     return fail("관광지는 여행 전체 최대 6곳까지 추가할 수 있어요.");
   if (activities.filter((activity) => activity.kind === "personal").length > 4)
     return fail("개인 일정은 여행 전체 최대 4개까지 추가할 수 있어요.");
+  const scheduledBlocks: TimeBlock[] = [];
   for (const day of [1, 2] as const) {
     const daily = activities.filter((activity) => activity.day === day);
     if (daily.filter((activity) => activity.kind === "attraction").length > 3)
@@ -1036,6 +1125,7 @@ function rebuildActivities(
     }
     const arranged = arrangeDay(plan, daily, day, targetId);
     if (arranged.reason) return fail(arranged.reason);
+    scheduledBlocks.push(...arranged.blocks);
     for (const activity of daily) {
       const slot = arranged.slots.get(activity.id)!;
       activity.startAt = stamp(plan.input, slot.start);
@@ -1061,7 +1151,10 @@ function rebuildActivities(
       changedDays.add(current.day);
   const mealNotice = "방문 장소가 바뀌었어요. 식당 위치를 확인해 주세요";
   const staticBlocks = plan.blocks
-    .filter((block) => !isActivity(block) && block.kind !== "free")
+    .filter(
+      (block) =>
+        !isActivity(block) && block.kind !== "free" && !block.localTravel,
+    )
     .map((block) =>
       block.kind === "meal" &&
       block.mealScope === "local" &&
@@ -1070,48 +1163,17 @@ function rebuildActivities(
         ? { ...block, reason: `${block.reason} · ${mealNotice}` }
         : block,
     );
-  const freeBlocks: TimeBlock[] = [];
-  for (const day of [1, 2] as const) {
-    const daily = activities
-      .filter((activity) => activity.day === day)
-      .toSorted((a, b) => a.startAt.localeCompare(b.startAt));
-    for (const available of editedAvailability(plan, day)) {
-      let cursor = available.start;
-      for (const activity of daily) {
-        const start = blockMinute(plan.input, activity.startAt),
-          end = blockMinute(plan.input, activity.endAt);
-        if (start < available.start || end > available.end) continue;
-        if (cursor < start)
-          freeBlocks.push({
-            id: `free-${cursor}`,
-            day,
-            startAt: stamp(plan.input, cursor),
-            endAt: stamp(plan.input, start),
-            kind: "free",
-            title: "여유시간",
-            durationMinutes: start - cursor,
-            reason:
-              "이동·주차·대기 등에 사용할 수 있는 여유예요. 실제 이동시간을 계산한 값은 아니에요.",
-          });
-        cursor = end;
-      }
-      if (cursor < available.end)
-        freeBlocks.push({
-          id: `free-${cursor}`,
-          day,
-          startAt: stamp(plan.input, cursor),
-          endAt: stamp(plan.input, available.end),
-          kind: "free",
-          title: "여유시간",
-          durationMinutes: available.end - cursor,
-          reason:
-            "이동·주차·대기 등에 사용할 수 있는 여유예요. 실제 이동시간을 계산한 값은 아니에요.",
-        });
-    }
-  }
-  const blocks = [...staticBlocks, ...activities, ...freeBlocks].toSorted(
-    (a, b) => a.startAt.localeCompare(b.startAt),
-  );
+  const blocks = [
+    ...staticBlocks.filter(
+      (b) => !(b.kind === "meal" && b.mealScope === "local"),
+    ),
+    ...scheduledBlocks.map(
+      (b) =>
+        activities.find((a) => a.id === b.id) ??
+        staticBlocks.find((s) => s.id === b.id) ??
+        b,
+    ),
+  ].toSorted((a, b) => a.startAt.localeCompare(b.startAt));
   const updated: PlanSnapshot = {
     ...plan,
     blocks,
@@ -1124,9 +1186,17 @@ function rebuildActivities(
     edited: true,
     updatedAt: new Date().toISOString(),
     itineraryRuleVersion: "e4-v2",
+    localTravelVersion: "straight-line-v1",
   };
   const error = planTimeError(updated);
   return error ? fail(error) : { ok: true, plan: updated };
+}
+/** Recalculate selected meals using the same editing constraints, without changing attractions. */
+export function recalculateLocalPlan(plan: PlanSnapshot): EditResult {
+  return rebuildActivities(
+    plan,
+    plan.blocks.filter(isActivity).map((b) => ({ ...b })),
+  );
 }
 export function planAccommodation(
   plan: PlanSnapshot,

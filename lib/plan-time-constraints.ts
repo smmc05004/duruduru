@@ -1,4 +1,5 @@
 import type { PlanSnapshot } from "./mvp-phase-two-types";
+import { estimateLocalTravel } from "./local-travel-time";
 
 /** Minutes relative to the trip's first KST midnight. Shared by generation,
  * editing and storage; this is a daytime activity window, not a driving limit. */
@@ -40,7 +41,10 @@ export function planTimeError(
       return "여행 범위의 시간 블록이 겹치거나 비어 있어요.";
     ids.add(block.id);
     previous = end;
-    if (["attraction", "personal", "free"].includes(block.kind)) {
+    if (
+      ["attraction", "personal", "free"].includes(block.kind) ||
+      block.localTravel
+    ) {
       const window = localActivityWindow(block.day, arrival, departure);
       if (
         minute(block.startAt) < window.start ||
@@ -66,6 +70,55 @@ export function planTimeError(
   }
   if (previous !== time(plan.input.returnBy))
     return "복귀 완료까지 시간 블록이 이어지지 않아요.";
+  if (plan.localTravelVersion) {
+    if (plan.localTravelVersion !== "straight-line-v1")
+      return "지원하지 않는 이동시간 규칙이에요.";
+    const used = new Set<string>();
+    for (const day of [1, 2]) {
+      const places = plan.blocks.filter(
+        (b) =>
+          b.day === day &&
+          (b.kind === "attraction" ||
+            b.kind === "personal" ||
+            (b.kind === "meal" && b.mealScope === "local")),
+      );
+      for (let i = 1; i < places.length; i++) {
+        const from = places[i - 1],
+          to = places[i];
+        const estimate = estimateLocalTravel(
+          from.attraction?.coordinates ?? from.restaurant?.coordinates ?? null,
+          to.attraction?.coordinates ?? to.restaurant?.coordinates ?? null,
+        );
+        const legs = plan.blocks.filter(
+          (b) =>
+            b.localTravel?.fromId === from.id && b.localTravel.toId === to.id,
+        );
+        if (estimate.reservedMinutes === 0 && !legs.length) continue;
+        if (legs.length !== 1)
+          return "장소 간 이동 구간이 누락되거나 중복됐어요.";
+        const b = legs[0],
+          l = b.localTravel!;
+        if (
+          b.day !== day ||
+          b.kind !== "travel" ||
+          b.direction !== undefined ||
+          b.durationMinutes !== estimate.reservedMinutes ||
+          time(b.startAt) < time(from.endAt) ||
+          time(b.endAt) > time(to.startAt) ||
+          l.status !== estimate.status ||
+          l.estimatedMinutes !== estimate.estimatedMinutes ||
+          l.reservedMinutes !== estimate.reservedMinutes ||
+          l.distanceKm !== estimate.distanceKm ||
+          l.policyVersion !== estimate.policyVersion
+        )
+          return "장소 간 이동시간과 일정이 일치하지 않아요.";
+        used.add(b.id);
+      }
+    }
+    if (plan.blocks.some((b) => b.localTravel && !used.has(b.id)))
+      return "이동 구간의 장소 연결이 올바르지 않아요.";
+  } else if (plan.blocks.some((b) => b.localTravel))
+    return "이동시간 규칙이 누락됐어요.";
   if (!enforceEditingRules) return;
   if (contents.size > 6)
     return "관광지는 여행 전체 최대 6곳까지 추가할 수 있어요.";
@@ -85,6 +138,7 @@ export function planTimeError(
         .reduce((sum, b) => sum + b.durationMinutes, 0) < 30
     )
       return "하루 여유시간 30분을 확보할 수 없어요.";
+    if (plan.localTravelVersion) continue;
     let lastActivityEnd: number | undefined;
     for (const block of daily) {
       if (block.kind === "free") continue;

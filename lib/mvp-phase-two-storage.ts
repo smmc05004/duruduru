@@ -238,6 +238,7 @@ function blocks(
     } else if (b.restaurant !== undefined) return false;
     if (
       b.kind === "travel" &&
+      b.localTravel === undefined &&
       b.direction !== "outbound" &&
       b.direction !== "return"
     )
@@ -474,6 +475,7 @@ function cleanBlock(b: TimeBlock): TimeBlock {
     mealScope: b.mealScope,
     mealType: b.mealType,
     direction: b.direction,
+    localTravel: b.localTravel ? { ...b.localTravel } : undefined,
     facilityGroupId: b.facilityGroupId,
     sessionId: b.sessionId,
     reason: b.reason,
@@ -559,6 +561,7 @@ function snapshot(plan: PlanSnapshot): PlanSnapshot {
     blocks: plan.blocks.map(cleanBlock),
     metrics: cleanMetrics(plan.metrics),
     itineraryRuleVersion: plan.itineraryRuleVersion,
+    localTravelVersion: plan.localTravelVersion,
     accommodation: plan.accommodation
       ? {
           name: plan.accommodation.name,

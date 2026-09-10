@@ -1,0 +1,2265 @@
+{
+  "schemaVersion": 1,
+  "mappingGeneratedAt": "2026-09-06T23:46:42.853Z",
+  "networkYear": 2024,
+  "regions": [
+    {
+      "id": "ktdb-zone-1",
+      "zoneId": "ktdb-zone-1",
+      "label": "서울특별시 종로구",
+      "province": "서울특별시",
+      "district": "종로구",
+      "aliases": ["서울특별시 종로구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-2",
+      "zoneId": "ktdb-zone-2",
+      "label": "서울특별시 중구",
+      "province": "서울특별시",
+      "district": "중구",
+      "aliases": ["서울특별시 중구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-3",
+      "zoneId": "ktdb-zone-3",
+      "label": "서울특별시 용산구",
+      "province": "서울특별시",
+      "district": "용산구",
+      "aliases": ["서울특별시 용산구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-4",
+      "zoneId": "ktdb-zone-4",
+      "label": "서울특별시 성동구",
+      "province": "서울특별시",
+      "district": "성동구",
+      "aliases": ["서울특별시 성동구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-5",
+      "zoneId": "ktdb-zone-5",
+      "label": "서울특별시 광진구",
+      "province": "서울특별시",
+      "district": "광진구",
+      "aliases": ["서울특별시 광진구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-6",
+      "zoneId": "ktdb-zone-6",
+      "label": "서울특별시 동대문구",
+      "province": "서울특별시",
+      "district": "동대문구",
+      "aliases": ["서울특별시 동대문구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-7",
+      "zoneId": "ktdb-zone-7",
+      "label": "서울특별시 중랑구",
+      "province": "서울특별시",
+      "district": "중랑구",
+      "aliases": ["서울특별시 중랑구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-8",
+      "zoneId": "ktdb-zone-8",
+      "label": "서울특별시 성북구",
+      "province": "서울특별시",
+      "district": "성북구",
+      "aliases": ["서울특별시 성북구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-9",
+      "zoneId": "ktdb-zone-9",
+      "label": "서울특별시 강북구",
+      "province": "서울특별시",
+      "district": "강북구",
+      "aliases": ["서울특별시 강북구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-10",
+      "zoneId": "ktdb-zone-10",
+      "label": "서울특별시 도봉구",
+      "province": "서울특별시",
+      "district": "도봉구",
+      "aliases": ["서울특별시 도봉구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-11",
+      "zoneId": "ktdb-zone-11",
+      "label": "서울특별시 노원구",
+      "province": "서울특별시",
+      "district": "노원구",
+      "aliases": ["서울특별시 노원구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-12",
+      "zoneId": "ktdb-zone-12",
+      "label": "서울특별시 은평구",
+      "province": "서울특별시",
+      "district": "은평구",
+      "aliases": ["서울특별시 은평구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-13",
+      "zoneId": "ktdb-zone-13",
+      "label": "서울특별시 서대문구",
+      "province": "서울특별시",
+      "district": "서대문구",
+      "aliases": ["서울특별시 서대문구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-14",
+      "zoneId": "ktdb-zone-14",
+      "label": "서울특별시 마포구",
+      "province": "서울특별시",
+      "district": "마포구",
+      "aliases": ["서울특별시 마포구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-15",
+      "zoneId": "ktdb-zone-15",
+      "label": "서울특별시 양천구",
+      "province": "서울특별시",
+      "district": "양천구",
+      "aliases": ["서울특별시 양천구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-16",
+      "zoneId": "ktdb-zone-16",
+      "label": "서울특별시 강서구",
+      "province": "서울특별시",
+      "district": "강서구",
+      "aliases": ["서울특별시 강서구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-17",
+      "zoneId": "ktdb-zone-17",
+      "label": "서울특별시 구로구",
+      "province": "서울특별시",
+      "district": "구로구",
+      "aliases": ["서울특별시 구로구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-18",
+      "zoneId": "ktdb-zone-18",
+      "label": "서울특별시 금천구",
+      "province": "서울특별시",
+      "district": "금천구",
+      "aliases": ["서울특별시 금천구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-19",
+      "zoneId": "ktdb-zone-19",
+      "label": "서울특별시 영등포구",
+      "province": "서울특별시",
+      "district": "영등포구",
+      "aliases": ["서울특별시 영등포구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-20",
+      "zoneId": "ktdb-zone-20",
+      "label": "서울특별시 동작구",
+      "province": "서울특별시",
+      "district": "동작구",
+      "aliases": ["서울특별시 동작구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-21",
+      "zoneId": "ktdb-zone-21",
+      "label": "서울특별시 관악구",
+      "province": "서울특별시",
+      "district": "관악구",
+      "aliases": ["서울특별시 관악구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-22",
+      "zoneId": "ktdb-zone-22",
+      "label": "서울특별시 서초구",
+      "province": "서울특별시",
+      "district": "서초구",
+      "aliases": ["서울특별시 서초구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-23",
+      "zoneId": "ktdb-zone-23",
+      "label": "서울특별시 강남구",
+      "province": "서울특별시",
+      "district": "강남구",
+      "aliases": ["서울특별시 강남구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-24",
+      "zoneId": "ktdb-zone-24",
+      "label": "서울특별시 송파구",
+      "province": "서울특별시",
+      "district": "송파구",
+      "aliases": ["서울특별시 송파구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-25",
+      "zoneId": "ktdb-zone-25",
+      "label": "서울특별시 강동구",
+      "province": "서울특별시",
+      "district": "강동구",
+      "aliases": ["서울특별시 강동구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-26",
+      "zoneId": "ktdb-zone-26",
+      "label": "부산광역시 중구",
+      "province": "부산광역시",
+      "district": "중구",
+      "aliases": ["부산광역시 중구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-27",
+      "zoneId": "ktdb-zone-27",
+      "label": "부산광역시 서구",
+      "province": "부산광역시",
+      "district": "서구",
+      "aliases": ["부산광역시 서구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-28",
+      "zoneId": "ktdb-zone-28",
+      "label": "부산광역시 동구",
+      "province": "부산광역시",
+      "district": "동구",
+      "aliases": ["부산광역시 동구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-29",
+      "zoneId": "ktdb-zone-29",
+      "label": "부산광역시 영도구",
+      "province": "부산광역시",
+      "district": "영도구",
+      "aliases": ["부산광역시 영도구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-30",
+      "zoneId": "ktdb-zone-30",
+      "label": "부산광역시 부산진구",
+      "province": "부산광역시",
+      "district": "부산진구",
+      "aliases": ["부산광역시 부산진구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-31",
+      "zoneId": "ktdb-zone-31",
+      "label": "부산광역시 동래구",
+      "province": "부산광역시",
+      "district": "동래구",
+      "aliases": ["부산광역시 동래구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-32",
+      "zoneId": "ktdb-zone-32",
+      "label": "부산광역시 남구",
+      "province": "부산광역시",
+      "district": "남구",
+      "aliases": ["부산광역시 남구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-33",
+      "zoneId": "ktdb-zone-33",
+      "label": "부산광역시 북구",
+      "province": "부산광역시",
+      "district": "북구",
+      "aliases": ["부산광역시 북구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-34",
+      "zoneId": "ktdb-zone-34",
+      "label": "부산광역시 해운대구",
+      "province": "부산광역시",
+      "district": "해운대구",
+      "aliases": ["부산광역시 해운대구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-35",
+      "zoneId": "ktdb-zone-35",
+      "label": "부산광역시 사하구",
+      "province": "부산광역시",
+      "district": "사하구",
+      "aliases": ["부산광역시 사하구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-36",
+      "zoneId": "ktdb-zone-36",
+      "label": "부산광역시 금정구",
+      "province": "부산광역시",
+      "district": "금정구",
+      "aliases": ["부산광역시 금정구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-37",
+      "zoneId": "ktdb-zone-37",
+      "label": "부산광역시 강서구",
+      "province": "부산광역시",
+      "district": "강서구",
+      "aliases": ["부산광역시 강서구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-38",
+      "zoneId": "ktdb-zone-38",
+      "label": "부산광역시 연제구",
+      "province": "부산광역시",
+      "district": "연제구",
+      "aliases": ["부산광역시 연제구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-39",
+      "zoneId": "ktdb-zone-39",
+      "label": "부산광역시 수영구",
+      "province": "부산광역시",
+      "district": "수영구",
+      "aliases": ["부산광역시 수영구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-40",
+      "zoneId": "ktdb-zone-40",
+      "label": "부산광역시 사상구",
+      "province": "부산광역시",
+      "district": "사상구",
+      "aliases": ["부산광역시 사상구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-41",
+      "zoneId": "ktdb-zone-41",
+      "label": "부산광역시 기장군",
+      "province": "부산광역시",
+      "district": "기장군",
+      "aliases": ["부산광역시 기장군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-42",
+      "zoneId": "ktdb-zone-42",
+      "label": "대구광역시 중구",
+      "province": "대구광역시",
+      "district": "중구",
+      "aliases": ["대구광역시 중구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-43",
+      "zoneId": "ktdb-zone-43",
+      "label": "대구광역시 동구",
+      "province": "대구광역시",
+      "district": "동구",
+      "aliases": ["대구광역시 동구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-44",
+      "zoneId": "ktdb-zone-44",
+      "label": "대구광역시 서구",
+      "province": "대구광역시",
+      "district": "서구",
+      "aliases": ["대구광역시 서구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-45",
+      "zoneId": "ktdb-zone-45",
+      "label": "대구광역시 남구",
+      "province": "대구광역시",
+      "district": "남구",
+      "aliases": ["대구광역시 남구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-46",
+      "zoneId": "ktdb-zone-46",
+      "label": "대구광역시 북구",
+      "province": "대구광역시",
+      "district": "북구",
+      "aliases": ["대구광역시 북구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-47",
+      "zoneId": "ktdb-zone-47",
+      "label": "대구광역시 수성구",
+      "province": "대구광역시",
+      "district": "수성구",
+      "aliases": ["대구광역시 수성구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-48",
+      "zoneId": "ktdb-zone-48",
+      "label": "대구광역시 달서구",
+      "province": "대구광역시",
+      "district": "달서구",
+      "aliases": ["대구광역시 달서구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-49",
+      "zoneId": "ktdb-zone-49",
+      "label": "대구광역시 달성군",
+      "province": "대구광역시",
+      "district": "달성군",
+      "aliases": ["대구광역시 달성군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-50",
+      "zoneId": "ktdb-zone-50",
+      "label": "대구광역시 군위군",
+      "province": "대구광역시",
+      "district": "군위군",
+      "aliases": ["대구광역시 군위군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-53",
+      "zoneId": "ktdb-zone-53",
+      "label": "인천광역시 미추홀구",
+      "province": "인천광역시",
+      "district": "미추홀구",
+      "aliases": ["인천광역시 미추홀구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-54",
+      "zoneId": "ktdb-zone-54",
+      "label": "인천광역시 연수구",
+      "province": "인천광역시",
+      "district": "연수구",
+      "aliases": ["인천광역시 연수구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-55",
+      "zoneId": "ktdb-zone-55",
+      "label": "인천광역시 남동구",
+      "province": "인천광역시",
+      "district": "남동구",
+      "aliases": ["인천광역시 남동구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-56",
+      "zoneId": "ktdb-zone-56",
+      "label": "인천광역시 부평구",
+      "province": "인천광역시",
+      "district": "부평구",
+      "aliases": ["인천광역시 부평구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-57",
+      "zoneId": "ktdb-zone-57",
+      "label": "인천광역시 계양구",
+      "province": "인천광역시",
+      "district": "계양구",
+      "aliases": ["인천광역시 계양구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-59",
+      "zoneId": "ktdb-zone-59",
+      "label": "인천광역시 강화군",
+      "province": "인천광역시",
+      "district": "강화군",
+      "aliases": ["인천광역시 강화군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-60",
+      "zoneId": "ktdb-zone-60",
+      "label": "인천광역시 옹진군",
+      "province": "인천광역시",
+      "district": "옹진군",
+      "aliases": ["인천광역시 옹진군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-61",
+      "zoneId": "ktdb-zone-61",
+      "label": "광주광역시 동구",
+      "province": "광주광역시",
+      "district": "동구",
+      "aliases": ["광주광역시 동구", "전남광주통합특별시 동구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-62",
+      "zoneId": "ktdb-zone-62",
+      "label": "광주광역시 서구",
+      "province": "광주광역시",
+      "district": "서구",
+      "aliases": ["광주광역시 서구", "전남광주통합특별시 서구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-63",
+      "zoneId": "ktdb-zone-63",
+      "label": "광주광역시 남구",
+      "province": "광주광역시",
+      "district": "남구",
+      "aliases": ["광주광역시 남구", "전남광주통합특별시 남구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-64",
+      "zoneId": "ktdb-zone-64",
+      "label": "광주광역시 북구",
+      "province": "광주광역시",
+      "district": "북구",
+      "aliases": ["광주광역시 북구", "전남광주통합특별시 북구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-65",
+      "zoneId": "ktdb-zone-65",
+      "label": "광주광역시 광산구",
+      "province": "광주광역시",
+      "district": "광산구",
+      "aliases": ["광주광역시 광산구", "전남광주통합특별시 광산구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-66",
+      "zoneId": "ktdb-zone-66",
+      "label": "대전광역시 동구",
+      "province": "대전광역시",
+      "district": "동구",
+      "aliases": ["대전광역시 동구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-67",
+      "zoneId": "ktdb-zone-67",
+      "label": "대전광역시 중구",
+      "province": "대전광역시",
+      "district": "중구",
+      "aliases": ["대전광역시 중구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-68",
+      "zoneId": "ktdb-zone-68",
+      "label": "대전광역시 서구",
+      "province": "대전광역시",
+      "district": "서구",
+      "aliases": ["대전광역시 서구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-69",
+      "zoneId": "ktdb-zone-69",
+      "label": "대전광역시 유성구",
+      "province": "대전광역시",
+      "district": "유성구",
+      "aliases": ["대전광역시 유성구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-70",
+      "zoneId": "ktdb-zone-70",
+      "label": "대전광역시 대덕구",
+      "province": "대전광역시",
+      "district": "대덕구",
+      "aliases": ["대전광역시 대덕구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-71",
+      "zoneId": "ktdb-zone-71",
+      "label": "울산광역시 중구",
+      "province": "울산광역시",
+      "district": "중구",
+      "aliases": ["울산광역시 중구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-72",
+      "zoneId": "ktdb-zone-72",
+      "label": "울산광역시 남구",
+      "province": "울산광역시",
+      "district": "남구",
+      "aliases": ["울산광역시 남구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-73",
+      "zoneId": "ktdb-zone-73",
+      "label": "울산광역시 동구",
+      "province": "울산광역시",
+      "district": "동구",
+      "aliases": ["울산광역시 동구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-74",
+      "zoneId": "ktdb-zone-74",
+      "label": "울산광역시 북구",
+      "province": "울산광역시",
+      "district": "북구",
+      "aliases": ["울산광역시 북구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-75",
+      "zoneId": "ktdb-zone-75",
+      "label": "울산광역시 울주군",
+      "province": "울산광역시",
+      "district": "울주군",
+      "aliases": ["울산광역시 울주군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-76",
+      "zoneId": "ktdb-zone-76",
+      "label": "경기도 수원시 장안구",
+      "province": "경기도",
+      "district": "수원시 장안구",
+      "aliases": ["경기도 수원시 장안구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-77",
+      "zoneId": "ktdb-zone-77",
+      "label": "경기도 수원시 권선구",
+      "province": "경기도",
+      "district": "수원시 권선구",
+      "aliases": ["경기도 수원시 권선구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-78",
+      "zoneId": "ktdb-zone-78",
+      "label": "경기도 수원시 팔달구",
+      "province": "경기도",
+      "district": "수원시 팔달구",
+      "aliases": ["경기도 수원시 팔달구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-79",
+      "zoneId": "ktdb-zone-79",
+      "label": "경기도 수원시 영통구",
+      "province": "경기도",
+      "district": "수원시 영통구",
+      "aliases": ["경기도 수원시 영통구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-80",
+      "zoneId": "ktdb-zone-80",
+      "label": "경기도 성남시 수정구",
+      "province": "경기도",
+      "district": "성남시 수정구",
+      "aliases": ["경기도 성남시 수정구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-81",
+      "zoneId": "ktdb-zone-81",
+      "label": "경기도 성남시 중원구",
+      "province": "경기도",
+      "district": "성남시 중원구",
+      "aliases": ["경기도 성남시 중원구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-82",
+      "zoneId": "ktdb-zone-82",
+      "label": "경기도 성남시 분당구",
+      "province": "경기도",
+      "district": "성남시 분당구",
+      "aliases": ["경기도 성남시 분당구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-83",
+      "zoneId": "ktdb-zone-83",
+      "label": "경기도 의정부시",
+      "province": "경기도",
+      "district": "의정부시",
+      "aliases": ["경기도 의정부시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-84",
+      "zoneId": "ktdb-zone-84",
+      "label": "경기도 안양시 만안구",
+      "province": "경기도",
+      "district": "안양시 만안구",
+      "aliases": ["경기도 안양시 만안구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-85",
+      "zoneId": "ktdb-zone-85",
+      "label": "경기도 안양시 동안구",
+      "province": "경기도",
+      "district": "안양시 동안구",
+      "aliases": ["경기도 안양시 동안구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-86",
+      "zoneId": "ktdb-zone-86",
+      "label": "경기도 부천시 원미구",
+      "province": "경기도",
+      "district": "부천시 원미구",
+      "aliases": ["경기도 부천시 원미구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-87",
+      "zoneId": "ktdb-zone-87",
+      "label": "경기도 부천시 소사구",
+      "province": "경기도",
+      "district": "부천시 소사구",
+      "aliases": ["경기도 부천시 소사구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-88",
+      "zoneId": "ktdb-zone-88",
+      "label": "경기도 부천시 오정구",
+      "province": "경기도",
+      "district": "부천시 오정구",
+      "aliases": ["경기도 부천시 오정구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-89",
+      "zoneId": "ktdb-zone-89",
+      "label": "경기도 광명시",
+      "province": "경기도",
+      "district": "광명시",
+      "aliases": ["경기도 광명시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-90",
+      "zoneId": "ktdb-zone-90",
+      "label": "경기도 평택시",
+      "province": "경기도",
+      "district": "평택시",
+      "aliases": ["경기도 평택시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-91",
+      "zoneId": "ktdb-zone-91",
+      "label": "경기도 동두천시",
+      "province": "경기도",
+      "district": "동두천시",
+      "aliases": ["경기도 동두천시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-92",
+      "zoneId": "ktdb-zone-92",
+      "label": "경기도 안산시 상록구",
+      "province": "경기도",
+      "district": "안산시 상록구",
+      "aliases": ["경기도 안산시 상록구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-93",
+      "zoneId": "ktdb-zone-93",
+      "label": "경기도 안산시 단원구",
+      "province": "경기도",
+      "district": "안산시 단원구",
+      "aliases": ["경기도 안산시 단원구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-94",
+      "zoneId": "ktdb-zone-94",
+      "label": "경기도 고양시 덕양구",
+      "province": "경기도",
+      "district": "고양시 덕양구",
+      "aliases": ["경기도 고양시 덕양구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-95",
+      "zoneId": "ktdb-zone-95",
+      "label": "경기도 고양시 일산동구",
+      "province": "경기도",
+      "district": "고양시 일산동구",
+      "aliases": ["경기도 고양시 일산동구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-96",
+      "zoneId": "ktdb-zone-96",
+      "label": "경기도 고양시 일산서구",
+      "province": "경기도",
+      "district": "고양시 일산서구",
+      "aliases": ["경기도 고양시 일산서구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-97",
+      "zoneId": "ktdb-zone-97",
+      "label": "경기도 과천시",
+      "province": "경기도",
+      "district": "과천시",
+      "aliases": ["경기도 과천시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-98",
+      "zoneId": "ktdb-zone-98",
+      "label": "경기도 구리시",
+      "province": "경기도",
+      "district": "구리시",
+      "aliases": ["경기도 구리시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-99",
+      "zoneId": "ktdb-zone-99",
+      "label": "경기도 남양주시",
+      "province": "경기도",
+      "district": "남양주시",
+      "aliases": ["경기도 남양주시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-100",
+      "zoneId": "ktdb-zone-100",
+      "label": "경기도 오산시",
+      "province": "경기도",
+      "district": "오산시",
+      "aliases": ["경기도 오산시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-101",
+      "zoneId": "ktdb-zone-101",
+      "label": "경기도 시흥시",
+      "province": "경기도",
+      "district": "시흥시",
+      "aliases": ["경기도 시흥시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-102",
+      "zoneId": "ktdb-zone-102",
+      "label": "경기도 군포시",
+      "province": "경기도",
+      "district": "군포시",
+      "aliases": ["경기도 군포시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-103",
+      "zoneId": "ktdb-zone-103",
+      "label": "경기도 의왕시",
+      "province": "경기도",
+      "district": "의왕시",
+      "aliases": ["경기도 의왕시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-104",
+      "zoneId": "ktdb-zone-104",
+      "label": "경기도 하남시",
+      "province": "경기도",
+      "district": "하남시",
+      "aliases": ["경기도 하남시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-105",
+      "zoneId": "ktdb-zone-105",
+      "label": "경기도 용인시 처인구",
+      "province": "경기도",
+      "district": "용인시 처인구",
+      "aliases": ["경기도 용인시 처인구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-106",
+      "zoneId": "ktdb-zone-106",
+      "label": "경기도 용인시 기흥구",
+      "province": "경기도",
+      "district": "용인시 기흥구",
+      "aliases": ["경기도 용인시 기흥구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-107",
+      "zoneId": "ktdb-zone-107",
+      "label": "경기도 용인시 수지구",
+      "province": "경기도",
+      "district": "용인시 수지구",
+      "aliases": ["경기도 용인시 수지구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-108",
+      "zoneId": "ktdb-zone-108",
+      "label": "경기도 파주시",
+      "province": "경기도",
+      "district": "파주시",
+      "aliases": ["경기도 파주시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-109",
+      "zoneId": "ktdb-zone-109",
+      "label": "경기도 이천시",
+      "province": "경기도",
+      "district": "이천시",
+      "aliases": ["경기도 이천시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-110",
+      "zoneId": "ktdb-zone-110",
+      "label": "경기도 안성시",
+      "province": "경기도",
+      "district": "안성시",
+      "aliases": ["경기도 안성시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-111",
+      "zoneId": "ktdb-zone-111",
+      "label": "경기도 김포시",
+      "province": "경기도",
+      "district": "김포시",
+      "aliases": ["경기도 김포시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-112",
+      "zoneId": "ktdb-zone-112",
+      "label": "경기도 화성시",
+      "province": "경기도",
+      "district": "화성시",
+      "aliases": ["경기도 화성시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-113",
+      "zoneId": "ktdb-zone-113",
+      "label": "경기도 광주시",
+      "province": "경기도",
+      "district": "광주시",
+      "aliases": ["경기도 광주시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-114",
+      "zoneId": "ktdb-zone-114",
+      "label": "경기도 양주시",
+      "province": "경기도",
+      "district": "양주시",
+      "aliases": ["경기도 양주시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-115",
+      "zoneId": "ktdb-zone-115",
+      "label": "경기도 포천시",
+      "province": "경기도",
+      "district": "포천시",
+      "aliases": ["경기도 포천시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-116",
+      "zoneId": "ktdb-zone-116",
+      "label": "경기도 여주시",
+      "province": "경기도",
+      "district": "여주시",
+      "aliases": ["경기도 여주시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-117",
+      "zoneId": "ktdb-zone-117",
+      "label": "경기도 연천군",
+      "province": "경기도",
+      "district": "연천군",
+      "aliases": ["경기도 연천군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-118",
+      "zoneId": "ktdb-zone-118",
+      "label": "경기도 가평군",
+      "province": "경기도",
+      "district": "가평군",
+      "aliases": ["경기도 가평군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-119",
+      "zoneId": "ktdb-zone-119",
+      "label": "경기도 양평군",
+      "province": "경기도",
+      "district": "양평군",
+      "aliases": ["경기도 양평군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-120",
+      "zoneId": "ktdb-zone-120",
+      "label": "강원특별자치도 춘천시",
+      "province": "강원특별자치도",
+      "district": "춘천시",
+      "aliases": ["강원특별자치도 춘천시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-121",
+      "zoneId": "ktdb-zone-121",
+      "label": "강원특별자치도 원주시",
+      "province": "강원특별자치도",
+      "district": "원주시",
+      "aliases": ["강원특별자치도 원주시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-122",
+      "zoneId": "ktdb-zone-122",
+      "label": "강원특별자치도 강릉시",
+      "province": "강원특별자치도",
+      "district": "강릉시",
+      "aliases": ["강원특별자치도 강릉시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-123",
+      "zoneId": "ktdb-zone-123",
+      "label": "강원특별자치도 동해시",
+      "province": "강원특별자치도",
+      "district": "동해시",
+      "aliases": ["강원특별자치도 동해시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-124",
+      "zoneId": "ktdb-zone-124",
+      "label": "강원특별자치도 태백시",
+      "province": "강원특별자치도",
+      "district": "태백시",
+      "aliases": ["강원특별자치도 태백시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-125",
+      "zoneId": "ktdb-zone-125",
+      "label": "강원특별자치도 속초시",
+      "province": "강원특별자치도",
+      "district": "속초시",
+      "aliases": ["강원특별자치도 속초시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-126",
+      "zoneId": "ktdb-zone-126",
+      "label": "강원특별자치도 삼척시",
+      "province": "강원특별자치도",
+      "district": "삼척시",
+      "aliases": ["강원특별자치도 삼척시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-127",
+      "zoneId": "ktdb-zone-127",
+      "label": "강원특별자치도 홍천군",
+      "province": "강원특별자치도",
+      "district": "홍천군",
+      "aliases": ["강원특별자치도 홍천군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-128",
+      "zoneId": "ktdb-zone-128",
+      "label": "강원특별자치도 횡성군",
+      "province": "강원특별자치도",
+      "district": "횡성군",
+      "aliases": ["강원특별자치도 횡성군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-129",
+      "zoneId": "ktdb-zone-129",
+      "label": "강원특별자치도 영월군",
+      "province": "강원특별자치도",
+      "district": "영월군",
+      "aliases": ["강원특별자치도 영월군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-130",
+      "zoneId": "ktdb-zone-130",
+      "label": "강원특별자치도 평창군",
+      "province": "강원특별자치도",
+      "district": "평창군",
+      "aliases": ["강원특별자치도 평창군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-131",
+      "zoneId": "ktdb-zone-131",
+      "label": "강원특별자치도 정선군",
+      "province": "강원특별자치도",
+      "district": "정선군",
+      "aliases": ["강원특별자치도 정선군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-132",
+      "zoneId": "ktdb-zone-132",
+      "label": "강원특별자치도 철원군",
+      "province": "강원특별자치도",
+      "district": "철원군",
+      "aliases": ["강원특별자치도 철원군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-133",
+      "zoneId": "ktdb-zone-133",
+      "label": "강원특별자치도 화천군",
+      "province": "강원특별자치도",
+      "district": "화천군",
+      "aliases": ["강원특별자치도 화천군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-134",
+      "zoneId": "ktdb-zone-134",
+      "label": "강원특별자치도 양구군",
+      "province": "강원특별자치도",
+      "district": "양구군",
+      "aliases": ["강원특별자치도 양구군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-135",
+      "zoneId": "ktdb-zone-135",
+      "label": "강원특별자치도 인제군",
+      "province": "강원특별자치도",
+      "district": "인제군",
+      "aliases": ["강원특별자치도 인제군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-136",
+      "zoneId": "ktdb-zone-136",
+      "label": "강원특별자치도 고성군",
+      "province": "강원특별자치도",
+      "district": "고성군",
+      "aliases": ["강원특별자치도 고성군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-137",
+      "zoneId": "ktdb-zone-137",
+      "label": "강원특별자치도 양양군",
+      "province": "강원특별자치도",
+      "district": "양양군",
+      "aliases": ["강원특별자치도 양양군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-138",
+      "zoneId": "ktdb-zone-138",
+      "label": "충청북도 청주시 상당구",
+      "province": "충청북도",
+      "district": "청주시 상당구",
+      "aliases": ["충청북도 청주시 상당구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-139",
+      "zoneId": "ktdb-zone-139",
+      "label": "충청북도 청주시 흥덕구",
+      "province": "충청북도",
+      "district": "청주시 흥덕구",
+      "aliases": ["충청북도 청주시 흥덕구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-140",
+      "zoneId": "ktdb-zone-140",
+      "label": "충청북도 청주시 청원구",
+      "province": "충청북도",
+      "district": "청주시 청원구",
+      "aliases": ["충청북도 청주시 청원구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-141",
+      "zoneId": "ktdb-zone-141",
+      "label": "충청북도 청주시 서원구",
+      "province": "충청북도",
+      "district": "청주시 서원구",
+      "aliases": ["충청북도 청주시 서원구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-142",
+      "zoneId": "ktdb-zone-142",
+      "label": "충청북도 충주시",
+      "province": "충청북도",
+      "district": "충주시",
+      "aliases": ["충청북도 충주시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-143",
+      "zoneId": "ktdb-zone-143",
+      "label": "충청북도 제천시",
+      "province": "충청북도",
+      "district": "제천시",
+      "aliases": ["충청북도 제천시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-144",
+      "zoneId": "ktdb-zone-144",
+      "label": "충청북도 보은군",
+      "province": "충청북도",
+      "district": "보은군",
+      "aliases": ["충청북도 보은군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-145",
+      "zoneId": "ktdb-zone-145",
+      "label": "충청북도 옥천군",
+      "province": "충청북도",
+      "district": "옥천군",
+      "aliases": ["충청북도 옥천군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-146",
+      "zoneId": "ktdb-zone-146",
+      "label": "충청북도 영동군",
+      "province": "충청북도",
+      "district": "영동군",
+      "aliases": ["충청북도 영동군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-147",
+      "zoneId": "ktdb-zone-147",
+      "label": "충청북도 증평군",
+      "province": "충청북도",
+      "district": "증평군",
+      "aliases": ["충청북도 증평군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-148",
+      "zoneId": "ktdb-zone-148",
+      "label": "충청북도 진천군",
+      "province": "충청북도",
+      "district": "진천군",
+      "aliases": ["충청북도 진천군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-149",
+      "zoneId": "ktdb-zone-149",
+      "label": "충청북도 괴산군",
+      "province": "충청북도",
+      "district": "괴산군",
+      "aliases": ["충청북도 괴산군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-150",
+      "zoneId": "ktdb-zone-150",
+      "label": "충청북도 음성군",
+      "province": "충청북도",
+      "district": "음성군",
+      "aliases": ["충청북도 음성군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-151",
+      "zoneId": "ktdb-zone-151",
+      "label": "충청북도 단양군",
+      "province": "충청북도",
+      "district": "단양군",
+      "aliases": ["충청북도 단양군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-152",
+      "zoneId": "ktdb-zone-152",
+      "label": "충청남도 천안시 동남구",
+      "province": "충청남도",
+      "district": "천안시 동남구",
+      "aliases": ["충청남도 천안시 동남구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-153",
+      "zoneId": "ktdb-zone-153",
+      "label": "충청남도 천안시 서북구",
+      "province": "충청남도",
+      "district": "천안시 서북구",
+      "aliases": ["충청남도 천안시 서북구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-154",
+      "zoneId": "ktdb-zone-154",
+      "label": "충청남도 공주시",
+      "province": "충청남도",
+      "district": "공주시",
+      "aliases": ["충청남도 공주시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-155",
+      "zoneId": "ktdb-zone-155",
+      "label": "충청남도 보령시",
+      "province": "충청남도",
+      "district": "보령시",
+      "aliases": ["충청남도 보령시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-156",
+      "zoneId": "ktdb-zone-156",
+      "label": "충청남도 아산시",
+      "province": "충청남도",
+      "district": "아산시",
+      "aliases": ["충청남도 아산시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-157",
+      "zoneId": "ktdb-zone-157",
+      "label": "충청남도 서산시",
+      "province": "충청남도",
+      "district": "서산시",
+      "aliases": ["충청남도 서산시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-158",
+      "zoneId": "ktdb-zone-158",
+      "label": "충청남도 논산시",
+      "province": "충청남도",
+      "district": "논산시",
+      "aliases": ["충청남도 논산시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-159",
+      "zoneId": "ktdb-zone-159",
+      "label": "충청남도 계룡시",
+      "province": "충청남도",
+      "district": "계룡시",
+      "aliases": ["충청남도 계룡시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-160",
+      "zoneId": "ktdb-zone-160",
+      "label": "충청남도 금산군",
+      "province": "충청남도",
+      "district": "금산군",
+      "aliases": ["충청남도 금산군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-161",
+      "zoneId": "ktdb-zone-161",
+      "label": "충청남도 부여군",
+      "province": "충청남도",
+      "district": "부여군",
+      "aliases": ["충청남도 부여군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-162",
+      "zoneId": "ktdb-zone-162",
+      "label": "충청남도 서천군",
+      "province": "충청남도",
+      "district": "서천군",
+      "aliases": ["충청남도 서천군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-163",
+      "zoneId": "ktdb-zone-163",
+      "label": "충청남도 청양군",
+      "province": "충청남도",
+      "district": "청양군",
+      "aliases": ["충청남도 청양군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-164",
+      "zoneId": "ktdb-zone-164",
+      "label": "충청남도 홍성군",
+      "province": "충청남도",
+      "district": "홍성군",
+      "aliases": ["충청남도 홍성군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-165",
+      "zoneId": "ktdb-zone-165",
+      "label": "충청남도 예산군",
+      "province": "충청남도",
+      "district": "예산군",
+      "aliases": ["충청남도 예산군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-166",
+      "zoneId": "ktdb-zone-166",
+      "label": "충청남도 태안군",
+      "province": "충청남도",
+      "district": "태안군",
+      "aliases": ["충청남도 태안군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-167",
+      "zoneId": "ktdb-zone-167",
+      "label": "충청남도 당진시",
+      "province": "충청남도",
+      "district": "당진시",
+      "aliases": ["충청남도 당진시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-168",
+      "zoneId": "ktdb-zone-168",
+      "label": "전북특별자치도 전주시 완산구",
+      "province": "전북특별자치도",
+      "district": "전주시 완산구",
+      "aliases": ["전북특별자치도 전주시 완산구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-169",
+      "zoneId": "ktdb-zone-169",
+      "label": "전북특별자치도 전주시 덕진구",
+      "province": "전북특별자치도",
+      "district": "전주시 덕진구",
+      "aliases": ["전북특별자치도 전주시 덕진구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-170",
+      "zoneId": "ktdb-zone-170",
+      "label": "전북특별자치도 군산시",
+      "province": "전북특별자치도",
+      "district": "군산시",
+      "aliases": ["전북특별자치도 군산시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-171",
+      "zoneId": "ktdb-zone-171",
+      "label": "전북특별자치도 익산시",
+      "province": "전북특별자치도",
+      "district": "익산시",
+      "aliases": ["전북특별자치도 익산시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-172",
+      "zoneId": "ktdb-zone-172",
+      "label": "전북특별자치도 정읍시",
+      "province": "전북특별자치도",
+      "district": "정읍시",
+      "aliases": ["전북특별자치도 정읍시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-173",
+      "zoneId": "ktdb-zone-173",
+      "label": "전북특별자치도 남원시",
+      "province": "전북특별자치도",
+      "district": "남원시",
+      "aliases": ["전북특별자치도 남원시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-174",
+      "zoneId": "ktdb-zone-174",
+      "label": "전북특별자치도 김제시",
+      "province": "전북특별자치도",
+      "district": "김제시",
+      "aliases": ["전북특별자치도 김제시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-175",
+      "zoneId": "ktdb-zone-175",
+      "label": "전북특별자치도 완주군",
+      "province": "전북특별자치도",
+      "district": "완주군",
+      "aliases": ["전북특별자치도 완주군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-176",
+      "zoneId": "ktdb-zone-176",
+      "label": "전북특별자치도 진안군",
+      "province": "전북특별자치도",
+      "district": "진안군",
+      "aliases": ["전북특별자치도 진안군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-177",
+      "zoneId": "ktdb-zone-177",
+      "label": "전북특별자치도 무주군",
+      "province": "전북특별자치도",
+      "district": "무주군",
+      "aliases": ["전북특별자치도 무주군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-178",
+      "zoneId": "ktdb-zone-178",
+      "label": "전북특별자치도 장수군",
+      "province": "전북특별자치도",
+      "district": "장수군",
+      "aliases": ["전북특별자치도 장수군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-179",
+      "zoneId": "ktdb-zone-179",
+      "label": "전북특별자치도 임실군",
+      "province": "전북특별자치도",
+      "district": "임실군",
+      "aliases": ["전북특별자치도 임실군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-180",
+      "zoneId": "ktdb-zone-180",
+      "label": "전북특별자치도 순창군",
+      "province": "전북특별자치도",
+      "district": "순창군",
+      "aliases": ["전북특별자치도 순창군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-181",
+      "zoneId": "ktdb-zone-181",
+      "label": "전북특별자치도 고창군",
+      "province": "전북특별자치도",
+      "district": "고창군",
+      "aliases": ["전북특별자치도 고창군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-182",
+      "zoneId": "ktdb-zone-182",
+      "label": "전북특별자치도 부안군",
+      "province": "전북특별자치도",
+      "district": "부안군",
+      "aliases": ["전북특별자치도 부안군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-183",
+      "zoneId": "ktdb-zone-183",
+      "label": "전라남도 목포시",
+      "province": "전라남도",
+      "district": "목포시",
+      "aliases": ["전라남도 목포시", "전남광주통합특별시 목포시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-184",
+      "zoneId": "ktdb-zone-184",
+      "label": "전라남도 여수시",
+      "province": "전라남도",
+      "district": "여수시",
+      "aliases": ["전라남도 여수시", "전남광주통합특별시 여수시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-185",
+      "zoneId": "ktdb-zone-185",
+      "label": "전라남도 순천시",
+      "province": "전라남도",
+      "district": "순천시",
+      "aliases": ["전라남도 순천시", "전남광주통합특별시 순천시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-186",
+      "zoneId": "ktdb-zone-186",
+      "label": "전라남도 나주시",
+      "province": "전라남도",
+      "district": "나주시",
+      "aliases": ["전라남도 나주시", "전남광주통합특별시 나주시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-187",
+      "zoneId": "ktdb-zone-187",
+      "label": "전라남도 광양시",
+      "province": "전라남도",
+      "district": "광양시",
+      "aliases": ["전라남도 광양시", "전남광주통합특별시 광양시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-188",
+      "zoneId": "ktdb-zone-188",
+      "label": "전라남도 담양군",
+      "province": "전라남도",
+      "district": "담양군",
+      "aliases": ["전라남도 담양군", "전남광주통합특별시 담양군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-189",
+      "zoneId": "ktdb-zone-189",
+      "label": "전라남도 곡성군",
+      "province": "전라남도",
+      "district": "곡성군",
+      "aliases": ["전라남도 곡성군", "전남광주통합특별시 곡성군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-190",
+      "zoneId": "ktdb-zone-190",
+      "label": "전라남도 구례군",
+      "province": "전라남도",
+      "district": "구례군",
+      "aliases": ["전라남도 구례군", "전남광주통합특별시 구례군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-191",
+      "zoneId": "ktdb-zone-191",
+      "label": "전라남도 고흥군",
+      "province": "전라남도",
+      "district": "고흥군",
+      "aliases": ["전라남도 고흥군", "전남광주통합특별시 고흥군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-192",
+      "zoneId": "ktdb-zone-192",
+      "label": "전라남도 보성군",
+      "province": "전라남도",
+      "district": "보성군",
+      "aliases": ["전라남도 보성군", "전남광주통합특별시 보성군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-193",
+      "zoneId": "ktdb-zone-193",
+      "label": "전라남도 화순군",
+      "province": "전라남도",
+      "district": "화순군",
+      "aliases": ["전라남도 화순군", "전남광주통합특별시 화순군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-194",
+      "zoneId": "ktdb-zone-194",
+      "label": "전라남도 장흥군",
+      "province": "전라남도",
+      "district": "장흥군",
+      "aliases": ["전라남도 장흥군", "전남광주통합특별시 장흥군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-195",
+      "zoneId": "ktdb-zone-195",
+      "label": "전라남도 강진군",
+      "province": "전라남도",
+      "district": "강진군",
+      "aliases": ["전라남도 강진군", "전남광주통합특별시 강진군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-196",
+      "zoneId": "ktdb-zone-196",
+      "label": "전라남도 해남군",
+      "province": "전라남도",
+      "district": "해남군",
+      "aliases": ["전라남도 해남군", "전남광주통합특별시 해남군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-197",
+      "zoneId": "ktdb-zone-197",
+      "label": "전라남도 영암군",
+      "province": "전라남도",
+      "district": "영암군",
+      "aliases": ["전라남도 영암군", "전남광주통합특별시 영암군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-198",
+      "zoneId": "ktdb-zone-198",
+      "label": "전라남도 무안군",
+      "province": "전라남도",
+      "district": "무안군",
+      "aliases": ["전라남도 무안군", "전남광주통합특별시 무안군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-199",
+      "zoneId": "ktdb-zone-199",
+      "label": "전라남도 함평군",
+      "province": "전라남도",
+      "district": "함평군",
+      "aliases": ["전라남도 함평군", "전남광주통합특별시 함평군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-200",
+      "zoneId": "ktdb-zone-200",
+      "label": "전라남도 영광군",
+      "province": "전라남도",
+      "district": "영광군",
+      "aliases": ["전라남도 영광군", "전남광주통합특별시 영광군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-201",
+      "zoneId": "ktdb-zone-201",
+      "label": "전라남도 장성군",
+      "province": "전라남도",
+      "district": "장성군",
+      "aliases": ["전라남도 장성군", "전남광주통합특별시 장성군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-202",
+      "zoneId": "ktdb-zone-202",
+      "label": "전라남도 완도군",
+      "province": "전라남도",
+      "district": "완도군",
+      "aliases": ["전라남도 완도군", "전남광주통합특별시 완도군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-203",
+      "zoneId": "ktdb-zone-203",
+      "label": "전라남도 진도군",
+      "province": "전라남도",
+      "district": "진도군",
+      "aliases": ["전라남도 진도군", "전남광주통합특별시 진도군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-204",
+      "zoneId": "ktdb-zone-204",
+      "label": "전라남도 신안군",
+      "province": "전라남도",
+      "district": "신안군",
+      "aliases": ["전라남도 신안군", "전남광주통합특별시 신안군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-205",
+      "zoneId": "ktdb-zone-205",
+      "label": "경상북도 포항시 남구",
+      "province": "경상북도",
+      "district": "포항시 남구",
+      "aliases": ["경상북도 포항시 남구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-206",
+      "zoneId": "ktdb-zone-206",
+      "label": "경상북도 포항시 북구",
+      "province": "경상북도",
+      "district": "포항시 북구",
+      "aliases": ["경상북도 포항시 북구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-207",
+      "zoneId": "ktdb-zone-207",
+      "label": "경상북도 경주시",
+      "province": "경상북도",
+      "district": "경주시",
+      "aliases": ["경상북도 경주시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-208",
+      "zoneId": "ktdb-zone-208",
+      "label": "경상북도 김천시",
+      "province": "경상북도",
+      "district": "김천시",
+      "aliases": ["경상북도 김천시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-209",
+      "zoneId": "ktdb-zone-209",
+      "label": "경상북도 안동시",
+      "province": "경상북도",
+      "district": "안동시",
+      "aliases": ["경상북도 안동시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-210",
+      "zoneId": "ktdb-zone-210",
+      "label": "경상북도 구미시",
+      "province": "경상북도",
+      "district": "구미시",
+      "aliases": ["경상북도 구미시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-211",
+      "zoneId": "ktdb-zone-211",
+      "label": "경상북도 영주시",
+      "province": "경상북도",
+      "district": "영주시",
+      "aliases": ["경상북도 영주시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-212",
+      "zoneId": "ktdb-zone-212",
+      "label": "경상북도 영천시",
+      "province": "경상북도",
+      "district": "영천시",
+      "aliases": ["경상북도 영천시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-213",
+      "zoneId": "ktdb-zone-213",
+      "label": "경상북도 상주시",
+      "province": "경상북도",
+      "district": "상주시",
+      "aliases": ["경상북도 상주시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-214",
+      "zoneId": "ktdb-zone-214",
+      "label": "경상북도 문경시",
+      "province": "경상북도",
+      "district": "문경시",
+      "aliases": ["경상북도 문경시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-215",
+      "zoneId": "ktdb-zone-215",
+      "label": "경상북도 경산시",
+      "province": "경상북도",
+      "district": "경산시",
+      "aliases": ["경상북도 경산시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-216",
+      "zoneId": "ktdb-zone-216",
+      "label": "경상북도 의성군",
+      "province": "경상북도",
+      "district": "의성군",
+      "aliases": ["경상북도 의성군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-217",
+      "zoneId": "ktdb-zone-217",
+      "label": "경상북도 청송군",
+      "province": "경상북도",
+      "district": "청송군",
+      "aliases": ["경상북도 청송군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-218",
+      "zoneId": "ktdb-zone-218",
+      "label": "경상북도 영양군",
+      "province": "경상북도",
+      "district": "영양군",
+      "aliases": ["경상북도 영양군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-219",
+      "zoneId": "ktdb-zone-219",
+      "label": "경상북도 영덕군",
+      "province": "경상북도",
+      "district": "영덕군",
+      "aliases": ["경상북도 영덕군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-220",
+      "zoneId": "ktdb-zone-220",
+      "label": "경상북도 청도군",
+      "province": "경상북도",
+      "district": "청도군",
+      "aliases": ["경상북도 청도군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-221",
+      "zoneId": "ktdb-zone-221",
+      "label": "경상북도 고령군",
+      "province": "경상북도",
+      "district": "고령군",
+      "aliases": ["경상북도 고령군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-222",
+      "zoneId": "ktdb-zone-222",
+      "label": "경상북도 성주군",
+      "province": "경상북도",
+      "district": "성주군",
+      "aliases": ["경상북도 성주군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-223",
+      "zoneId": "ktdb-zone-223",
+      "label": "경상북도 칠곡군",
+      "province": "경상북도",
+      "district": "칠곡군",
+      "aliases": ["경상북도 칠곡군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-224",
+      "zoneId": "ktdb-zone-224",
+      "label": "경상북도 예천군",
+      "province": "경상북도",
+      "district": "예천군",
+      "aliases": ["경상북도 예천군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-225",
+      "zoneId": "ktdb-zone-225",
+      "label": "경상북도 봉화군",
+      "province": "경상북도",
+      "district": "봉화군",
+      "aliases": ["경상북도 봉화군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-226",
+      "zoneId": "ktdb-zone-226",
+      "label": "경상북도 울진군",
+      "province": "경상북도",
+      "district": "울진군",
+      "aliases": ["경상북도 울진군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-227",
+      "zoneId": "ktdb-zone-227",
+      "label": "경상북도 울릉군",
+      "province": "경상북도",
+      "district": "울릉군",
+      "aliases": ["경상북도 울릉군"],
+      "supported": false
+    },
+    {
+      "id": "ktdb-zone-228",
+      "zoneId": "ktdb-zone-228",
+      "label": "경상남도 창원시 의창구",
+      "province": "경상남도",
+      "district": "창원시 의창구",
+      "aliases": ["경상남도 창원시 의창구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-229",
+      "zoneId": "ktdb-zone-229",
+      "label": "경상남도 창원시 성산구",
+      "province": "경상남도",
+      "district": "창원시 성산구",
+      "aliases": ["경상남도 창원시 성산구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-230",
+      "zoneId": "ktdb-zone-230",
+      "label": "경상남도 창원시 마산합포구",
+      "province": "경상남도",
+      "district": "창원시 마산합포구",
+      "aliases": ["경상남도 창원시 마산합포구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-231",
+      "zoneId": "ktdb-zone-231",
+      "label": "경상남도 창원시 마산회원구",
+      "province": "경상남도",
+      "district": "창원시 마산회원구",
+      "aliases": ["경상남도 창원시 마산회원구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-232",
+      "zoneId": "ktdb-zone-232",
+      "label": "경상남도 창원시 진해구",
+      "province": "경상남도",
+      "district": "창원시 진해구",
+      "aliases": ["경상남도 창원시 진해구"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-233",
+      "zoneId": "ktdb-zone-233",
+      "label": "경상남도 진주시",
+      "province": "경상남도",
+      "district": "진주시",
+      "aliases": ["경상남도 진주시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-234",
+      "zoneId": "ktdb-zone-234",
+      "label": "경상남도 통영시",
+      "province": "경상남도",
+      "district": "통영시",
+      "aliases": ["경상남도 통영시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-235",
+      "zoneId": "ktdb-zone-235",
+      "label": "경상남도 사천시",
+      "province": "경상남도",
+      "district": "사천시",
+      "aliases": ["경상남도 사천시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-236",
+      "zoneId": "ktdb-zone-236",
+      "label": "경상남도 김해시",
+      "province": "경상남도",
+      "district": "김해시",
+      "aliases": ["경상남도 김해시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-237",
+      "zoneId": "ktdb-zone-237",
+      "label": "경상남도 밀양시",
+      "province": "경상남도",
+      "district": "밀양시",
+      "aliases": ["경상남도 밀양시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-238",
+      "zoneId": "ktdb-zone-238",
+      "label": "경상남도 거제시",
+      "province": "경상남도",
+      "district": "거제시",
+      "aliases": ["경상남도 거제시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-239",
+      "zoneId": "ktdb-zone-239",
+      "label": "경상남도 양산시",
+      "province": "경상남도",
+      "district": "양산시",
+      "aliases": ["경상남도 양산시"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-240",
+      "zoneId": "ktdb-zone-240",
+      "label": "경상남도 의령군",
+      "province": "경상남도",
+      "district": "의령군",
+      "aliases": ["경상남도 의령군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-241",
+      "zoneId": "ktdb-zone-241",
+      "label": "경상남도 함안군",
+      "province": "경상남도",
+      "district": "함안군",
+      "aliases": ["경상남도 함안군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-242",
+      "zoneId": "ktdb-zone-242",
+      "label": "경상남도 창녕군",
+      "province": "경상남도",
+      "district": "창녕군",
+      "aliases": ["경상남도 창녕군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-243",
+      "zoneId": "ktdb-zone-243",
+      "label": "경상남도 고성군",
+      "province": "경상남도",
+      "district": "고성군",
+      "aliases": ["경상남도 고성군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-244",
+      "zoneId": "ktdb-zone-244",
+      "label": "경상남도 남해군",
+      "province": "경상남도",
+      "district": "남해군",
+      "aliases": ["경상남도 남해군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-245",
+      "zoneId": "ktdb-zone-245",
+      "label": "경상남도 하동군",
+      "province": "경상남도",
+      "district": "하동군",
+      "aliases": ["경상남도 하동군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-246",
+      "zoneId": "ktdb-zone-246",
+      "label": "경상남도 산청군",
+      "province": "경상남도",
+      "district": "산청군",
+      "aliases": ["경상남도 산청군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-247",
+      "zoneId": "ktdb-zone-247",
+      "label": "경상남도 함양군",
+      "province": "경상남도",
+      "district": "함양군",
+      "aliases": ["경상남도 함양군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-248",
+      "zoneId": "ktdb-zone-248",
+      "label": "경상남도 거창군",
+      "province": "경상남도",
+      "district": "거창군",
+      "aliases": ["경상남도 거창군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-249",
+      "zoneId": "ktdb-zone-249",
+      "label": "경상남도 합천군",
+      "province": "경상남도",
+      "district": "합천군",
+      "aliases": ["경상남도 합천군"],
+      "supported": true
+    },
+    {
+      "id": "ktdb-zone-250",
+      "zoneId": "ktdb-zone-250",
+      "label": "제주특별자치도 제주시",
+      "province": "제주특별자치도",
+      "district": "제주시",
+      "aliases": ["제주특별자치도 제주시"],
+      "supported": false
+    },
+    {
+      "id": "ktdb-zone-251",
+      "zoneId": "ktdb-zone-251",
+      "label": "제주특별자치도 서귀포시",
+      "province": "제주특별자치도",
+      "district": "서귀포시",
+      "aliases": ["제주특별자치도 서귀포시"],
+      "supported": false
+    },
+    {
+      "id": "ktdb-zone-252",
+      "zoneId": "ktdb-zone-252",
+      "label": "세종특별자치시",
+      "province": "세종특별자치시",
+      "district": "세종시",
+      "aliases": ["세종특별자치시 세종시", "세종특별자치시 세종특별자치시"],
+      "supported": true
+    }
+  ],
+  "excluded": [
+    {
+      "id": "ktdb-zone-51",
+      "label": "인천광역시 중구",
+      "reason": "no-exact-match"
+    },
+    {
+      "id": "ktdb-zone-52",
+      "label": "인천광역시 동구",
+      "reason": "no-exact-match"
+    },
+    {
+      "id": "ktdb-zone-58",
+      "label": "인천광역시 서구",
+      "reason": "no-exact-match"
+    }
+  ]
+}

@@ -4,6 +4,7 @@ import type {
   Restaurant,
   TimeBlock,
 } from "@/lib/mvp-phase-two-types";
+import { recalculateLocalPlan } from "@/lib/mvp-phase-two-planner";
 
 function distance(a: Coordinates, b: Coordinates): number {
   const rad = Math.PI / 180;
@@ -115,42 +116,47 @@ export function assignRestaurants(
   plan: PlanSnapshot,
   restaurants: Restaurant[],
 ): PlanSnapshot {
-  const used = new Set(
-    plan.blocks.flatMap((block) =>
-      block.restaurant ? [block.restaurant.contentId] : [],
-    ),
-  );
-  let changed = false;
-  const blocks = plan.blocks.map((block) => {
-    if (
-      block.kind !== "meal" ||
-      block.mealScope !== "local" ||
-      block.restaurant
-    )
-      return block;
-    const restaurant = ranked(plan, block, restaurants).find(
-      (item) => !used.has(item.contentId),
-    );
-    if (restaurant) used.add(restaurant.contentId);
-    const next = withRestaurant(block, restaurant);
-    if (
-      restaurant ||
-      next.title !== block.title ||
-      next.reason !== block.reason
-    )
-      changed = true;
-    return next;
-  });
-  return changed
-    ? {
-        ...plan,
-        blocks,
-        updatedAt: new Date().toISOString(),
-        edited: plan.edited || Boolean(plan.savedAt),
-      }
-    : plan;
+  let current = plan;
+  for (const meal of plan.blocks.filter(
+    (b) => b.kind === "meal" && b.mealScope === "local" && !b.restaurant,
+  )) {
+    let assigned = false;
+    for (const restaurant of restaurantAlternatives(
+      current,
+      meal.id,
+      restaurants,
+    )) {
+      const proposed = {
+        ...current,
+        blocks: current.blocks.map((b) =>
+          b.id === meal.id ? withRestaurant(b, restaurant) : b,
+        ),
+      };
+      const result = recalculateLocalPlan(proposed);
+      if (!result.ok) continue;
+      current = {
+        ...result.plan,
+        edited: current.edited || Boolean(current.savedAt),
+      };
+      assigned = true;
+      break;
+    }
+    if (!assigned)
+      current = {
+        ...current,
+        blocks: current.blocks.map((b) =>
+          b.id === meal.id
+            ? {
+                ...withRestaurant(b),
+                reason:
+                  "이동시간을 포함해 배정할 식당을 찾지 못했어요. 식사 시간과 미확정 이동 여유는 유지했어요.",
+              }
+            : b,
+        ),
+      };
+  }
+  return current;
 }
-
 export function replaceRestaurant(
   plan: PlanSnapshot,
   mealBlockId: string,
@@ -158,12 +164,13 @@ export function replaceRestaurant(
 ): PlanSnapshot {
   if (!restaurantAlternatives(plan, mealBlockId, [restaurant]).length)
     return plan;
-  return {
+  const result = recalculateLocalPlan({
     ...plan,
     edited: true,
     updatedAt: new Date().toISOString(),
     blocks: plan.blocks.map((block) =>
       block.id === mealBlockId ? withRestaurant(block, restaurant) : block,
     ),
-  };
+  });
+  return result.ok ? result.plan : plan;
 }

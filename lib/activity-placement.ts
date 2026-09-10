@@ -4,6 +4,8 @@ export type PlacementActivity = {
   originalStart?: number;
   preserveStart: boolean;
   fixedStart?: number;
+  /** Explicit connection cost for a single-window local itinerary. */
+  gapBefore?: number;
 };
 export type PlacementInterval = { start: number; end: number };
 type State = {
@@ -38,6 +40,7 @@ function better(
 export function placeActivities(
   activities: PlacementActivity[],
   intervals: PlacementInterval[],
+  minimumFreeMinutes = 30,
 ): number[] | null {
   if (!activities.length) return [];
   if (
@@ -46,7 +49,7 @@ export function placeActivities(
       0,
     ) -
       activities.reduce((sum, activity) => sum + activity.duration, 0) <
-    30
+    minimumFreeMinutes
   )
     return null;
   let states: State[] = [];
@@ -75,7 +78,10 @@ export function placeActivities(
         start + activity.duration <= interval.end;
         start++
       ) {
-        while (cursor < previous.length && previous[cursor].end + 15 <= start)
+        while (
+          cursor < previous.length &&
+          previous[cursor].end + (activity.gapBefore ?? 15) <= start
+        )
           prefix = better(prefix, previous[cursor++]);
         if (activity.fixedStart !== undefined && start !== activity.fixedStart)
           continue;

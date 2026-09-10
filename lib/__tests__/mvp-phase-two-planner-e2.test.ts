@@ -227,11 +227,14 @@ describe("E2 공통 일정 여유", () => {
     const previous = attractions[attractions.indexOf(consecutive) - 1];
     const slack = result.blocks.find(
       (block) =>
-        block.kind === "free" &&
-        block.startAt === previous.endAt &&
+        block.localTravel?.fromId === previous.id &&
         block.endAt === consecutive.startAt,
     );
-    expect(slack).toMatchObject({ durationMinutes: 15, title: "여유시간" });
+    expect(slack?.localTravel).toMatchObject({
+      status: "estimated",
+      toId: consecutive.id,
+    });
+    expect(slack?.durationMinutes).toBeGreaterThanOrEqual(5);
     expect(result.metrics.freeMinutes).toBeGreaterThanOrEqual(30);
   });
 });

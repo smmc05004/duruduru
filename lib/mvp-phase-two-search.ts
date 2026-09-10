@@ -16,7 +16,6 @@ import {
   type SchedulingCache,
 } from "@/lib/mvp-phase-two-planner";
 import {
-  ORIGINS,
   type Attraction,
   type Candidate,
   type CandidateRecommendation,
@@ -25,6 +24,7 @@ import {
   type SearchInput,
   type SearchResponse,
 } from "@/lib/mvp-phase-two-types";
+import { originRegion } from "@/lib/origin-regions";
 
 export { groupForMapping } from "@/lib/mvp-phase-two-regions";
 const zoneIndices = new Map(
@@ -276,7 +276,7 @@ export function searchPhaseTwo(
 ): SearchResponse {
   const validated = validateSearchInput(input);
   if (!validated.ok) return { kind: "input-error", message: validated.reason };
-  const origin = ORIGINS.find((item) => item.id === input.originId)!;
+  const origin = originRegion(input.originId)!;
   const originIndex = zoneIndices.get(origin.zoneId),
     originMapping = mappings.get(origin.zoneId);
   if (originIndex === undefined || !originMapping)
