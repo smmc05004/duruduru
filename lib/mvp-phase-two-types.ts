@@ -1,4 +1,5 @@
 import type { MvpCategoryId } from "@/lib/mvp-region-data";
+import type { LocalTravelLeg } from "@/lib/local-travel-time";
 
 /** Client-safe contracts: no national JSON or server runtime imports. */
 export const INTERESTS: Array<{ id: MvpCategoryId; label: string }> = [
@@ -13,7 +14,7 @@ export const ORIGINS = [
   { id: "busan", label: "부산광역시", zoneId: "ktdb-zone-26" },
 ] as const;
 export type SearchInput = {
-  originId: "seoul" | "busan";
+  originId: string;
   startAt: string;
   returnBy: string;
   transport: "car";
@@ -87,6 +88,7 @@ export type TimeBlock = {
   mealScope?: "local" | "transit";
   mealType?: "lunch" | "dinner";
   direction?: "outbound" | "return";
+  localTravel?: LocalTravelLeg;
   /** E2's conservative facility signal; it is not an official facility ID. */
   facilityGroupId?: string;
   /** Date + morning/afternoon selection session, not a route segment. */
@@ -162,6 +164,7 @@ export type PlanSnapshot = {
   metrics: PlanMetrics;
   accommodation?: AccommodationNote;
   itineraryRuleVersion: "e4-v1" | "e4-v2";
+  localTravelVersion?: "straight-line-v1";
 };
 export type SearchResponse =
   | {

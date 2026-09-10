@@ -2,11 +2,11 @@ import { Button } from "@/components/Button";
 import { Chip } from "@/components/Chip";
 import {
   INTERESTS,
-  ORIGINS,
   type Candidate,
   type SearchInput,
   type TimeBlock,
 } from "@/lib/mvp-phase-two-types";
+import { originRegion } from "@/lib/origin-regions";
 
 export const notebookDuration = (minutes: number) =>
   minutes < 60
@@ -62,7 +62,7 @@ export function NotebookConditions({
       <div className="p2-summary-chips">
         <Chip
           variant="summary"
-          label={`${ORIGINS.find((origin) => origin.id === input.originId)?.label} 출발 · 자차`}
+          label={`${originRegion(input.originId)?.label ?? "저장된 출발 지역"} 출발 · 자차`}
         />
         <Chip variant="summary" label={`${notebookDate(input.startAt)} 출발`} />
         <Chip

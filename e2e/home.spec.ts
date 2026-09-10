@@ -136,7 +136,12 @@ test("실제 검색 엔진의 역할 후보를 선택한 뒤에만 음식점 API
   const plan = page.getByRole("region", { name: "여행 계획" });
   await expect(plan).toBeVisible();
   await expect(plan).toContainText("여유시간");
-  await expect(plan).toContainText("실제 이동시간을 계산한 값은 아니에요");
+  await expect(
+    plan.getByRole("region", { name: "이동시간 안내" }),
+  ).toBeVisible();
+  await expect(
+    plan.getByRole("region", { name: "이동시간 안내" }),
+  ).toContainText("장소 간 이동시간은 직선거리를 기준으로 추정했어요.");
   await expect.poll(() => restaurantCalls).toBe(1);
 });
 
@@ -205,9 +210,76 @@ test("부산 출발 선택은 부산을 검색 입력으로 전송한다", async
   await fillRequired(page);
   await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
   await expect(
-    page.getByRole("heading", { name: "부산광역시에서 갈 수 있는 곳" }),
+    page.getByRole("heading", { name: "부산광역시 중구에서 갈 수 있는 곳" }),
   ).toBeVisible();
   expect(origins).toEqual(["busan"]);
+});
+
+test("표준 출발 검색은 선택 후 제출하며 지역 간 시간과 현지 이동 계획을 만든다", async ({
+  page,
+}) => {
+  const requests: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().endsWith("/api/search"))
+      requests.push(request.postDataJSON().originId);
+  });
+  await page.route("**/api/phase-two/restaurants", (route) =>
+    route.fulfill({
+      json: {
+        kind: "success",
+        restaurants: [],
+        queriedRegionIds: [],
+        failedRegionIds: [],
+        truncated: false,
+        fetchedAt: "2026-09-09T00:00:00Z",
+      },
+    }),
+  );
+  await page.route("**/api/attractions/**", (route) =>
+    route.fulfill({
+      status: 502,
+      json: { kind: "data-error", message: "검증용 상세 결측" },
+    }),
+  );
+  await page.goto("/");
+  await fillRequired(page);
+  await page.getByLabel("출발 지역 검색", { exact: true }).fill("수원");
+  expect(requests).toEqual([]);
+  const select = page.getByLabel("출발 지역 선택", { exact: true });
+  const value = await select.locator("option").nth(1).getAttribute("value");
+  await select.selectOption(value!);
+  await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
+  await expect(
+    page.getByRole("heading", { name: /수원시 .*구에서 갈 수 있는 곳/ }),
+  ).toBeVisible();
+  await page
+    .getByRole("region", { name: "목적지 추천" })
+    .getByRole("button", { name: /일정 보기$/ })
+    .first()
+    .click();
+  const plan = page.getByRole("region", { name: "여행 계획" });
+  await expect(plan).toBeVisible();
+  await expect(
+    plan.getByRole("region", { name: "이동시간 안내" }),
+  ).toBeVisible();
+  expect(requests).toEqual([value]);
+  await page
+    .getByRole("button", { name: "조건 수정하기", exact: true })
+    .click();
+  await page
+    .getByLabel("출발 시도", { exact: true })
+    .selectOption("세종특별자치시");
+  const sejong = page.getByLabel("출발 지역 선택", { exact: true });
+  await sejong.selectOption({ label: "세종특별자치시" });
+  await page.route("**/api/search", (route) =>
+    route.fulfill({
+      status: 502,
+      json: { kind: "data-error", message: "검증용 검색 실패" },
+    }),
+  );
+  await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
+  await expect(plan).toBeVisible();
+  await expect(plan).toContainText("수원시");
 });
 
 test("당일 입력은 검색 요청 없이 1박 2일 오류를 표시한다", async ({ page }) => {
@@ -217,7 +289,9 @@ test("당일 입력은 검색 요청 없이 1박 2일 오류를 표시한다", a
   await page.getByLabel("출발 일시").fill("2026-09-12T08:00");
   await page.getByLabel("다음날 귀가 완료 일시").fill("2026-09-12T20:00");
   await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
-  await expect(page.getByRole("status")).toContainText("다음날");
+  await expect(
+    page.getByRole("status").filter({ hasText: "복귀 날짜" }),
+  ).toContainText("다음날");
   expect(origins).toHaveLength(0);
 });
 

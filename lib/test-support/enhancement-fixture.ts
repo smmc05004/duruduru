@@ -5,6 +5,7 @@ import {
   scheduleTrip,
 } from "@/lib/mvp-phase-two-planner";
 import { isSavedPlan } from "@/lib/mvp-phase-two-storage";
+import { isLocalPlace, localLeg } from "@/lib/local-travel-schedule";
 import type {
   Attraction,
   Candidate,
@@ -73,11 +74,40 @@ export function placed(
   activities: TimeBlock[],
 ): PlanSnapshot {
   const fixed = plan.blocks.filter(
-    (b) => !["attraction", "personal", "free"].includes(b.kind),
+    (b) =>
+      !["attraction", "personal", "free"].includes(b.kind) && !b.localTravel,
   );
   const occupied = [...fixed, ...activities].toSorted((a, b) =>
     a.startAt.localeCompare(b.startAt),
   );
+  // Rebuild connections for the controlled places, never remove regional driving.
+  for (const day of [1, 2] as const) {
+    const places = occupied.filter((b) => b.day === day && isLocalPlace(b));
+    for (let i = 1; i < places.length; i++) {
+      const leg = localLeg(places[i - 1], places[i]);
+      if (!leg.reservedMinutes) continue;
+      const end = places[i].startAt;
+      const start = new Date(
+        Date.parse(`${end}:00+09:00`) -
+          leg.reservedMinutes * 60000 +
+          9 * 3600000,
+      )
+        .toISOString()
+        .slice(0, 16);
+      occupied.push({
+        id: `fixture-local-${day}-${i}`,
+        day,
+        startAt: start,
+        endAt: end,
+        kind: "travel",
+        title: "현지 이동",
+        durationMinutes: leg.reservedMinutes,
+        localTravel: leg,
+        reason: "새 연결의 이동 예약",
+      });
+    }
+  }
+  occupied.sort((a, b) => a.startAt.localeCompare(b.startAt));
   const blocks: TimeBlock[] = [];
   let cursor = plan.input.startAt;
   for (const block of occupied) {
