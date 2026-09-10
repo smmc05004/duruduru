@@ -65,6 +65,9 @@ function attraction(v: unknown): v is Attraction {
     ["12", "14", "28"].includes(v.contentTypeId) &&
     id(v.regionId) &&
     [v.title, v.address, v.imageUrl, v.cat1, v.cat2, v.cat3].every(text) &&
+    [v.lclsSystm1, v.lclsSystm2, v.lclsSystm3].every(
+      (code) => code === undefined || text(code),
+    ) &&
     categories(v.categories) &&
     coordinates(v.coordinates)
   );
@@ -430,6 +433,9 @@ function cleanAttraction(a: Attraction): Attraction {
     cat1: a.cat1,
     cat2: a.cat2,
     cat3: a.cat3,
+    ...(a.lclsSystm1 ? { lclsSystm1: a.lclsSystm1 } : {}),
+    ...(a.lclsSystm2 ? { lclsSystm2: a.lclsSystm2 } : {}),
+    ...(a.lclsSystm3 ? { lclsSystm3: a.lclsSystm3 } : {}),
   };
 }
 function cleanRestaurant(r: Restaurant): Restaurant {

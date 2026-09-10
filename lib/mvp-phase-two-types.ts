@@ -33,6 +33,10 @@ export type Attraction = {
   cat1: string;
   cat2: string;
   cat3: string;
+  /** 새 공식 분류(`lclsSystmCode2`). 구 수집본·구 저장본에는 없어 선택 필드다. */
+  lclsSystm1?: string;
+  lclsSystm2?: string;
+  lclsSystm3?: string;
 };
 export type Restaurant = {
   contentId: string;

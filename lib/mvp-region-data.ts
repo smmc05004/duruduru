@@ -1,12 +1,9 @@
-export const MVP_CATEGORY_IDS = [
-  "nature",
-  "history",
-  "rest",
-  "culture",
-  "leisure",
-] as const;
-
-export type MvpCategoryId = (typeof MVP_CATEGORY_IDS)[number];
+export {
+  MVP_CATEGORY_IDS,
+  type MvpCategoryId,
+  CLASSIFICATION_VERSION,
+} from "@/lib/interest-classification";
+import type { MvpCategoryId } from "@/lib/interest-classification";
 
 export type RegionMapping = {
   regionId: string;
@@ -22,6 +19,10 @@ export type RegionMapping = {
 export type RegionAttraction = {
   contentId: string;
   title: string;
+  /**
+   * 하위 호환용 단일 관심사 태그. 구 수집본(schemaVersion 1)에서 나온 값이며,
+   * 새 판정은 공통 해석기 `classifyInterests`로 `categories`를 계산한다.
+   */
   categoryId: MvpCategoryId;
   contentTypeId: string;
   address: string;
@@ -31,6 +32,14 @@ export type RegionAttraction = {
   cat1: string;
   cat2: string;
   cat3: string;
+  /** 새 공식 분류(`lclsSystmCode2`). 구 수집본에는 없어 선택 필드다. */
+  lclsSystm1?: string;
+  lclsSystm2?: string;
+  lclsSystm3?: string;
+  /** TourAPI 원천 수정일(`modifiedtime`). 구 수집본에는 없다. */
+  sourceModifiedAt?: string;
+  /** 이 레코드를 판정한 공식 분류 목록 버전. 구 수집본에는 없다. */
+  classificationVersion?: string;
 };
 
 export type RegionProfile = Pick<

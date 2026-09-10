@@ -2,6 +2,10 @@
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+import {
+  CLASSIFICATION_VERSION,
+  classifyInterests,
+} from "../lib/interest-classification.ts";
 
 const TOUR_API_BASE_URL = "https://apis.data.go.kr/B551011/KorService2";
 const REQUEST_TIMEOUT_MS = 20_000;
@@ -104,21 +108,47 @@ function toAttraction(item, categoryId) {
   const lDongRegnCd = String(item.lDongRegnCd ?? "").trim();
   const lDongSignguCd = String(item.lDongSignguCd ?? "").trim();
   if (!contentId || !title || !lDongRegnCd || !lDongSignguCd) return null;
-  return {
+  const contentTypeId = String(item.contenttypeid ?? "").trim();
+  const lclsSystm1 = String(item.lclsSystm1 ?? "").trim();
+  const lclsSystm2 = String(item.lclsSystm2 ?? "").trim();
+  const lclsSystm3 = String(item.lclsSystm3 ?? "").trim();
+  const cat1 = String(item.cat1 ?? "").trim();
+  const cat2 = String(item.cat2 ?? "").trim();
+  const cat3 = String(item.cat3 ?? "").trim();
+  // 공통 해석기로 판정한다. 필터가 걸어 온 관심사가 해석 결과에 없으면
+  // (새 분류가 그 관심사에 매핑되지 않으면) 그 레코드는 이 관심사에서 제외한다.
+  const { categories } = classifyInterests({
+    lclsSystm1,
+    lclsSystm2,
+    lclsSystm3,
+    cat1,
+    cat2,
+    cat3,
+    contentTypeId,
+  });
+  if (!categories.includes(categoryId)) return null;
+  const stored = {
     lDongRegnCd,
     lDongSignguCd,
     contentId,
     title,
     categoryId,
-    contentTypeId: String(item.contenttypeid ?? ""),
+    contentTypeId,
     address: String(item.addr1 ?? "").trim(),
     imageUrl: String(item.firstimage ?? item.firstimage2 ?? "").trim(),
     mapX: String(item.mapx ?? "").trim(),
     mapY: String(item.mapy ?? "").trim(),
-    cat1: String(item.cat1 ?? "").trim(),
-    cat2: String(item.cat2 ?? "").trim(),
-    cat3: String(item.cat3 ?? "").trim(),
+    cat1,
+    cat2,
+    cat3,
+    classificationVersion: CLASSIFICATION_VERSION,
   };
+  if (lclsSystm1) stored.lclsSystm1 = lclsSystm1;
+  if (lclsSystm2) stored.lclsSystm2 = lclsSystm2;
+  if (lclsSystm3) stored.lclsSystm3 = lclsSystm3;
+  const modifiedAt = String(item.modifiedtime ?? "").trim();
+  if (modifiedAt) stored.sourceModifiedAt = modifiedAt;
+  return stored;
 }
 
 function createProfiles(mappings) {
@@ -190,6 +220,7 @@ const output = {
     tourApi: "KorService2/areaBasedList2",
     mappingGeneratedAt: mappingDocument.generatedAt ?? "",
     categories,
+    classificationVersion: CLASSIFICATION_VERSION,
     requestCount,
   },
   generatedAt: new Date().toISOString(),

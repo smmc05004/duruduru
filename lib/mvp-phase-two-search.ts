@@ -25,6 +25,7 @@ import {
   type SearchResponse,
 } from "@/lib/mvp-phase-two-types";
 import { originRegion } from "@/lib/origin-regions";
+import { classifyInterests } from "@/lib/interest-classification";
 
 export { groupForMapping } from "@/lib/mvp-phase-two-regions";
 const zoneIndices = new Map(
@@ -43,15 +44,15 @@ export function regionMappingFor(regionId: string): RegionMapping | null {
   return mappings.get(regionId) ?? null;
 }
 function categoriesFor(place: RegionAttraction): MvpCategoryId[] {
-  const result: MvpCategoryId[] = [];
-  if (place.cat1 === "A01") result.push("nature");
-  if (place.cat2 === "A0201") result.push("history");
-  if (place.cat2 === "A0202") result.push("rest");
-  if (place.cat2 === "A0206" || place.contentTypeId === "14")
-    result.push("culture");
-  if (place.cat1 === "A03" || place.contentTypeId === "28")
-    result.push("leisure");
-  return result;
+  return classifyInterests({
+    lclsSystm1: place.lclsSystm1,
+    lclsSystm2: place.lclsSystm2,
+    lclsSystm3: place.lclsSystm3,
+    cat1: place.cat1,
+    cat2: place.cat2,
+    cat3: place.cat3,
+    contentTypeId: place.contentTypeId,
+  }).categories;
 }
 function normalizedAttraction(
   place: RegionAttraction,
@@ -82,6 +83,9 @@ function normalizedAttraction(
     cat1: place.cat1,
     cat2: place.cat2,
     cat3: place.cat3,
+    ...(place.lclsSystm1 ? { lclsSystm1: place.lclsSystm1 } : {}),
+    ...(place.lclsSystm2 ? { lclsSystm2: place.lclsSystm2 } : {}),
+    ...(place.lclsSystm3 ? { lclsSystm3: place.lclsSystm3 } : {}),
   };
 }
 export function attractionFor(
