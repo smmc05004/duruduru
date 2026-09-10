@@ -18,3 +18,11 @@ data/region-profiles.next.json
 data/region-profiles.next.json.tmp
 data/region-profiles.checkpoint.json
 data/region-profiles.quality-report.json
+
+# 중심 관광지 수집 중간 산출물 (재생성 가능)
+data/central-attractions.next.json
+data/central-attractions.next.json.tmp
+data/central-attractions.checkpoint.json
+data/central-attractions.checkpoint.json.tmp
+data/central-attractions.quality-report.json
+data/central-attractions.lock
