@@ -169,6 +169,15 @@ D4 정렬 규칙 자체의 산출물이 제품 원칙("가용시간 우선", "�
 - **회귀 테스트.** 불완전 응답(1/N건) → `--resume`에서 정상 응답으로 **실제 복구**되고 1·2페이지는 재호출하지 않음, 일관성 붕괴 → 1페이지부터 재수집, 검증 통과 페이지만 건너뜀 — 프로필·중심·공통(`collectPagedUnit`) 세 레벨에서.
 - **검증.** `npm run verify` 통과. `npm run test:enhancement` 150 통과. `npx jest scripts/__tests__/` 109 통과. `npx jest` 367 통과 / 19 실패(전부 기존 PoC `page.test.tsx`, 신규 회귀 0). `npm run test:e2e -- --repeat-each=2` 24 통과. T6 48셀 비교 매트릭스 바이트 동일.
 
+### 6.7 3라운드 리뷰 후속 수정 (2026-09-10, 같은 PR)
+
+수집 재개 기능의 결함 2건을 같은 브랜치에서 추가로 고쳤다. **추천 정책·가중치·역할 순서·목적 점수 공식은 불변이고, 변경 범위는 전부 `scripts/`(수집기)라 `lib/` 수정이 없다 → T6 48셀 비교 매트릭스는 구성상 영향 없음.**
+
+- **결함 1 — 페이지 검증에 필수 식별자 유효성 포함.** 기존 페이지 완료 판정이 응답 배열 **길이만** 봐서, `totalCount=2`에 `[{contentId:"a"}, {}]`처럼 식별자가 빈 항목이 섞여도 `complete`로 저장됐다. 그 페이지가 체크포인트 `pages`에 남아 `--resume` 해도 재조회 없이 최종 `validateDocument` 실패가 무한 반복됐다. `scripts/lib/paged-collection.mjs`에 공유 함수 `hasRequiredId`/`pageItemsAllHaveId`를 두고, 페이지 완료 판정을 `isPageValidated`(항목 수 + 모든 항목의 필수 식별자)로 바꿨다. 필수 식별자는 프로필 = `contentId`, 중심 = `hubTatsCd`이며 두 수집기가 이미 넘기는 `idOf`를 그대로 쓴다(중복 로직 없음). 식별자 누락 페이지는 체크포인트에서 빠지고 스펙/지역 `done`도 false다. 오래된 체크포인트에 `complete`로 저장돼 있어도 seed 단계에서 배제해 재조회한다. `validateDocument`도 같은 함수로 항목 식별자 결측을 교체 차단 사유에 추가한다.
+- **결함 2 — 검증된 페이지마다 체크포인트 영속 저장.** 체크포인트가 스펙/지역 종료·예외 시점에만 저장돼, 페이지 2 검증 후 프로세스가 죽으면 디스크에 아무것도 안 남았다. `collectPagedUnit`에 `onProgress` 훅을 두어 **정상 페이지 검증 직후**와 **일관성 붕괴로 단위를 재시작할 때(폐기 목록 `{}`)** 즉시 호출하고, 두 수집기 CLI가 이 훅에서 실제 체크포인트 파일(`data/region-profiles.checkpoint.json`, `data/central-attractions.checkpoint.json`)에 flush 한다. 뒤에 더 받을 페이지가 있을 때만 저장해 단일 페이지 수집(중심 API의 일반적 경우)의 쓰기 폭증을 피한다. 재시작 시 폐기는 재수집을 시작하기 **전에** 디스크에 반영된다.
+- **회귀 테스트.** 공유 함수 3종, ID 누락 페이지 미저장·`--resume` 복구·오래된 체크포인트 배제, `onProgress` 페이지별·재시작 호출 — 공통(`collectPagedUnit`)·프로필·중심 세 레벨. 추가로 `scripts/__tests__/collector-cli-resume.test.js`가 `child_process`로 두 CLI를 실제 실행한다(통제된 fetch를 `DURUDURU_TEST_FETCH_MODULE`로 주입, 프로덕션은 전역 `fetch` 그대로): 하드 크래시 후 3페이지부터 재개·1·2 미호출·정상본 교체·실패 중 정상본 보존, 재시작 폐기 상태의 즉시 영속, 프로필 ID 누락 페이지 복구.
+- **검증.** `npm run verify` 통과. `npm run test:enhancement` 150 통과. `npx jest scripts/__tests__/` 123 통과. `npx jest` 381 통과 / 19 실패(전부 기존 PoC `page.test.tsx`, 신규 회귀 0). `npm run test:e2e -- --repeat-each=2` 24 통과.
+
 ## 부록: 재현 스크립트
 
 | 목적                       | 명령                                                                                         |
