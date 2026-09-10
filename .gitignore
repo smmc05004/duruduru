@@ -12,3 +12,9 @@ tsconfig.tsbuildinfo
 # 디자인 캔버스 발행물 (에디터 페이로드 포함, 재생성 가능)
 design/**/*.html
 !design/**/*.dc.html
+
+# 지역 프로필 수집 중간 산출물 (재생성 가능, 대용량)
+data/region-profiles.next.json
+data/region-profiles.next.json.tmp
+data/region-profiles.checkpoint.json
+data/region-profiles.quality-report.json

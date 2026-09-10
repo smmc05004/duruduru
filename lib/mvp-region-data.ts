@@ -20,13 +20,18 @@ export type RegionAttraction = {
   contentId: string;
   title: string;
   /**
-   * 하위 호환용 단일 관심사 태그. 구 수집본(schemaVersion 1)에서 나온 값이며,
-   * 새 판정은 공통 해석기 `classifyInterests`로 `categories`를 계산한다.
+   * 공통 해석기 `classifyInterests`가 판정한 관심사 목록. schemaVersion 2 수집본의
+   * 정본 필드다. 검색·후보 판정은 저장값을 신뢰하지 않고 다시 해석하지만, 수집
+   * 시점의 판정 근거를 보존한다.
    */
-  categoryId: MvpCategoryId;
+  categories: MvpCategoryId[];
+  /** 어느 분류 경로로 판정했는지(`lcls` 우선, `legacy` 하위 호환). */
+  classificationBasis?: "lcls" | "legacy";
   contentTypeId: string;
   address: string;
   imageUrl: string;
+  /** TourAPI `cpyrhtDivCd`. 이미지 존재로 사용권한을 추정하지 않는다. */
+  imageCopyright?: string;
   mapX: string;
   mapY: string;
   cat1: string;
@@ -36,6 +41,8 @@ export type RegionAttraction = {
   lclsSystm1?: string;
   lclsSystm2?: string;
   lclsSystm3?: string;
+  /** 공식 목록에 없는 `lclsSystm*` 코드. 임의로 덮지 않고 보존한다. */
+  unresolvedLcls?: string[];
   /** TourAPI 원천 수정일(`modifiedtime`). 구 수집본에는 없다. */
   sourceModifiedAt?: string;
   /** 이 레코드를 판정한 공식 분류 목록 버전. 구 수집본에는 없다. */
@@ -55,19 +62,16 @@ export type RegionProfile = Pick<
 };
 
 export type RegionProfileDocument = {
-  schemaVersion: 1;
+  schemaVersion: 2;
+  classificationVersion: string;
   source: {
     tourApi: "KorService2/areaBasedList2";
+    querySpecs: string[];
     mappingGeneratedAt: string;
-    categories: Array<{
-      id: MvpCategoryId;
-      filters: Array<{
-        cat1?: string;
-        cat2?: string;
-        contentTypeId?: string;
-      }>;
-    }>;
     requestCount: number;
+    retryCount: number;
+    failedRequestCount: number;
+    runId: string;
   };
   generatedAt: string;
   profiles: RegionProfile[];
@@ -81,7 +85,7 @@ export function attractionsForCategory(
 ): RegionAttraction[] {
   const byContentId = new Map<string, RegionAttraction>();
   for (const attraction of profile.attractions) {
-    if (attraction.categoryId !== categoryId) continue;
+    if (!attraction.categories.includes(categoryId)) continue;
     byContentId.set(attraction.contentId, attraction);
   }
   return [...byContentId.values()];

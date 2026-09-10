@@ -178,7 +178,7 @@ export function searchCandidates(input: SearchInput): Candidate[] {
     const attractionMap = new Map<string, RegionAttraction>();
     for (const interest of input.interests)
       for (const attraction of profile.attractions)
-        if (attraction.categoryId === interest)
+        if (attraction.categories.includes(interest))
           attractionMap.set(attraction.contentId, attraction);
     const localMinutes =
       Math.floor((end.getTime() - start.getTime()) / 60_000) - minutes * 2;
