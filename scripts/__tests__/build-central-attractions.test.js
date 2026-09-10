@@ -476,6 +476,45 @@ describe("collectRegion — 결함 1 (수집 완전성)", () => {
     expect(result.collected).toBe(250);
     expect(result.completenessBlockers).toEqual([]);
   });
+
+  it("hubTatsCd 가 빠진 항목이 섞이면 그 페이지는 미저장·status failed", async () => {
+    const holed = [
+      ...hubPage(201, 49),
+      { ...hub(250), hubTatsCd: "" }, // 건수는 50건이지만 식별자 없음
+    ];
+    const fetchImpl = fetchByPage({
+      1: okBody(hubPage(1, 100), 250, 1),
+      2: okBody(hubPage(101, 100), 250, 2),
+      3: okBody(holed, 250, 3),
+    });
+    const result = await collectorFor(fetchImpl).collectRegion(m);
+    expect(result.status).toBe("failed");
+    expect(result.done).toBe(false);
+    expect(Object.keys(result.validatedPages).sort()).toEqual(["1", "2"]);
+  });
+
+  it("ID 누락 페이지 → --resume 에서 정상 페이지로 실제 복구(1·2 재호출 안 함)", async () => {
+    const first = fetchByPage({
+      1: okBody(hubPage(1, 100), 250, 1),
+      2: okBody(hubPage(101, 100), 250, 2),
+      3: okBody(
+        [...hubPage(201, 49), { ...hub(250), hubTatsCd: "  " }],
+        250,
+        3,
+      ),
+    });
+    const run1 = await collectorFor(first).collectRegion(m);
+    expect(run1.status).toBe("failed");
+    expect(Object.keys(run1.validatedPages).map(Number).sort()).toEqual([1, 2]);
+
+    const second = fetchByPage({ 3: okBody(hubPage(201, 50), 250, 3) });
+    const run2 = await collectorFor(second).collectRegion(m, {
+      savedPages: run1.validatedPages,
+    });
+    expect(second.calls).toEqual([3]);
+    expect(run2.status).toBe("ok");
+    expect(run2.collected).toBe(250);
+  });
 });
 
 describe("collectRegion — 결함 3 (페이지 재개)", () => {
@@ -570,7 +609,13 @@ describe("validateDocument", () => {
     status: "ok",
     collected: 100,
     totalCount: 100,
-    hubs: [{ hubTatsName: `${district} 대표`, hubRank: 1 }],
+    hubs: [
+      {
+        hubTatsCd: `cd-${district}`,
+        hubTatsName: `${district} 대표`,
+        hubRank: 1,
+      },
+    ],
     ...extra,
   });
 
@@ -580,7 +625,7 @@ describe("validateDocument", () => {
     regions: [
       ...Array.from({ length: 210 }, (_, i) => sampleRegion(`더미${i}`)),
       sampleRegion("공주시", {
-        hubs: [{ hubTatsName: "공산성", hubRank: 2 }],
+        hubs: [{ hubTatsCd: "cd-gongsan", hubTatsName: "공산성", hubRank: 2 }],
       }),
       sampleRegion("익산시"),
       sampleRegion("경주시"),
@@ -622,7 +667,7 @@ describe("validateDocument", () => {
   it("공주시에 공산성이 없으면 회귀 실패로 차단", () => {
     const doc = goodDoc();
     doc.regions.find((r) => r.district === "공주시").hubs = [
-      { hubTatsName: "다른곳", hubRank: 1 },
+      { hubTatsCd: "cd-other", hubTatsName: "다른곳", hubRank: 1 },
     ];
     expect(validateDocument(doc).some((b) => b.includes("공산성"))).toBe(true);
   });

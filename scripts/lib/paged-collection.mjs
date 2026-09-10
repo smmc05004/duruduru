@@ -32,13 +32,54 @@ export function expectedPageItemCount(declaredTotal, pageSize, pageNo) {
 }
 
 /**
- * 한 페이지 응답이 **데이터 검증**까지 통과했는지. HTTP 200·resultCode 0000 이어도
+ * 한 페이지 응답이 **항목 수** 기준을 통과했는지. HTTP 200·resultCode 0000 이어도
  * 항목 수가 기대치에 못 미치면(예: `totalCount=100`인데 1건) 이 페이지는 불완전이며
  * 체크포인트에 성공으로 저장하지 않는다.
+ *
+ * 항목의 **필수 식별자 유효성**까지 함께 보려면 `isPageValidated` 를 쓴다.
  */
 export function isPageComplete(declaredTotal, pageSize, pageNo, itemCount) {
   return (
     Number(itemCount) >= expectedPageItemCount(declaredTotal, pageSize, pageNo)
+  );
+}
+
+/**
+ * 한 항목이 담아야 하는 **필수 식별자**(정규화한 `idOf` 값이 비어있지 않음)를 가졌는지.
+ *
+ * 최종 `validateDocument` 가 항목에 적용하는 기준 — 프로필은 `contentId`,
+ * 중심은 `hubTatsCd` 가 비어 있으면 안 된다 — 을 페이지 검증 단계에서도 **같은 함수**로
+ * 쓴다. 두 수집기는 이 `idOf` 를 이미 `collectPagedUnit` 에 넘기므로 중복 로직이 없다.
+ */
+export function hasRequiredId(item, idOf) {
+  return String(idOf?.(item) ?? "").trim() !== "";
+}
+
+/** 페이지의 모든 항목이 필수 식별자를 갖췄는지(빈 배열은 true). */
+export function pageItemsAllHaveId(items, idOf) {
+  return (items ?? []).every((item) => hasRequiredId(item, idOf));
+}
+
+/**
+ * 한 페이지가 체크포인트에 성공(`complete`)으로 저장될 자격이 있는지.
+ *   (1) 항목 수가 기대치 이상이고,
+ *   (2) 모든 항목이 필수 식별자(`idOf`)를 갖췄을 때만 `true`.
+ *
+ * `totalCount=2` 인데 `[{ contentId: "a" }, {}]` 같은 응답은 길이만 보면 통과하지만
+ * 최종 `validateDocument` 에서 실패한다. 그 페이지를 `complete` 로 저장하면 `--resume`
+ * 이 재조회 없이 같은 실패를 무한 반복하므로 여기서 걸러 낸다.
+ */
+export function isPageValidated({
+  declaredTotal,
+  pageSize,
+  pageNo,
+  items,
+  idOf,
+}) {
+  const list = items ?? [];
+  return (
+    isPageComplete(declaredTotal, pageSize, pageNo, list.length) &&
+    pageItemsAllHaveId(list, idOf)
   );
 }
 
@@ -220,6 +261,14 @@ function completePagesObject(fetched) {
  * `requestPage(pageNo)` 는 `{ items, totalCount }` 를 주는 async 함수다. 네트워크·원천
  * 오류는 그대로 던지되, 그때까지 검증 통과한 페이지를 `error.validatedPages` 로
  * 붙여 재개에 쓸 수 있게 한다.
+ *
+ * `onProgress({ validatedPages, reason, morePagesExpected })` 는 (있으면) **정상
+ * 페이지 검증 직후**와 **일관성 붕괴로 단위를 재시작할 때** 즉시 호출되는 async 훅이다.
+ * 호출부(두 수집기 CLI)가 이 시점에 체크포인트 파일을 디스크로 flush 한다(결함 2).
+ *   - `reason: "page"` — 방금 한 페이지가 검증됐다. `morePagesExpected` 가 참이면
+ *     뒤에 더 받을 페이지가 있다.
+ *   - `reason: "restart"` — 저장된 페이지를 전부 무효화하고 1페이지부터 다시 받는다.
+ *     `validatedPages` 는 `{}` 다(재수집 시작 전에 폐기를 디스크에 반영해야 한다).
  */
 export async function collectPagedUnit({
   requestPage,
@@ -227,11 +276,20 @@ export async function collectPagedUnit({
   pageSize,
   savedPages = {},
   maxRestarts = 2,
+  onProgress,
 }) {
+  const emitProgress = (payload) =>
+    typeof onProgress === "function"
+      ? Promise.resolve(onProgress(payload))
+      : Promise.resolve();
+
   const seedFrom = (source) => {
     const map = new Map();
     for (const pageNo of validatedPageNumbers(source)) {
       const value = source[String(pageNo)] ?? source[pageNo];
+      // 오래된 체크포인트에 complete 로 저장됐더라도 필수 식별자가 빠진 페이지는
+      // 재사용하지 않고 다시 조회한다(결함 1).
+      if (!pageItemsAllHaveId(value.items, idOf)) continue;
       map.set(pageNo, {
         totalCount: Number(value.totalCount),
         items: value.items,
@@ -257,12 +315,18 @@ export async function collectPagedUnit({
         fetched.set(1, {
           totalCount: declaredTotal,
           items: first.items,
-          complete: isPageComplete(
+          complete: isPageValidated({
             declaredTotal,
             pageSize,
-            1,
-            first.items.length,
-          ),
+            pageNo: 1,
+            items: first.items,
+            idOf,
+          }),
+        });
+        await emitProgress({
+          validatedPages: completePagesObject(fetched),
+          reason: "page",
+          morePagesExpected: expectedPageCount(declaredTotal, pageSize) > 1,
         });
       }
       const pageCount = expectedPageCount(declaredTotal, pageSize);
@@ -276,12 +340,18 @@ export async function collectPagedUnit({
         fetched.set(pageNo, {
           totalCount: Number(page.totalCount),
           items: page.items,
-          complete: isPageComplete(
+          complete: isPageValidated({
             declaredTotal,
             pageSize,
             pageNo,
-            page.items.length,
-          ),
+            items: page.items,
+            idOf,
+          }),
+        });
+        await emitProgress({
+          validatedPages: completePagesObject(fetched),
+          reason: "page",
+          morePagesExpected: pageNo < pageCount,
         });
       }
     } catch (error) {
@@ -320,6 +390,13 @@ export async function collectPagedUnit({
       restartReasons.push(broken);
       restarts += 1;
       seed = new Map(); // 저장된 성공 페이지 전부 무효화 → 1페이지부터 재수집
+      // 재수집을 시작하기 전에 폐기를 디스크에 반영한다(결함 2). 여기서 죽어도
+      // 다음 실행이 낡은 페이지를 재사용하면 안 된다.
+      await emitProgress({
+        validatedPages: {},
+        reason: "restart",
+        morePagesExpected: true,
+      });
       if (restarts > maxRestarts) {
         return {
           declaredTotal,

@@ -19,7 +19,7 @@
  *   - 미래월/미지원 코드도 resultCode 0000 + totalCount 0
  */
 
-import { collectPagedUnit } from "./paged-collection.mjs";
+import { collectPagedUnit, hasRequiredId } from "./paged-collection.mjs";
 
 export const SCHEMA_VERSION = 1;
 export const BASE_YM = "202608";
@@ -448,7 +448,7 @@ export function createCollector({
    *   - `status`가 `failed`이면 재개에 쓸 검증 통과 페이지를 `validatedPages`로 준다.
    */
   async function collectRegion(mapping, opts = {}) {
-    const { savedPages = {} } = opts;
+    const { savedPages = {}, onProgress } = opts;
     const { areaCd, signguCd } = centralApiCodesFor(mapping);
     const label = `${mapping.regionId}(${signguCd})`;
 
@@ -459,6 +459,7 @@ export function createCollector({
         idOf: (raw) => text(raw.hubTatsCd),
         pageSize: PAGE_SIZE,
         savedPages,
+        onProgress,
       });
     } catch (error) {
       if (error instanceof FatalApiError) {
@@ -562,6 +563,14 @@ export function validateDocument(doc) {
   const regions = Array.isArray(doc?.regions) ? doc.regions : [];
   if (regions.length < 200) {
     blockers.push(`지역 수가 비정상: ${regions.length}`);
+  }
+  const hubsMissingId = regions
+    .flatMap((r) => r.hubs ?? [])
+    .filter((h) => !hasRequiredId(h, (x) => x.hubTatsCd)).length;
+  if (hubsMissingId > 0) {
+    blockers.push(
+      `필수 식별자(hubTatsCd)가 없는 중심 관광지 ${hubsMissingId}건`,
+    );
   }
   const failed = regions.filter((r) => r.status === "failed");
   if (failed.length > 0) {

@@ -12,7 +12,7 @@
  * (`contentTypeId` 14·28)로 전국 목록을 페이지 끝까지 받는다.
  */
 
-import { collectPagedUnit } from "./paged-collection.mjs";
+import { collectPagedUnit, hasRequiredId } from "./paged-collection.mjs";
 
 export const TOUR_API_BASE_URL = "https://apis.data.go.kr/B551011/KorService2";
 export const REQUEST_TIMEOUT_MS = 20_000;
@@ -221,12 +221,13 @@ export function createProfileCollector({
    * `done: false`로 반환하고, `validatedPages`에는 검증 통과 페이지만 담는다.
    */
   async function collectSpec(spec, opts = {}) {
-    const { savedPages = {} } = opts;
+    const { savedPages = {}, onProgress } = opts;
     const unit = await collectPagedUnit({
       requestPage: (pageNo) => requestPage(spec, pageNo),
       idOf: (item) => item.contentid,
       pageSize: PAGE_SIZE,
       savedPages,
+      onProgress,
     });
     return {
       label: spec.label,
@@ -280,6 +281,12 @@ export function validateDocument(doc) {
   const all = (doc?.profiles ?? []).flatMap((p) =>
     (p.attractions ?? []).map((a) => ({ ...a, regionId: p.regionId })),
   );
+  const missingContentId = all.filter(
+    (a) => !hasRequiredId(a, (x) => x.contentId),
+  ).length;
+  if (missingContentId > 0) {
+    blockers.push(`필수 식별자(contentId)가 없는 관광지 ${missingContentId}건`);
+  }
   const byId = new Map(all.map((a) => [a.contentId, a]));
   const landmarks = [
     { id: "125949", region: "공주", cat: "history" },

@@ -102,6 +102,49 @@ describe("createProfileCollector.collectSpec — 결함 1 (수집 완전성)", (
     expect(result.blockers).toEqual([]);
     expect(result.receivedUnique).toBe(2200);
   });
+
+  it("contentid 가 빠진 항목이 섞이면(건수는 채워도) 그 페이지는 미저장·done=false", async () => {
+    const withHole = [
+      ...nItems("p3", 199),
+      { contentid: "", title: "식별자 없음" },
+    ];
+    const collector = collectorFor(
+      fetchByPage({
+        1: tourBody(nItems("p1", 1000), 2200),
+        2: tourBody(nItems("p2", 1000), 2200),
+        3: tourBody(withHole, 2200),
+      }),
+    );
+    const result = await collector.collectSpec(spec);
+    expect(result.done).toBe(false);
+    expect(result.incompletePages).toEqual([3]);
+    expect(Object.keys(result.validatedPages).sort()).toEqual(["1", "2"]);
+  });
+
+  it("ID 누락 페이지 → --resume 에서 정상 페이지로 실제 복구(1·2 재호출 안 함)", async () => {
+    const first = collectorFor(
+      fetchByPage({
+        1: tourBody(nItems("p1", 1000), 2200),
+        2: tourBody(nItems("p2", 1000), 2200),
+        3: tourBody(
+          [...nItems("p3", 199), { contentid: "  ", title: "공백 ID" }],
+          2200,
+        ),
+      }),
+    );
+    const run1 = await first.collectSpec(spec);
+    expect(run1.done).toBe(false);
+    expect(Object.keys(run1.validatedPages).sort()).toEqual(["1", "2"]);
+
+    const secondFetch = fetchByPage({ 3: tourBody(nItems("p3", 200), 2200) });
+    const second = collectorFor(secondFetch);
+    const run2 = await second.collectSpec(spec, {
+      savedPages: run1.validatedPages,
+    });
+    expect(secondFetch.calls).toEqual([3]);
+    expect(run2.done).toBe(true);
+    expect(run2.receivedUnique).toBe(2200);
+  });
 });
 
 const validated = (prefix, count, totalCount) => ({

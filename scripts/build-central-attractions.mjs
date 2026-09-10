@@ -97,6 +97,22 @@ function serviceKey() {
 
 const jsonLine = (value) => `${JSON.stringify(value, null, 2)}\n`;
 
+/**
+ * 프로덕션은 전역 `fetch` 를 그대로 쓴다. 테스트에서만 `DURUDURU_TEST_FETCH_MODULE`
+ * 로 통제된 fetch(`createTestFetch`)를 주입한다. 그 변수가 없으면 동작이 바뀌지 않는다.
+ */
+async function resolveFetchImpl() {
+  const modulePath = process.env.DURUDURU_TEST_FETCH_MODULE;
+  if (!modulePath) return fetch;
+  const mod = await import(pathToFileURL(resolve(modulePath)).href);
+  if (typeof mod.createTestFetch !== "function") {
+    throw new Error(
+      "DURUDURU_TEST_FETCH_MODULE 은 createTestFetch 를 export 해야 합니다.",
+    );
+  }
+  return mod.createTestFetch();
+}
+
 async function writeJsonAtomic(path, value) {
   await mkdir(dirname(resolve(path)), { recursive: true });
   const tempPath = `${path}.tmp`;
@@ -417,10 +433,14 @@ async function main() {
   // 이전 실행들의 누적 요청 수(재개 시). 이번 실행의 collector.stats를 여기에 더한다.
   const priorStats = { ...checkpoint.stats };
   const collector = createCollector({
-    fetchImpl: fetch,
+    fetchImpl: await resolveFetchImpl(),
     serviceKey: serviceKey(),
     baseYm: context.baseYm,
     maxRequests: maxRequests - priorStats.requests,
+    // 통제된 fetch 를 주입한 테스트에서만 요청 간 지연을 없앤다.
+    ...(process.env.DURUDURU_TEST_FETCH_MODULE
+      ? { sleep: () => Promise.resolve() }
+      : {}),
   });
   const syncStats = () => {
     checkpoint.stats = {
@@ -439,9 +459,28 @@ async function main() {
       currentMapping = mapping;
       const { areaCd, signguCd } = centralApiCodesFor(mapping);
       const priorRecord = checkpoint.regions[mapping.regionId];
-      // 결함 3: 재개 시 **검증까지 통과한(complete)** 페이지만 건너뛴다.
+      // 재개 시 **검증까지 통과한(complete)** 페이지만 건너뛴다.
+      // 결함 2: 정상 페이지 검증 직후·재시작 직후 체크포인트를 디스크로 flush 한다.
       const result = await collector.collectRegion(mapping, {
         savedPages: priorRecord?.pages ?? {},
+        onProgress: async ({ validatedPages, reason, morePagesExpected }) => {
+          if (reason !== "restart" && !morePagesExpected) return;
+          checkpoint.regions[mapping.regionId] = {
+            ...(checkpoint.regions[mapping.regionId] ?? {}),
+            regionId: mapping.regionId,
+            name: mapping.name,
+            province: mapping.province,
+            district: mapping.district,
+            areaCd,
+            signguCd,
+            status: "failed",
+            pages: validatedPages,
+            collectedAt: new Date().toISOString(),
+          };
+          syncStats();
+          checkpoint.updatedAt = new Date().toISOString();
+          await writeJsonAtomic(CHECKPOINT_PATH, checkpoint);
+        },
       });
       checkpoint.regions[mapping.regionId] = {
         regionId: mapping.regionId,
