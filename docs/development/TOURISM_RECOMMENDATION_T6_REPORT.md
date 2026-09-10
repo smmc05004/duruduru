@@ -1,5 +1,7 @@
 # T6 — 관광 데이터·목적 적합성 고도화 결과 비교·검증 보고
 
+> **후속 결정(2026-09-10):** 이 보고서는 T7 이전 구현의 비교 이력이다. 사용자가 목적 적합성 보완(T7)만 추가 승인했다. 최신 정책은 [제품 D4](../product/TOURISM_RECOMMENDATION_UPGRADE.md), 진행 순서는 [작업 계획 T7](TOURISM_RECOMMENDATION_WORK_PLAN.md)을 따른다. 아래 6.1의 제안은 채택 대기 중인 최신 규칙이 아니다. 관심사 우선·실제 일정 중심·유사 적합성 내 이동 부담 비교를 적용하며, 추가 입력·시간당 점수 나눗셈·지역 수 나눗셈·근거리 우선 복귀는 채택하지 않는다. T7 구현/검증은 아직 완료되지 않았다.
+
 > 기준일: 2026-09-10. 브랜치 `docs/tourism-recommendation-upgrade`. 제품 SSOT: [관광 데이터·목적 적합성 기획서](../product/TOURISM_RECOMMENDATION_UPGRADE.md). 작업 계획: [TOURISM_RECOMMENDATION_WORK_PLAN.md](TOURISM_RECOMMENDATION_WORK_PLAN.md).
 >
 > T1~~T5 구현(커밋 `3ba31e1`~~`cd43a9b`)의 변경 전/후를 비교하고, 통합·E2E·단위 검증을 정리한다. **결론: 수용 기준 1·2·3·4·6은 충족. 수용 기준 5의 "개선되지 않은/후퇴 사례"가 다수이고, `interest` 역할이 원거리 대도시로 쏠리는 구조적 현상은 D4 규칙에 충실한 결과이나 제품상 바람직한지 PM 판단이 필요하다.**
