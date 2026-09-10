@@ -1,6 +1,6 @@
 # MVP 구현 계획
 
-> **최신 다음 작업(2026-09-10):** [관광 데이터·목적 적합성 기획서](../product/TOURISM_RECOMMENDATION_UPGRADE.md)와 [작업 계획](TOURISM_RECOMMENDATION_WORK_PLAN.md) 작성·대조 완료. 실제 API로 새 분류 누락 원인과 중심 관광지 표본 사용 가능성을 확인했다. **코드 수정·전국 재수집·추천 개선 구현은 미착수**이며 모델 변경 후 사용자 지시를 기다린다. 시작점은 T1 공식 분류 계약→T2 수집 수정/재수집이다. 아래 과거의 ‘다음 작업’ 문구보다 이 항목이 우선한다.
+> **최신 인계(2026-09-10):** [관광 데이터·목적 적합성 기획서](../product/TOURISM_RECOMMENDATION_UPGRADE.md)의 D1~D4를 **T1~T6으로 구현 완료**(브랜치 `docs/tourism-recommendation-upgrade`, PR 병합 대기). 새 공식 분류(`lclsSystm*`) 해석기·전국 재수집(schemaVersion 2)·중심 관광지 수집(202608)·보수적 원천 연결·목적 근거 점수·`interest` 우선 역할 순서가 반영됐다. 결과·검증·미해소 항목은 [T6 보고서](TOURISM_RECOMMENDATION_T6_REPORT.md). 아래 2장의 관심사 코드 규칙(`A01`·`A0201` 등)은 새 분류가 없는 레코드의 하위 호환 경로로만 유효하다. **PM 판단 대기: `interest` 역할의 원거리 대도시 쏠림(D4 정렬 산출물).** 아래 과거의 ‘다음 작업’ 문구보다 이 항목이 우선한다.
 
 > 현재 인계(2026-09-09): [서비스 2차 고도화 작업 계획](SERVICE_ENHANCEMENT_PHASE_2_WORK_PLAN.md)의 장소 간 추정 이동·재계산과 표준 출발 검색 구현 및 작업자 검증을 완료했다. 관련 Jest84개, E2E11개, verify/build 통과. 전체 Jest는 기존 PoC19개 실패가 남는다. 다음은 총괄 직접 점검이며 커밋·PR은 사용자 지시에 따라 보류한다. 아래 미착수/계획 문구는 이전 시점 이력이다.
 
