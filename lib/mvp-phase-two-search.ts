@@ -19,6 +19,7 @@ import {
   type Attraction,
   type Candidate,
   type CandidateRecommendation,
+  type PurposeEvidence,
   type RecommendedCandidate,
   type RecommendationRole,
   type SearchInput,
@@ -26,6 +27,10 @@ import {
 } from "@/lib/mvp-phase-two-types";
 import { originRegion } from "@/lib/origin-regions";
 import { classifyInterests } from "@/lib/interest-classification";
+import {
+  computePurposeEvidence,
+  hubRankForSelection,
+} from "@/lib/tourism-evidence";
 
 export { groupForMapping } from "@/lib/mvp-phase-two-regions";
 const zoneIndices = new Map(
@@ -152,6 +157,7 @@ function recommendationFor(
   candidate: Omit<Candidate, "recommendation" | "reasons">,
   role: RecommendationRole,
   requestedInterests: MvpCategoryId[],
+  purpose?: PurposeEvidence,
 ): CandidateRecommendation {
   const { metrics } = candidate.preview;
   const fulfilled = requestedInterests.filter((interest) =>
@@ -160,7 +166,8 @@ function recommendationFor(
   const distance = actualDistanceMetrics(candidate);
   return {
     role,
-    algorithmVersion: "e1-v1",
+    algorithmVersion: "e1-v2",
+    ...(purpose ? { purpose } : {}),
     roundTripMinutes: candidate.oneWayMinutes * 2,
     fulfilledInterestCount: fulfilled.length,
     attractionCount: metrics.attractionCount,
@@ -172,6 +179,14 @@ function recommendationFor(
       (interest) => !fulfilled.includes(interest),
     ),
   };
+}
+
+/** 저장본에 근거가 없거나(`unavailable`) 중심 자료가 없으면 0으로 정렬한다. */
+function purposeScoreOf(recommendation: CandidateRecommendation): number {
+  const purpose = recommendation.purpose;
+  if (!purpose || purpose.status === "unavailable" || purpose.score === null)
+    return 0;
+  return purpose.score;
 }
 
 function compareByRole(
@@ -191,6 +206,7 @@ function compareByRole(
   if (role === "interest")
     result =
       compareNumber(b.fulfilledInterestCount, a.fulfilledInterestCount) ||
+      compareNumber(purposeScoreOf(b), purposeScoreOf(a)) ||
       compareNumber(b.categoryDiversity, a.categoryDiversity) ||
       compareNumber(b.attractionCount, a.attractionCount) ||
       compareNumber(a.roundTripMinutes, b.roundTripMinutes);
@@ -207,6 +223,34 @@ function compareByRole(
       compareNumber(a.roundTripMinutes, b.roundTripMinutes);
   }
   return result || compareText(left.groupId, right.groupId);
+}
+
+/**
+ * 목적 근거 문구. 원천명·기준월·연결 상태·세부 점수는 카드 본문이 아니라 근거
+ * 펼치기에 들어간다(D4). 중심 근거가 없는 카드에는 중심 관광지 문구를 붙이지 않는다.
+ */
+function purposeReasons(purpose?: PurposeEvidence): string[] {
+  if (!purpose || purpose.status === "unavailable") return [];
+  const baseYm = purpose.baseYm
+    ? `${purpose.baseYm.slice(0, 4)}-${purpose.baseYm.slice(4, 6)}`
+    : "미상";
+  if (purpose.status === "no-central-data")
+    return [
+      "이 지역은 중심 관광지 자료가 없어 목적 근거 점수는 0이에요. 지역의 매력이 없다는 뜻이 아니에요.",
+    ];
+  if (!purpose.contributingContentIds.length)
+    return [
+      `실제 초안 관광지 중 확정 연결된 중심 관광지가 없어 목적 근거 점수는 0이에요 (기준월 ${baseYm}).`,
+    ];
+  const score = (purpose.score ?? 0).toFixed(2);
+  return [
+    `실제 초안에 배치한 중심 관광지 ${purpose.contributingContentIds.length}곳으로 목적 근거 점수 ${score}를 계산했어요. 티맵 기반 지역 연계 방문 중심성(기준월 ${baseYm})이며 전국 인기·평점·영업 보장이 아니에요.`,
+    ...(purpose.centralEmptyRegionIds.length
+      ? [
+          `구성 지역 ${purpose.centralEmptyRegionIds.length}곳은 중심 관광지 자료가 없어 점수에 반영되지 않았어요.`,
+        ]
+      : []),
+  ];
 }
 
 function reasonsFor(recommendation: CandidateRecommendation): string[] {
@@ -227,6 +271,7 @@ function reasonsFor(recommendation: CandidateRecommendation): string[] {
   return [
     `${roleTitle[recommendation.role]} · 왕복 자동차 일반 예상시간 ${recommendation.roundTripMinutes}분`,
     `${included || "선택 관심사 없음"} 포함 · 관광 ${recommendation.attractionCount}곳 · 현지 낮 자유시간 ${recommendation.localFreeMinutes}분${missing ? ` · ${missing} 미포함` : ""}`,
+    ...purposeReasons(recommendation.purpose),
     ...(recommendation.proximityComparable
       ? [
           `당일 연속 관광지 ${recommendation.distancePairCount}쌍의 직선거리 근거를 확인했어요. 지역 내부 이동시간은 계산하지 않아요.`,
@@ -240,12 +285,14 @@ function reasonsFor(recommendation: CandidateRecommendation): string[] {
 export function selectCandidateRoles(
   candidates: Array<Omit<Candidate, "recommendation" | "reasons">>,
   requestedInterests: MvpCategoryId[],
+  purposeByGroupId?: Map<string, PurposeEvidence>,
 ): RecommendedCandidate[] {
   const prepared = candidates.map((candidate) => {
     const recommendation = recommendationFor(
       candidate,
-      "easy",
+      "interest",
       requestedInterests,
+      purposeByGroupId?.get(candidate.groupId),
     );
     return {
       ...candidate,
@@ -254,7 +301,7 @@ export function selectCandidateRoles(
     };
   });
   const selected: RecommendedCandidate[] = [];
-  for (const role of ["easy", "interest", "relaxed"] as const) {
+  for (const role of ["interest", "easy", "relaxed"] as const) {
     const winner = prepared
       .filter(
         (candidate) =>
@@ -337,6 +384,7 @@ export function searchPhaseTwo(
     }
   }
   const candidates: Array<Omit<Candidate, "recommendation" | "reasons">> = [];
+  const purposeByGroupId = new Map<string, PurposeEvidence>();
   const timingCache: SchedulingCache = new Map();
   let classifiedGroups = 0,
     timingFailures = 0;
@@ -351,11 +399,24 @@ export function searchPhaseTwo(
       undefined,
       [],
       timingCache,
+      hubRankForSelection,
     );
     if (!preview.ok) {
       timingFailures++;
       continue;
     }
+    // 목적 근거 점수의 근거 장소는 "실제 초안에 배치된" 관광지뿐이다(D4·수용 기준 4).
+    const placedAttractions = preview.blocks.flatMap((block) =>
+      block.kind === "attraction" && block.attraction ? [block.attraction] : [],
+    );
+    purposeByGroupId.set(
+      group.groupId,
+      computePurposeEvidence(
+        placedAttractions,
+        input.interests,
+        group.memberRegionIds,
+      ),
+    );
     candidates.push({
       groupId: group.groupId,
       memberRegionIds: group.memberRegionIds.sort(),
@@ -388,7 +449,11 @@ export function searchPhaseTwo(
   return {
     kind: "success",
     searchId,
-    candidates: selectCandidateRoles(candidates, input.interests),
+    candidates: selectCandidateRoles(
+      candidates,
+      input.interests,
+      purposeByGroupId,
+    ),
     profileGeneratedAt: profiles.generatedAt,
   };
 }

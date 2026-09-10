@@ -100,6 +100,30 @@ function metrics(v: unknown): v is PlanMetrics {
     (v.averageDistanceKm === null || finite(v.averageDistanceKm))
   );
 }
+function purposeEvidence(v: unknown): boolean {
+  if (v === undefined) return true;
+  if (!object(v)) return false;
+  const status = String(v.status);
+  if (!["scored", "no-central-data", "unavailable"].includes(status))
+    return false;
+  if (
+    !text(v.version) ||
+    !text(v.baseYm) ||
+    !(v.score === null || (finite(v.score) && v.score <= 1)) ||
+    !object(v.perInterest) ||
+    !Object.entries(v.perInterest).every(
+      ([key, value]) =>
+        INTERESTS.some((i) => i.id === key) && finite(value) && value <= 1,
+    ) ||
+    !Array.isArray(v.contributingContentIds) ||
+    !v.contributingContentIds.every(id) ||
+    !Array.isArray(v.centralEmptyRegionIds) ||
+    !v.centralEmptyRegionIds.every(id) ||
+    !finite(v.matchedHubCount)
+  )
+    return false;
+  return true;
+}
 function recommendation(v: unknown): v is CandidateRecommendation {
   if (!object(v)) return false;
   const pairCount = v.distancePairCount;
@@ -108,7 +132,8 @@ function recommendation(v: unknown): v is CandidateRecommendation {
   const missingInterests = v.missingInterests;
   return (
     ["easy", "interest", "relaxed"].includes(String(v.role)) &&
-    v.algorithmVersion === "e1-v1" &&
+    ["e1-v1", "e1-v2"].includes(String(v.algorithmVersion)) &&
+    purposeEvidence(v.purpose) &&
     [
       v.roundTripMinutes,
       v.fulfilledInterestCount,
@@ -266,7 +291,7 @@ function candidate(v: unknown): v is Candidate {
     !v.reasons.every(text) ||
     (v.recommendation !== undefined && !recommendation(v.recommendation)) ||
     (v.itineraryAlgorithmVersion !== undefined &&
-      v.itineraryAlgorithmVersion !== "e2-v1") ||
+      !["e2-v1", "e2-v2"].includes(String(v.itineraryAlgorithmVersion))) ||
     !object(v.metadata)
   )
     return false;
@@ -507,6 +532,24 @@ function cleanRecommendation(
     ? {
         role: recommendation.role,
         algorithmVersion: recommendation.algorithmVersion,
+        ...(recommendation.purpose
+          ? {
+              purpose: {
+                version: recommendation.purpose.version,
+                baseYm: recommendation.purpose.baseYm,
+                status: recommendation.purpose.status,
+                score: recommendation.purpose.score,
+                perInterest: { ...recommendation.purpose.perInterest },
+                contributingContentIds: [
+                  ...recommendation.purpose.contributingContentIds,
+                ],
+                centralEmptyRegionIds: [
+                  ...recommendation.purpose.centralEmptyRegionIds,
+                ],
+                matchedHubCount: recommendation.purpose.matchedHubCount,
+              },
+            }
+          : {}),
         roundTripMinutes: recommendation.roundTripMinutes,
         fulfilledInterestCount: recommendation.fulfilledInterestCount,
         attractionCount: recommendation.attractionCount,

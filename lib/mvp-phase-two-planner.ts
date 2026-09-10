@@ -30,7 +30,8 @@ const normalizeFacilityAddress = (text: string) =>
     .replace(/\s*-\s*/gu, "-")
     .replace(/\s+/gu, " ")
     .trim();
-export const E2_ITINERARY_ALGORITHM_VERSION = "e2-v1" as const;
+/** e2-v2: 초안 관광 선정에 중심 관광지 근거(hubRank) 동점 규칙을 추가(D4). */
+export const E2_ITINERARY_ALGORITHM_VERSION = "e2-v2" as const;
 const GENERIC_FACILITY_TOKENS = new Set(
   [
     "관광지",
@@ -218,11 +219,18 @@ export function distinctAttractions(places: Attraction[]): Attraction[] {
   return result;
 }
 type ScheduledVisit = Visit;
+/**
+ * D4 관광 선정. `centralHubRank`는 배치 후보의 확정 연결 중심 관광지 순위(1~100)
+ * 또는 null을 반환하는 선택적 신호다. 미충족 관심사 다음, 세부 분류 우선 전에
+ * 적용한다. 근거 장소가 배치 불가하면 다음 후보로 넘어가고 데이터가 없으면
+ * 기존 정렬만 쓴다.
+ */
 export function selectPlaces(
   places: Attraction[],
   interests: SearchInput["interests"],
   slots: [Interval[], Interval[]],
   corrections: readonly FacilityCorrection[] = FACILITY_CORRECTIONS,
+  centralHubRank?: (place: Attraction) => number | null,
 ): ScheduledVisit[] {
   const selected: ScheduledVisit[] = [],
     used = new Set<string>(),
@@ -285,6 +293,14 @@ export function selectPlaces(
           }
           const interest = missing(b) - missing(a);
           if (interest) return interest;
+          if (centralHubRank) {
+            const rankA = centralHubRank(a);
+            const rankB = centralHubRank(b);
+            const hasEvidence = Number(rankB !== null) - Number(rankA !== null);
+            if (hasEvidence) return hasEvidence;
+            if (rankA !== null && rankB !== null && rankA !== rankB)
+              return rankA - rankB;
+          }
           const categoryDifference =
             Number(dayCategories.has(detailCategory(a))) -
             Number(dayCategories.has(detailCategory(b)));
@@ -609,6 +625,7 @@ function scheduleBaseTrip(
   retained?: Visit[],
   requiredLocalMeals: string[] = [],
   timingCache?: SchedulingCache,
+  centralHubRank?: (place: Attraction) => number | null,
 ): ScheduleResult {
   if (!validateSearchInput(input).ok || !Number.isFinite(oneWay) || oneWay <= 0)
     return {
@@ -659,7 +676,13 @@ function scheduleBaseTrip(
         if (!firstSlots || !secondSlots) continue;
         const visits: Visit[] = retained
           ? retainedVisitsForSlots(retained, [firstSlots, secondSlots], places)
-          : selectPlaces(places, input.interests, [firstSlots, secondSlots]);
+          : selectPlaces(
+              places,
+              input.interests,
+              [firstSlots, secondSlots],
+              FACILITY_CORRECTIONS,
+              centralHubRank,
+            );
         if (visits.length !== count) continue;
         best = { layout, slots: [firstSlots, secondSlots], visits, count };
       }
@@ -793,6 +816,7 @@ export function scheduleTrip(
   retained?: Visit[],
   requiredLocalMeals: string[] = [],
   timingCache?: SchedulingCache,
+  centralHubRank?: (place: Attraction) => number | null,
 ): ScheduleResult {
   let result = scheduleBaseTrip(
     input,
@@ -801,6 +825,7 @@ export function scheduleTrip(
     retained,
     requiredLocalMeals,
     timingCache,
+    centralHubRank,
   );
   while (result.ok) {
     const { blocks, metrics } = result;
@@ -861,6 +886,7 @@ export function scheduleTrip(
       visits.slice(0, -1),
       requiredLocalMeals,
       timingCache,
+      centralHubRank,
     );
   }
   return result.ok
