@@ -19,6 +19,8 @@
  *   - 미래월/미지원 코드도 resultCode 0000 + totalCount 0
  */
 
+import { assessCompleteness, expectedPageCount } from "./paged-collection.mjs";
+
 export const SCHEMA_VERSION = 1;
 export const BASE_YM = "202608";
 export const CENTRAL_API = "LocgoHubTarService1/areaBasedList1";
@@ -434,28 +436,64 @@ export function createCollector({
 
   /**
    * 한 지역의 중심 관광지를 수집한다.
-   * 반환: { status: "ok"|"empty"|"failed", totalCount, collected, hubs, duplicateHubCds, rankRange, error? }
+   *
+   * `opts.savedPages`(체크포인트에 저장된 `{ [pageNo]: { totalCount, items } }`)를
+   * 주면 그 페이지는 다시 호출하지 않고 실패·미수집 페이지만 잇는다(결함 3).
+   * `opts.onPage(pageNo, { totalCount, items })`는 페이지 성공마다 호출한다(체크포인트 저장).
+   *
+   * 수집 완전성(건수 부족·페이지 누락·페이지 간 중복·페이지별 totalCount 변동)을
+   * 검증해, 불완전하면 `status: "failed"` + `completenessBlockers`로 반환한다(결함 1).
+   * 이때 성공한 페이지는 `pages`로 함께 반환해 재개가 그 페이지를 건너뛰게 한다.
+   *
+   * 반환: { status: "ok"|"empty"|"failed", totalCount, collected, hubs,
+   *        duplicateHubCds, rankRange, pages, completenessBlockers, error? }
    */
-  async function collectRegion(mapping) {
+  async function collectRegion(mapping, opts = {}) {
+    const { savedPages = {}, onPage } = opts;
     const { areaCd, signguCd } = centralApiCodesFor(mapping);
     const label = `${mapping.regionId}(${signguCd})`;
-    try {
-      const first = await requestPage(label, areaCd, signguCd, 1);
-      const totalCount = first.totalCount;
-      const pages = [first.items];
 
-      const pageCount = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+    /** pageNo -> { totalCount, items } */
+    const fetched = new Map();
+    for (const [key, value] of Object.entries(savedPages)) {
+      const pageNo = Number(key);
+      if (
+        Number.isInteger(pageNo) &&
+        pageNo >= 1 &&
+        value &&
+        Array.isArray(value.items)
+      ) {
+        fetched.set(pageNo, {
+          totalCount: Number(value.totalCount) || 0,
+          items: value.items,
+        });
+      }
+    }
+    const savedPagesOut = () =>
+      Object.fromEntries([...fetched.entries()].sort((a, b) => a[0] - b[0]));
+
+    try {
+      if (!fetched.has(1)) {
+        const first = await requestPage(label, areaCd, signguCd, 1);
+        fetched.set(1, { totalCount: first.totalCount, items: first.items });
+        if (onPage) await onPage(1, fetched.get(1));
+      }
+      const declaredTotal = fetched.get(1).totalCount;
+      const pageCount = expectedPageCount(declaredTotal, PAGE_SIZE);
       for (let pageNo = 2; pageNo <= pageCount; pageNo += 1) {
+        if (fetched.has(pageNo)) continue;
         const page = await requestPage(label, areaCd, signguCd, pageNo);
-        if (page.items.length === 0) break; // 페이지 종료
-        pages.push(page.items);
+        fetched.set(pageNo, { totalCount: page.totalCount, items: page.items });
+        if (onPage) await onPage(pageNo, fetched.get(pageNo));
+        if (page.items.length === 0) break; // 페이지 종료(완전성 평가가 누락으로 잡는다)
       }
 
+      const orderedPages = [...fetched.entries()].sort((a, b) => a[0] - b[0]);
       const seen = new Set();
       let duplicateHubCds = 0;
       const hubs = [];
-      for (const pageItems of pages) {
-        for (const raw of pageItems) {
+      for (const [, page] of orderedPages) {
+        for (const raw of page.items) {
           const hub = normalizeHub(raw);
           if (!hub.hubTatsCd) continue;
           if (seen.has(hub.hubTatsCd)) {
@@ -480,26 +518,58 @@ export function createCollector({
         ? { min: Math.min(...ranks), max: Math.max(...ranks) }
         : null;
 
-      if (totalCount === 0 && hubs.length === 0) {
+      if (declaredTotal === 0 && hubs.length === 0) {
         return {
           status: "empty",
-          totalCount,
+          totalCount: 0,
           collected: 0,
           hubs: [],
           duplicateHubCds: 0,
           rankRange: null,
+          pages: {},
+          completenessBlockers: [],
         };
       }
+
+      const completeness = assessCompleteness({
+        declaredTotal,
+        pageSize: PAGE_SIZE,
+        pages: orderedPages.map(([pageNo, page]) => ({
+          pageNo,
+          totalCount: page.totalCount,
+          ids: page.items.map((raw) => text(raw.hubTatsCd)).filter(Boolean),
+        })),
+      });
+
+      if (completeness.blockers.length) {
+        return {
+          status: "failed",
+          totalCount: declaredTotal,
+          collected: hubs.length,
+          hubs: [],
+          duplicateHubCds,
+          rankRange: null,
+          pages: savedPagesOut(),
+          completenessBlockers: completeness.blockers,
+          error: `불완전 수집: ${completeness.blockers.join(" · ")}`,
+        };
+      }
+
       return {
         status: "ok",
-        totalCount,
+        totalCount: declaredTotal,
         collected: hubs.length,
         hubs,
         duplicateHubCds,
         rankRange,
+        pages: {},
+        completenessBlockers: [],
       };
     } catch (error) {
-      if (error instanceof FatalApiError) throw error;
+      if (error instanceof FatalApiError) {
+        error.savedPages = savedPagesOut();
+        throw error;
+      }
       return {
         status: "failed",
         totalCount: 0,
@@ -508,6 +578,8 @@ export function createCollector({
         duplicateHubCds: 0,
         rankRange: null,
         error: String(error.message),
+        pages: savedPagesOut(),
+        completenessBlockers: [],
       };
     }
   }
@@ -540,6 +612,25 @@ export function validateDocument(doc) {
       `실패 지역 ${failed.length}곳이 남아 전국 정상본으로 교체할 수 없음: ${failed
         .slice(0, 10)
         .map((r) => r.regionId)
+        .join(", ")}`,
+    );
+  }
+  // 결함 1: ok 로 표시됐어도 totalCount 와 실제 수집·중복 합이 어긋나면 차단한다.
+  const incomplete = regions.filter(
+    (r) =>
+      r.status === "ok" &&
+      Number.isFinite(r.totalCount) &&
+      r.totalCount > 0 &&
+      r.totalCount !== (r.collected ?? 0) + (r.duplicateHubCds ?? 0),
+  );
+  if (incomplete.length > 0) {
+    blockers.push(
+      `수집 건수가 totalCount 와 불일치한 지역 ${incomplete.length}곳: ${incomplete
+        .slice(0, 10)
+        .map(
+          (r) =>
+            `${r.regionId}(total ${r.totalCount}/수집 ${r.collected}/중복 ${r.duplicateHubCds})`,
+        )
         .join(", ")}`,
     );
   }

@@ -400,6 +400,117 @@ describe("createCollector.collectRegion", () => {
   });
 });
 
+/** pageNo → 응답(객체/함수/Error)을 돌려주는 fake fetch(중심 API). */
+function fetchByPage(map) {
+  const calls = [];
+  const impl = async (url) => {
+    const pageNo = Number(new URL(url).searchParams.get("pageNo"));
+    calls.push(pageNo);
+    const spec = map[pageNo];
+    if (spec === undefined) throw new Error(`no response for page ${pageNo}`);
+    if (spec instanceof Error) throw spec;
+    const body = typeof spec === "function" ? spec() : spec;
+    return {
+      status: 200,
+      ok: true,
+      text: async () =>
+        typeof body === "string" ? body : JSON.stringify(body),
+    };
+  };
+  impl.calls = calls;
+  return impl;
+}
+
+const hubPage = (from, count) =>
+  Array.from({ length: count }, (_, i) => hub(from + i, `cd-${from + i}`));
+
+describe("collectRegion — 결함 1 (수집 완전성)", () => {
+  const m = mapping("z1", "44", "150", "공주시");
+
+  it("totalCount 100 인데 1건만 반환되면 status failed + completenessBlockers", async () => {
+    const fetchImpl = queueFetch([{ body: okBody([hub(1)], 100) }]);
+    const result = await collectorFor(fetchImpl).collectRegion(m);
+    expect(result.status).toBe("failed");
+    expect(result.completenessBlockers.length).toBeGreaterThan(0);
+    expect(result.error).toMatch(/불완전 수집/);
+  });
+
+  it("페이지별 totalCount 가 흔들리면 status failed", async () => {
+    const fetchImpl = fetchByPage({
+      1: okBody(hubPage(1, 100), 250, 1),
+      2: okBody(hubPage(101, 100), 250, 2),
+      3: okBody(hubPage(201, 50), 240, 3),
+    });
+    const result = await collectorFor(fetchImpl).collectRegion(m);
+    expect(result.status).toBe("failed");
+    expect(
+      result.completenessBlockers.some((b) =>
+        b.includes("페이지별 totalCount 변동"),
+      ),
+    ).toBe(true);
+  });
+
+  it("모든 페이지가 채워지면 status ok", async () => {
+    const fetchImpl = fetchByPage({
+      1: okBody(hubPage(1, 100), 250, 1),
+      2: okBody(hubPage(101, 100), 250, 2),
+      3: okBody(hubPage(201, 50), 250, 3),
+    });
+    const result = await collectorFor(fetchImpl).collectRegion(m);
+    expect(result.status).toBe("ok");
+    expect(result.collected).toBe(250);
+    expect(result.completenessBlockers).toEqual([]);
+  });
+});
+
+describe("collectRegion — 결함 3 (페이지 재개)", () => {
+  const m = mapping("z1", "44", "150", "공주시");
+
+  it("저장된 1·2페이지는 다시 호출하지 않고 3페이지만 조회한다", async () => {
+    const fetchImpl = fetchByPage({ 3: okBody(hubPage(201, 50), 250, 3) });
+    const savedPages = {
+      1: { totalCount: 250, items: hubPage(1, 100) },
+      2: { totalCount: 250, items: hubPage(101, 100) },
+    };
+    const persisted = [];
+    const result = await collectorFor(fetchImpl).collectRegion(m, {
+      savedPages,
+      onPage: async (pageNo) => persisted.push(pageNo),
+    });
+    expect(fetchImpl.calls).toEqual([3]);
+    expect(persisted).toEqual([3]);
+    expect(result.status).toBe("ok");
+    expect(result.collected).toBe(250);
+  });
+
+  it("3페이지 실패 후 재개하면 1·2페이지를 다시 부르지 않는다", async () => {
+    const first = fetchByPage({
+      1: okBody(hubPage(1, 100), 250, 1),
+      2: okBody(hubPage(101, 100), 250, 2),
+      3: () =>
+        (() => {
+          throw Object.assign(new Error("boom"), { code: "ECONNRESET" });
+        })(),
+    });
+    const saved = {};
+    const failed = await collectorFor(first).collectRegion(m, {
+      onPage: async (pageNo, page) => {
+        saved[pageNo] = page;
+      },
+    });
+    expect(failed.status).toBe("failed");
+    expect(Object.keys(failed.pages).map(Number).sort()).toEqual([1, 2]);
+
+    const second = fetchByPage({ 3: okBody(hubPage(201, 50), 250, 3) });
+    const resumed = await collectorFor(second).collectRegion(m, {
+      savedPages: failed.pages,
+    });
+    expect(second.calls).toEqual([3]);
+    expect(resumed.status).toBe("ok");
+    expect(resumed.collected).toBe(250);
+  });
+});
+
 describe("validateDocument", () => {
   const sampleRegion = (district, extra = {}) => ({
     regionId: `z-${district}`,
@@ -463,5 +574,14 @@ describe("validateDocument", () => {
       { hubTatsName: "다른곳", hubRank: 1 },
     ];
     expect(validateDocument(doc).some((b) => b.includes("공산성"))).toBe(true);
+  });
+
+  it("ok 인데 totalCount ≠ 수집+중복 이면 차단(결함 1)", () => {
+    const doc = goodDoc();
+    doc.regions.find((r) => r.district === "익산시").collected = 1;
+    doc.regions.find((r) => r.district === "익산시").totalCount = 100;
+    expect(validateDocument(doc).some((b) => b.includes("불일치한 지역"))).toBe(
+      true,
+    );
   });
 });

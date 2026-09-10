@@ -165,6 +165,9 @@ function assembleDocument(checkpoint) {
       duplicateHubCds: record.duplicateHubCds ?? 0,
       rankRange: record.rankRange ?? null,
       hubs: record.hubs ?? [],
+      ...(record.completenessBlockers?.length
+        ? { completenessBlockers: record.completenessBlockers }
+        : {}),
       ...(record.error ? { error: record.error } : {}),
     }))
     .sort((a, b) =>
@@ -432,8 +435,28 @@ async function main() {
   let preflightConfirmed = pending.length === 0;
   try {
     for (const mapping of pending) {
-      const result = await collector.collectRegion(mapping);
       const { areaCd, signguCd } = centralApiCodesFor(mapping);
+      const priorRecord = checkpoint.regions[mapping.regionId];
+      const result = await collector.collectRegion(mapping, {
+        savedPages: priorRecord?.pages ?? {},
+        // 결함 3: 페이지가 성공할 때마다 체크포인트에 저장한다. 프로세스가 중간에
+        // 죽거나 지역이 실패해도 성공한 페이지는 재개 시 다시 호출하지 않는다.
+        onPage: async (pageNo, page) => {
+          const record = (checkpoint.regions[mapping.regionId] ??= {
+            regionId: mapping.regionId,
+            name: mapping.name,
+            province: mapping.province,
+            district: mapping.district,
+            areaCd,
+            signguCd,
+            status: "in-progress",
+          });
+          record.pages = { ...(record.pages ?? {}), [pageNo]: page };
+          syncStats();
+          checkpoint.updatedAt = new Date().toISOString();
+          await writeJsonAtomic(CHECKPOINT_PATH, checkpoint);
+        },
+      });
       checkpoint.regions[mapping.regionId] = {
         regionId: mapping.regionId,
         name: mapping.name,
@@ -447,6 +470,15 @@ async function main() {
         duplicateHubCds: result.duplicateHubCds,
         rankRange: result.rankRange,
         hubs: result.hubs,
+        // 실패(불완전 포함) 지역만 성공 페이지를 남겨 재개가 이어서 조회한다.
+        ...(result.status === "failed" &&
+        result.pages &&
+        Object.keys(result.pages).length
+          ? { pages: result.pages }
+          : {}),
+        ...(result.completenessBlockers?.length
+          ? { completenessBlockers: result.completenessBlockers }
+          : {}),
         ...(result.error ? { error: result.error } : {}),
         collectedAt: new Date().toISOString(),
       };
