@@ -1,4 +1,5 @@
 import { INTERESTS } from "@/lib/mvp-phase-two-types";
+import { detailClassification } from "@/lib/interest-classification";
 import { originRegion } from "@/lib/origin-regions";
 import { scheduleLocalDay } from "@/lib/local-travel-schedule";
 import { localActivityWindow, planTimeError } from "./plan-time-constraints";
@@ -30,7 +31,12 @@ const normalizeFacilityAddress = (text: string) =>
     .replace(/\s*-\s*/gu, "-")
     .replace(/\s+/gu, " ")
     .trim();
-export const E2_ITINERARY_ALGORITHM_VERSION = "e2-v1" as const;
+/**
+ * e2-v3 (T7 / D4): 초안 관광 선정 순서를 미충족 관심사 → 세부 유형 다양성·근접성 →
+ * 중심 근거(확정 연결 여부, 보조) → 안정 ID로 재정렬. hubRank 숫자의 전국 공통
+ * 비교를 제거해 총순서(추이성)를 유지한다.
+ */
+export const E2_ITINERARY_ALGORITHM_VERSION = "e2-v3" as const;
 const GENERIC_FACILITY_TOKENS = new Set(
   [
     "관광지",
@@ -86,10 +92,21 @@ function facilitySignal(left: Attraction, right: Attraction): boolean {
  * Conservative, client-safe grouping signal. It keeps original attractions and
  * checks a new member against the representative and every current member.
  */
+/**
+ * `facilityGroups`는 O(n²) 시설 신호 비교라 큰 후보 풀에서 비싸다. `selectPlaces`가
+ * 한 스케줄링 안에서 같은 `places` 배열 참조로 수십 번 재호출하므로, 기본 보정
+ * 목록(빈 배열 상수)일 때만 배열 참조로 메모이즈한다. 순수 함수라 결정성은 유지된다.
+ */
+const facilityGroupCache = new WeakMap<Attraction[], Map<string, string>>();
 export function facilityGroups(
   places: Attraction[],
   corrections: readonly FacilityCorrection[] = FACILITY_CORRECTIONS,
 ): Map<string, string> {
+  const cacheable = corrections === FACILITY_CORRECTIONS;
+  if (cacheable) {
+    const cached = facilityGroupCache.get(places);
+    if (cached) return cached;
+  }
   const groups: Attraction[][] = [];
   for (const place of [...places].toSorted((a, b) =>
     compareId(a.contentId, b.contentId),
@@ -119,6 +136,7 @@ export function facilityGroups(
       result.set(second, `facility-independent-${second}`);
     }
   }
+  if (cacheable) facilityGroupCache.set(places, result);
   return result;
 }
 export function parseLocalDate(value: unknown): number | null {
@@ -187,8 +205,11 @@ export function distanceKm(
       Math.sin(((b.longitude - a.longitude) * rad) / 2) ** 2;
   return 6371 * 2 * Math.asin(Math.sqrt(Math.min(1, h)));
 }
-const detailCategory = (place: Attraction) =>
-  place.cat3 || place.cat2 || place.categories.join("+");
+/**
+ * 세부 분류 다양성 지표의 값. 새 공식 세부 분류(`lclsSystm3`→`lclsSystm2`)를
+ * 우선하고 없을 때만 구 `cat3`→`cat2`를 본다(결함 2). 공통 헬퍼로 통일한다.
+ */
+const detailCategory = (place: Attraction) => detailClassification(place);
 export function distinctAttractions(places: Attraction[]): Attraction[] {
   const result: Attraction[] = [],
     seen = new Set<string>();
@@ -218,11 +239,18 @@ export function distinctAttractions(places: Attraction[]): Attraction[] {
   return result;
 }
 type ScheduledVisit = Visit;
+/**
+ * D4 관광 선정. `centralHubRank`는 배치 후보의 확정 연결 중심 관광지 순위(1~100)
+ * 또는 null을 반환하는 선택적 신호다. 미충족 관심사 다음, 세부 분류 우선 전에
+ * 적용한다. 근거 장소가 배치 불가하면 다음 후보로 넘어가고 데이터가 없으면
+ * 기존 정렬만 쓴다.
+ */
 export function selectPlaces(
   places: Attraction[],
   interests: SearchInput["interests"],
   slots: [Interval[], Interval[]],
   corrections: readonly FacilityCorrection[] = FACILITY_CORRECTIONS,
+  centralHubRank?: (place: Attraction) => number | null,
 ): ScheduledVisit[] {
   const selected: ScheduledVisit[] = [],
     used = new Set<string>(),
@@ -289,12 +317,21 @@ export function selectPlaces(
             Number(dayCategories.has(detailCategory(a))) -
             Number(dayCategories.has(detailCategory(b)));
           if (categoryDifference) return categoryDifference;
-          if (!previous) return compareId(a.contentId, b.contentId);
-          return (
-            (distanceKm(previous.coordinates, a.coordinates) ?? Infinity) -
-              (distanceKm(previous.coordinates, b.coordinates) ?? Infinity) ||
-            compareId(a.contentId, b.contentId)
-          );
+          const proximity = previous
+            ? (distanceKm(previous.coordinates, a.coordinates) ?? Infinity) -
+              (distanceKm(previous.coordinates, b.coordinates) ?? Infinity)
+            : 0;
+          if (proximity) return proximity;
+          if (centralHubRank) {
+            // D4: 중심 근거는 세부 유형 다양성·근접성 뒤의 **보조 신호**다.
+            // 다른 구의 hubRank 숫자를 전국 공통 척도로 비교하지 않으려고 "확정
+            // 연결 여부"(불리언)만 쓴다 — 불리언이라 총순서(추이성)를 유지한다.
+            const hasEvidence =
+              Number(centralHubRank(b) !== null) -
+              Number(centralHubRank(a) !== null);
+            if (hasEvidence) return hasEvidence;
+          }
+          return compareId(a.contentId, b.contentId);
         });
         const place = ordered[0];
         if (!place) break;
@@ -609,6 +646,7 @@ function scheduleBaseTrip(
   retained?: Visit[],
   requiredLocalMeals: string[] = [],
   timingCache?: SchedulingCache,
+  centralHubRank?: (place: Attraction) => number | null,
 ): ScheduleResult {
   if (!validateSearchInput(input).ok || !Number.isFinite(oneWay) || oneWay <= 0)
     return {
@@ -659,7 +697,13 @@ function scheduleBaseTrip(
         if (!firstSlots || !secondSlots) continue;
         const visits: Visit[] = retained
           ? retainedVisitsForSlots(retained, [firstSlots, secondSlots], places)
-          : selectPlaces(places, input.interests, [firstSlots, secondSlots]);
+          : selectPlaces(
+              places,
+              input.interests,
+              [firstSlots, secondSlots],
+              FACILITY_CORRECTIONS,
+              centralHubRank,
+            );
         if (visits.length !== count) continue;
         best = { layout, slots: [firstSlots, secondSlots], visits, count };
       }
@@ -793,6 +837,7 @@ export function scheduleTrip(
   retained?: Visit[],
   requiredLocalMeals: string[] = [],
   timingCache?: SchedulingCache,
+  centralHubRank?: (place: Attraction) => number | null,
 ): ScheduleResult {
   let result = scheduleBaseTrip(
     input,
@@ -801,6 +846,7 @@ export function scheduleTrip(
     retained,
     requiredLocalMeals,
     timingCache,
+    centralHubRank,
   );
   while (result.ok) {
     const { blocks, metrics } = result;
@@ -861,6 +907,7 @@ export function scheduleTrip(
       visits.slice(0, -1),
       requiredLocalMeals,
       timingCache,
+      centralHubRank,
     );
   }
   return result.ok

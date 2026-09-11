@@ -1,12 +1,9 @@
-export const MVP_CATEGORY_IDS = [
-  "nature",
-  "history",
-  "rest",
-  "culture",
-  "leisure",
-] as const;
-
-export type MvpCategoryId = (typeof MVP_CATEGORY_IDS)[number];
+export {
+  MVP_CATEGORY_IDS,
+  type MvpCategoryId,
+  CLASSIFICATION_VERSION,
+} from "@/lib/interest-classification";
+import type { MvpCategoryId } from "@/lib/interest-classification";
 
 export type RegionMapping = {
   regionId: string;
@@ -22,15 +19,34 @@ export type RegionMapping = {
 export type RegionAttraction = {
   contentId: string;
   title: string;
-  categoryId: MvpCategoryId;
+  /**
+   * 공통 해석기 `classifyInterests`가 판정한 관심사 목록. schemaVersion 2 수집본의
+   * 정본 필드다. 검색·후보 판정은 저장값을 신뢰하지 않고 다시 해석하지만, 수집
+   * 시점의 판정 근거를 보존한다.
+   */
+  categories: MvpCategoryId[];
+  /** 어느 분류 경로로 판정했는지(`lcls` 우선, `legacy` 하위 호환). */
+  classificationBasis?: "lcls" | "legacy";
   contentTypeId: string;
   address: string;
   imageUrl: string;
+  /** TourAPI `cpyrhtDivCd`. 이미지 존재로 사용권한을 추정하지 않는다. */
+  imageCopyright?: string;
   mapX: string;
   mapY: string;
   cat1: string;
   cat2: string;
   cat3: string;
+  /** 새 공식 분류(`lclsSystmCode2`). 구 수집본에는 없어 선택 필드다. */
+  lclsSystm1?: string;
+  lclsSystm2?: string;
+  lclsSystm3?: string;
+  /** 공식 목록에 없는 `lclsSystm*` 코드. 임의로 덮지 않고 보존한다. */
+  unresolvedLcls?: string[];
+  /** TourAPI 원천 수정일(`modifiedtime`). 구 수집본에는 없다. */
+  sourceModifiedAt?: string;
+  /** 이 레코드를 판정한 공식 분류 목록 버전. 구 수집본에는 없다. */
+  classificationVersion?: string;
 };
 
 export type RegionProfile = Pick<
@@ -46,19 +62,16 @@ export type RegionProfile = Pick<
 };
 
 export type RegionProfileDocument = {
-  schemaVersion: 1;
+  schemaVersion: 2;
+  classificationVersion: string;
   source: {
     tourApi: "KorService2/areaBasedList2";
+    querySpecs: string[];
     mappingGeneratedAt: string;
-    categories: Array<{
-      id: MvpCategoryId;
-      filters: Array<{
-        cat1?: string;
-        cat2?: string;
-        contentTypeId?: string;
-      }>;
-    }>;
     requestCount: number;
+    retryCount: number;
+    failedRequestCount: number;
+    runId: string;
   };
   generatedAt: string;
   profiles: RegionProfile[];
@@ -72,7 +85,7 @@ export function attractionsForCategory(
 ): RegionAttraction[] {
   const byContentId = new Map<string, RegionAttraction>();
   for (const attraction of profile.attractions) {
-    if (attraction.categoryId !== categoryId) continue;
+    if (!attraction.categories.includes(categoryId)) continue;
     byContentId.set(attraction.contentId, attraction);
   }
   return [...byContentId.values()];

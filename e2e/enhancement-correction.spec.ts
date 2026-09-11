@@ -65,7 +65,10 @@ async function setup(page: Page, origin: "서울특별시" | "부산광역시") 
     await history.click();
   await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
   const results = page.getByRole("region", { name: "목적지 추천" });
-  await expect(results.locator(".dd-candidate").first()).toBeVisible();
+  // 실제 검색 엔진이 전국 프로필을 도는 첫 요청이라 dev 서버에서 수 초 걸릴 수 있다.
+  await expect(results.locator(".dd-candidate").first()).toBeVisible({
+    timeout: 20_000,
+  });
   expect(calls).toEqual({ meals: 0, details: 0 });
   await results
     .getByRole("button", { name: /일정 보기$/ })
@@ -257,4 +260,114 @@ test("R6 부산 개인 일정 날짜/시간·14시 고정·숙소 메모·불가
     meals: 1,
     details: original.metrics.attractionCount,
   });
+});
+
+test("T7 카드의 목적 적합성 구간·확정 연결 시설 수가 실제 초안 배치와 맞고 시간표 제약을 지킨다", async ({
+  page,
+}) => {
+  let response: { candidates: PlanSnapshot["destination"][] };
+  page.on("response", async (result) => {
+    if (result.url().endsWith("/api/search") && result.ok())
+      response = await result.json();
+  });
+  await page.route("**/api/phase-two/restaurants", async (route) => {
+    const body = route.request().postDataJSON();
+    const candidate = response.candidates.find(
+      (c) => c.groupId === body.groupId,
+    )!;
+    await route.fulfill({
+      json: {
+        kind: "success",
+        restaurants: Array.from({ length: 8 }, (_, index) => ({
+          contentId: `restaurant-${index}`,
+          regionId: candidate.memberRegionIds[0],
+          name: `검증 식당 ${index + 1}`,
+          address: `${candidate.displayName} 음식점 주소 ${index}`,
+          phone: "",
+          imageUrl: "",
+          coordinates: candidate.attractions[0]?.coordinates ?? null,
+          certified: false,
+          foodCultureMatch: false,
+          fetchedAt: "2026-09-09T00:00:00Z",
+        })),
+        queriedRegionIds: candidate.memberRegionIds.slice(0, 1),
+        failedRegionIds: [],
+        truncated: false,
+        fetchedAt: "2026-09-09T00:00:00Z",
+        message: "목록 확인",
+      },
+    });
+  });
+  await page.route("**/api/attractions/**", async (route) => {
+    await route.fulfill({
+      json: {
+        kind: "success",
+        detail: {
+          title: { status: "confirmed", value: "관광지 정보" },
+          address: { status: "unknown" },
+          overview: { status: "confirmed", value: "공공데이터 소개" },
+          openingHours: { status: "unknown" },
+          closedDays: { status: "unknown" },
+          fees: { status: "unknown" },
+          phone: { status: "unknown" },
+          imageUrl: "",
+          fetchedAt: "2026-09-09T00:00:00Z",
+        },
+      },
+    });
+  });
+
+  await page.goto("/");
+  await page.getByRole("radio", { name: "서울특별시" }).check();
+  await page.getByLabel("출발 일시").fill("2026-09-12T08:00");
+  await page.getByLabel("다음날 귀가 완료 일시").fill("2026-09-13T20:00");
+  for (const name of ["역사", "문화"]) {
+    const box = page.getByRole("checkbox", { name });
+    if ((await box.getAttribute("aria-checked")) !== "true") await box.click();
+  }
+  await page.getByRole("button", { name: "갈 수 있는 곳 찾기" }).click();
+
+  const results = page.getByRole("region", { name: "목적지 추천" });
+  const interestCard = results.locator(".dd-candidate").first();
+  await expect(interestCard).toBeVisible({ timeout: 20_000 });
+
+  const basis = interestCard.locator("details.p2-basis");
+  await basis.locator("summary").click();
+  const basisText = (await basis.innerText()).replace(/\s+/gu, " ");
+  // 목적 점수는 노출하되 과장 표현("전국 1위"·"가장 인기")은 없어야 한다(D4).
+  // 면책 문구 "…평점·영업 보장이 아니에요"는 허용한다.
+  expect(basisText).not.toMatch(/전국 역사 1위|가장 인기 있는/);
+  // T7(D4): 원점수 대신 목적 적합성 구간을 노출한다.
+  expect(basisText).toMatch(/목적 적합성 구간/);
+  const hubMatch = basisText.match(
+    /확정 연결 시설 (\d+)곳|(\d+)곳이 중심 관광지에 확정 연결/,
+  );
+  const claimedHubCount = hubMatch ? Number(hubMatch[1] ?? hubMatch[2]) : 0;
+
+  await interestCard.getByRole("button", { name: /일정 보기$/ }).click();
+  const plan = page.getByRole("region", { name: "여행 계획" });
+  await expect(page.locator(".p2-block--restaurant").first()).toBeVisible();
+
+  // 중심 근거로 주장한 관광지 수 ≤ 실제 초안에 배치된 관광지 수.
+  const attractionCount = await page.locator(".p2-block--attraction").count();
+  expect(attractionCount).toBeGreaterThanOrEqual(claimedHubCount);
+  expect(attractionCount).toBeGreaterThan(0);
+
+  // 시간표 제약: 야간 휴식 고정, 점심·저녁 식사, 출발·복귀 블록.
+  await expect(page.locator(".p2-block--rest").first()).toBeVisible();
+  expect(
+    await page.locator(".p2-block--restaurant").count(),
+  ).toBeGreaterThanOrEqual(2);
+  await expect(plan).toContainText("출발");
+  await expect(plan).toContainText(/복귀|귀가/);
+
+  // 저장 → 새로고침 → 복원.
+  await page.getByRole("button", { name: "이 기기에 저장" }).click();
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem("duruduru.plans.v3")))
+    .not.toBeNull();
+  await page.reload();
+  await page.getByRole("button", { name: "저장한 여행" }).click();
+  await page.getByRole("button", { name: "불러오기" }).click();
+  await expect(page.getByRole("region", { name: "여행 계획" })).toBeVisible();
 });

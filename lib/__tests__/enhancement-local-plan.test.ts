@@ -91,6 +91,48 @@ describe("현지 이동 공통 엔진·식사·저장 통합", () => {
     expect(restored.blocks).toEqual(plan.blocks);
     expect(restored.localTravelVersion).toBe("straight-line-v1");
   });
+  it("이동 구간 distanceKm의 엔진 간 1 ULP 차이는 저장을 막지 않는다", () => {
+    // 서버(Node)가 만든 계획을 브라우저(Chromium)가 검증할 때 Math.sin/asin
+    // 결과가 최대 1 ULP 다를 수 있어 저장이 거부되던 회귀.
+    const plan = fixture();
+    const perturbed = {
+      ...plan,
+      blocks: plan.blocks.map((block, index) =>
+        block.localTravel && block.localTravel.distanceKm !== null
+          ? {
+              ...block,
+              localTravel: {
+                ...block.localTravel,
+                distanceKm:
+                  block.localTravel.distanceKm +
+                  (index % 2 ? 1 : -1) * 4e-16 * block.localTravel.distanceKm,
+              },
+            }
+          : block,
+      ),
+    };
+    expect(perturbed.blocks).not.toEqual(plan.blocks);
+    expect(planTimeError(perturbed)).toBeUndefined();
+    expect(savePlan(perturbed).error).toBeUndefined();
+    // 실제로 어긋난 거리(1mm 초과)는 여전히 거부한다.
+    const broken = {
+      ...plan,
+      blocks: plan.blocks.map((block) =>
+        block.localTravel && block.localTravel.distanceKm !== null
+          ? {
+              ...block,
+              localTravel: {
+                ...block.localTravel,
+                distanceKm: block.localTravel.distanceKm + 0.5,
+              },
+            }
+          : block,
+      ),
+    };
+    expect(planTimeError(broken)).toBe(
+      "장소 간 이동시간과 일정이 일치하지 않아요.",
+    );
+  });
   it("식당 배정 후 양쪽 이동이 재계산되고 끼니별 식당이 다르다", () => {
     const original = fixture();
     const plan = assignRestaurants(original, [

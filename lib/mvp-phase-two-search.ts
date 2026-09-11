@@ -19,12 +19,18 @@ import {
   type Attraction,
   type Candidate,
   type CandidateRecommendation,
+  type PurposeEvidence,
   type RecommendedCandidate,
   type RecommendationRole,
   type SearchInput,
   type SearchResponse,
 } from "@/lib/mvp-phase-two-types";
 import { originRegion } from "@/lib/origin-regions";
+import { classifyInterests } from "@/lib/interest-classification";
+import {
+  computePurposeEvidence,
+  hubRankForSelection,
+} from "@/lib/tourism-evidence";
 
 export { groupForMapping } from "@/lib/mvp-phase-two-regions";
 const zoneIndices = new Map(
@@ -43,15 +49,15 @@ export function regionMappingFor(regionId: string): RegionMapping | null {
   return mappings.get(regionId) ?? null;
 }
 function categoriesFor(place: RegionAttraction): MvpCategoryId[] {
-  const result: MvpCategoryId[] = [];
-  if (place.cat1 === "A01") result.push("nature");
-  if (place.cat2 === "A0201") result.push("history");
-  if (place.cat2 === "A0202") result.push("rest");
-  if (place.cat2 === "A0206" || place.contentTypeId === "14")
-    result.push("culture");
-  if (place.cat1 === "A03" || place.contentTypeId === "28")
-    result.push("leisure");
-  return result;
+  return classifyInterests({
+    lclsSystm1: place.lclsSystm1,
+    lclsSystm2: place.lclsSystm2,
+    lclsSystm3: place.lclsSystm3,
+    cat1: place.cat1,
+    cat2: place.cat2,
+    cat3: place.cat3,
+    contentTypeId: place.contentTypeId,
+  }).categories;
 }
 function normalizedAttraction(
   place: RegionAttraction,
@@ -82,6 +88,9 @@ function normalizedAttraction(
     cat1: place.cat1,
     cat2: place.cat2,
     cat3: place.cat3,
+    ...(place.lclsSystm1 ? { lclsSystm1: place.lclsSystm1 } : {}),
+    ...(place.lclsSystm2 ? { lclsSystm2: place.lclsSystm2 } : {}),
+    ...(place.lclsSystm3 ? { lclsSystm3: place.lclsSystm3 } : {}),
   };
 }
 export function attractionFor(
@@ -148,6 +157,7 @@ function recommendationFor(
   candidate: Omit<Candidate, "recommendation" | "reasons">,
   role: RecommendationRole,
   requestedInterests: MvpCategoryId[],
+  purpose?: PurposeEvidence,
 ): CandidateRecommendation {
   const { metrics } = candidate.preview;
   const fulfilled = requestedInterests.filter((interest) =>
@@ -156,7 +166,8 @@ function recommendationFor(
   const distance = actualDistanceMetrics(candidate);
   return {
     role,
-    algorithmVersion: "e1-v1",
+    algorithmVersion: "e1-v3",
+    ...(purpose ? { purpose } : {}),
     roundTripMinutes: candidate.oneWayMinutes * 2,
     fulfilledInterestCount: fulfilled.length,
     attractionCount: metrics.attractionCount,
@@ -168,6 +179,29 @@ function recommendationFor(
       (interest) => !fulfilled.includes(interest),
     ),
   };
+}
+
+/**
+ * `interest` 정렬의 2번째 키(D4). 저장본에 근거가 없으면(`unavailable`) 0으로 둔다.
+ * 중심 자료가 없어도(`no-central-data`) 구간은 실제 일정 지표로 정상 계산된다.
+ */
+function purposeFitBandOf(recommendation: CandidateRecommendation): number {
+  const purpose = recommendation.purpose;
+  if (!purpose || purpose.status === "unavailable" || purpose.fitBand == null)
+    return 0;
+  return purpose.fitBand;
+}
+
+/**
+ * `interest` 정렬의 보조 동점 키(D4). 확정 연결된 초안 배치 시설 수(상한 적용).
+ * 하위 구 개수·구별 순위 숫자에 불변이다.
+ */
+function matchedFacilityCountOf(
+  recommendation: CandidateRecommendation,
+): number {
+  const purpose = recommendation.purpose;
+  if (!purpose || purpose.status === "unavailable") return 0;
+  return purpose.matchedFacilityCount ?? 0;
 }
 
 function compareByRole(
@@ -185,11 +219,14 @@ function compareByRole(
       compareNumber(b.attractionCount, a.attractionCount) ||
       compareNumber(b.categoryDiversity, a.categoryDiversity);
   if (role === "interest")
+    // D4: 충족 관심사 수 ↓ → 목적 적합성 구간 ↓ → 왕복시간 ↑ → 상한 적용 중심
+    // 연결 시설 수 ↓ → groupId ↑. 같은 구간에서 원점수·관광 수를 왕복시간 앞에
+    // 다시 넣지 않는다. 더 높은 구간이면 먼 지역도 선정될 수 있다.
     result =
       compareNumber(b.fulfilledInterestCount, a.fulfilledInterestCount) ||
-      compareNumber(b.categoryDiversity, a.categoryDiversity) ||
-      compareNumber(b.attractionCount, a.attractionCount) ||
-      compareNumber(a.roundTripMinutes, b.roundTripMinutes);
+      compareNumber(purposeFitBandOf(b), purposeFitBandOf(a)) ||
+      compareNumber(a.roundTripMinutes, b.roundTripMinutes) ||
+      compareNumber(matchedFacilityCountOf(b), matchedFacilityCountOf(a));
   if (role === "relaxed") {
     result =
       compareNumber(
@@ -203,6 +240,55 @@ function compareByRole(
       compareNumber(a.roundTripMinutes, b.roundTripMinutes);
   }
   return result || compareText(left.groupId, right.groupId);
+}
+
+const bandLabel = ["보통", "충실", "매우 충실"];
+
+/**
+ * 목적 적합성 근거 문구(D4). 실제 초안의 관심사별 시설·세부 유형 수로 만든 구간과
+ * 보조(중심 연결) 근거를 구분한다. 원천명·기준월은 근거 펼치기에 둔다. 중심 근거가
+ * 없는 카드에는 중심 관광지 문구를 붙이지 않는다.
+ */
+function purposeReasons(
+  purpose: PurposeEvidence | undefined,
+  requestedInterests: MvpCategoryId[],
+): string[] {
+  if (!purpose || purpose.status === "unavailable" || purpose.fitBand == null)
+    return [];
+  const baseYm = purpose.baseYm
+    ? `${purpose.baseYm.slice(0, 4)}-${purpose.baseYm.slice(4, 6)}`
+    : "미상";
+  const perInterestText = requestedInterests
+    .map((interest) => {
+      const fit = purpose.fitByInterest?.[interest];
+      if (!fit) return null;
+      return `${categoryLabels.get(interest)} 시설 ${fit.facilities}곳·세부 유형 ${fit.types}종`;
+    })
+    .filter((value): value is string => value !== null)
+    .join(" · ");
+  const lines = [
+    `실제 초안의 목적 적합성 구간 ${bandLabel[purpose.fitBand] ?? purpose.fitBand}${
+      perInterestText ? ` (${perInterestText})` : ""
+    }. 요청 관심사·장소 수를 늘려도 상한까지만 반영해요.`,
+  ];
+  const matchedFacilityCount = purpose.matchedFacilityCount ?? 0;
+  if (purpose.status === "no-central-data")
+    lines.push(
+      "이 지역은 중심 관광지 연계 자료가 없어 보조 근거는 없어요. 지역의 매력이 없다는 뜻이 아니에요.",
+    );
+  else if (matchedFacilityCount > 0)
+    lines.push(
+      `보조 근거: 초안 배치 시설 중 ${matchedFacilityCount}곳이 중심 관광지에 확정 연결돼요. 티맵 기반 지역 연계 방문 중심성(기준월 ${baseYm})이며 전국 인기·평점·영업 보장이 아니에요.`,
+    );
+  else
+    lines.push(
+      `보조 근거: 초안 배치 시설 중 중심 관광지에 확정 연결된 곳이 없어요 (기준월 ${baseYm}).`,
+    );
+  if (purpose.centralEmptyRegionIds.length)
+    lines.push(
+      `구성 지역 ${purpose.centralEmptyRegionIds.length}곳은 중심 관광지 자료가 없어 보조 근거에 반영되지 않았어요.`,
+    );
+  return lines;
 }
 
 function reasonsFor(recommendation: CandidateRecommendation): string[] {
@@ -223,6 +309,10 @@ function reasonsFor(recommendation: CandidateRecommendation): string[] {
   return [
     `${roleTitle[recommendation.role]} · 왕복 자동차 일반 예상시간 ${recommendation.roundTripMinutes}분`,
     `${included || "선택 관심사 없음"} 포함 · 관광 ${recommendation.attractionCount}곳 · 현지 낮 자유시간 ${recommendation.localFreeMinutes}분${missing ? ` · ${missing} 미포함` : ""}`,
+    ...purposeReasons(
+      recommendation.purpose,
+      recommendation.requestedInterests,
+    ),
     ...(recommendation.proximityComparable
       ? [
           `당일 연속 관광지 ${recommendation.distancePairCount}쌍의 직선거리 근거를 확인했어요. 지역 내부 이동시간은 계산하지 않아요.`,
@@ -236,12 +326,14 @@ function reasonsFor(recommendation: CandidateRecommendation): string[] {
 export function selectCandidateRoles(
   candidates: Array<Omit<Candidate, "recommendation" | "reasons">>,
   requestedInterests: MvpCategoryId[],
+  purposeByGroupId?: Map<string, PurposeEvidence>,
 ): RecommendedCandidate[] {
   const prepared = candidates.map((candidate) => {
     const recommendation = recommendationFor(
       candidate,
-      "easy",
+      "interest",
       requestedInterests,
+      purposeByGroupId?.get(candidate.groupId),
     );
     return {
       ...candidate,
@@ -250,7 +342,7 @@ export function selectCandidateRoles(
     };
   });
   const selected: RecommendedCandidate[] = [];
-  for (const role of ["easy", "interest", "relaxed"] as const) {
+  for (const role of ["interest", "easy", "relaxed"] as const) {
     const winner = prepared
       .filter(
         (candidate) =>
@@ -333,6 +425,7 @@ export function searchPhaseTwo(
     }
   }
   const candidates: Array<Omit<Candidate, "recommendation" | "reasons">> = [];
+  const purposeByGroupId = new Map<string, PurposeEvidence>();
   const timingCache: SchedulingCache = new Map();
   let classifiedGroups = 0,
     timingFailures = 0;
@@ -347,11 +440,24 @@ export function searchPhaseTwo(
       undefined,
       [],
       timingCache,
+      hubRankForSelection,
     );
     if (!preview.ok) {
       timingFailures++;
       continue;
     }
+    // 목적 근거 점수의 근거 장소는 "실제 초안에 배치된" 관광지뿐이다(D4·수용 기준 4).
+    const placedAttractions = preview.blocks.flatMap((block) =>
+      block.kind === "attraction" && block.attraction ? [block.attraction] : [],
+    );
+    purposeByGroupId.set(
+      group.groupId,
+      computePurposeEvidence(
+        placedAttractions,
+        input.interests,
+        group.memberRegionIds,
+      ),
+    );
     candidates.push({
       groupId: group.groupId,
       memberRegionIds: group.memberRegionIds.sort(),
@@ -384,7 +490,11 @@ export function searchPhaseTwo(
   return {
     kind: "success",
     searchId,
-    candidates: selectCandidateRoles(candidates, input.interests),
+    candidates: selectCandidateRoles(
+      candidates,
+      input.interests,
+      purposeByGroupId,
+    ),
     profileGeneratedAt: profiles.generatedAt,
   };
 }

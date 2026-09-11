@@ -65,6 +65,9 @@ function attraction(v: unknown): v is Attraction {
     ["12", "14", "28"].includes(v.contentTypeId) &&
     id(v.regionId) &&
     [v.title, v.address, v.imageUrl, v.cat1, v.cat2, v.cat3].every(text) &&
+    [v.lclsSystm1, v.lclsSystm2, v.lclsSystm3].every(
+      (code) => code === undefined || text(code),
+    ) &&
     categories(v.categories) &&
     coordinates(v.coordinates)
   );
@@ -97,6 +100,59 @@ function metrics(v: unknown): v is PlanMetrics {
     (v.averageDistanceKm === null || finite(v.averageDistanceKm))
   );
 }
+function purposeEvidence(v: unknown): boolean {
+  if (v === undefined) return true;
+  if (!object(v)) return false;
+  const status = String(v.status);
+  if (!["scored", "no-central-data", "unavailable"].includes(status))
+    return false;
+  if (
+    !text(v.version) ||
+    !text(v.baseYm) ||
+    !(v.score === null || (finite(v.score) && v.score <= 1)) ||
+    !object(v.perInterest) ||
+    !Object.entries(v.perInterest).every(
+      ([key, value]) =>
+        INTERESTS.some((i) => i.id === key) && finite(value) && value <= 1,
+    ) ||
+    !Array.isArray(v.contributingContentIds) ||
+    !v.contributingContentIds.every(id) ||
+    !Array.isArray(v.centralEmptyRegionIds) ||
+    !v.centralEmptyRegionIds.every(id) ||
+    !finite(v.matchedHubCount)
+  )
+    return false;
+  // T7(e1-v3) 새 필드. 이전(e1-v2) 저장본에는 없어 모두 선택 필드다.
+  if (
+    v.fitBand !== undefined &&
+    v.fitBand !== null &&
+    !(finite(v.fitBand) && Number.isInteger(v.fitBand) && v.fitBand <= 2)
+  )
+    return false;
+  if (
+    v.fitAverage !== undefined &&
+    v.fitAverage !== null &&
+    !finite(v.fitAverage)
+  )
+    return false;
+  if (v.matchedFacilityCount !== undefined && !finite(v.matchedFacilityCount))
+    return false;
+  if (v.fitByInterest !== undefined) {
+    if (!object(v.fitByInterest)) return false;
+    if (
+      !Object.entries(v.fitByInterest).every(
+        ([key, value]) =>
+          INTERESTS.some((i) => i.id === key) &&
+          object(value) &&
+          finite(value.facilities) &&
+          finite(value.types) &&
+          finite(value.fit),
+      )
+    )
+      return false;
+  }
+  return true;
+}
 function recommendation(v: unknown): v is CandidateRecommendation {
   if (!object(v)) return false;
   const pairCount = v.distancePairCount;
@@ -105,7 +161,8 @@ function recommendation(v: unknown): v is CandidateRecommendation {
   const missingInterests = v.missingInterests;
   return (
     ["easy", "interest", "relaxed"].includes(String(v.role)) &&
-    v.algorithmVersion === "e1-v1" &&
+    ["e1-v1", "e1-v2", "e1-v3"].includes(String(v.algorithmVersion)) &&
+    purposeEvidence(v.purpose) &&
     [
       v.roundTripMinutes,
       v.fulfilledInterestCount,
@@ -263,7 +320,9 @@ function candidate(v: unknown): v is Candidate {
     !v.reasons.every(text) ||
     (v.recommendation !== undefined && !recommendation(v.recommendation)) ||
     (v.itineraryAlgorithmVersion !== undefined &&
-      v.itineraryAlgorithmVersion !== "e2-v1") ||
+      !["e2-v1", "e2-v2", "e2-v3"].includes(
+        String(v.itineraryAlgorithmVersion),
+      )) ||
     !object(v.metadata)
   )
     return false;
@@ -430,6 +489,9 @@ function cleanAttraction(a: Attraction): Attraction {
     cat1: a.cat1,
     cat2: a.cat2,
     cat3: a.cat3,
+    ...(a.lclsSystm1 ? { lclsSystm1: a.lclsSystm1 } : {}),
+    ...(a.lclsSystm2 ? { lclsSystm2: a.lclsSystm2 } : {}),
+    ...(a.lclsSystm3 ? { lclsSystm3: a.lclsSystm3 } : {}),
   };
 }
 function cleanRestaurant(r: Restaurant): Restaurant {
@@ -494,6 +556,38 @@ function cleanMetrics(m: PlanMetrics): PlanMetrics {
     averageDistanceKm: m.averageDistanceKm,
   };
 }
+function cleanPurpose(
+  purpose: NonNullable<CandidateRecommendation["purpose"]>,
+): NonNullable<CandidateRecommendation["purpose"]> {
+  return {
+    version: purpose.version,
+    baseYm: purpose.baseYm,
+    status: purpose.status,
+    // T7(e1-v3) 새 필드. 이전 저장본에는 없어 있을 때만 보존한다.
+    ...(purpose.fitBand !== undefined ? { fitBand: purpose.fitBand } : {}),
+    ...(purpose.fitAverage !== undefined
+      ? { fitAverage: purpose.fitAverage }
+      : {}),
+    ...(purpose.fitByInterest !== undefined
+      ? {
+          fitByInterest: Object.fromEntries(
+            Object.entries(purpose.fitByInterest).map(([key, value]) => [
+              key,
+              { ...value },
+            ]),
+          ),
+        }
+      : {}),
+    ...(purpose.matchedFacilityCount !== undefined
+      ? { matchedFacilityCount: purpose.matchedFacilityCount }
+      : {}),
+    score: purpose.score,
+    perInterest: { ...purpose.perInterest },
+    contributingContentIds: [...purpose.contributingContentIds],
+    centralEmptyRegionIds: [...purpose.centralEmptyRegionIds],
+    matchedHubCount: purpose.matchedHubCount,
+  };
+}
 function cleanRecommendation(
   recommendation: CandidateRecommendation | undefined,
 ): CandidateRecommendation | undefined {
@@ -501,6 +595,9 @@ function cleanRecommendation(
     ? {
         role: recommendation.role,
         algorithmVersion: recommendation.algorithmVersion,
+        ...(recommendation.purpose
+          ? { purpose: cleanPurpose(recommendation.purpose) }
+          : {}),
         roundTripMinutes: recommendation.roundTripMinutes,
         fulfilledInterestCount: recommendation.fulfilledInterestCount,
         attractionCount: recommendation.attractionCount,

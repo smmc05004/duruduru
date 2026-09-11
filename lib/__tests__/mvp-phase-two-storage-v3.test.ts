@@ -167,3 +167,72 @@ describe("E4 v3 저장 이관", () => {
     expect(readSavedPlans().plans).toEqual([]);
   });
 });
+
+describe("T5 목적 근거 필드 저장 하위호환", () => {
+  const purpose = {
+    version: "e92fe6b14b65c1a5",
+    baseYm: "202608",
+    status: "scored" as const,
+    score: 0.42,
+    perInterest: { history: 0.42 },
+    contributingContentIds: ["126537"],
+    centralEmptyRegionIds: [],
+    matchedHubCount: 1,
+  };
+  const legacyRecommendation = {
+    role: "easy" as const,
+    algorithmVersion: "e1-v1" as const,
+    roundTripMinutes: 240,
+    fulfilledInterestCount: 1,
+    attractionCount: 3,
+    categoryDiversity: 1,
+    localFreeMinutes: 120,
+    distancePairCount: 0,
+    validDistancePairCount: 0,
+    averageDistanceKm: null,
+    proximityComparable: false,
+    requestedInterests: ["history"] as const,
+    missingInterests: [] as const,
+  };
+
+  it("근거 필드가 없는 e1-v1 저장본은 그대로(이전 상태로) 복원된다", () => {
+    const plan = savedPlan();
+    plan.destination.recommendation = { ...legacyRecommendation };
+    expect(isSavedPlan({ ...plan, savedAt: "2026-09-01T00:00:00Z" })).toBe(
+      true,
+    );
+    const write = savePlan(plan);
+    expect(write.error).toBeUndefined();
+    const back = readSavedPlans().plans[0];
+    expect(back.destination.recommendation?.algorithmVersion).toBe("e1-v1");
+    expect(back.destination.recommendation?.purpose).toBeUndefined();
+  });
+
+  it("e1-v2 + purpose 저장본은 근거 필드를 round-trip 한다", () => {
+    const plan = savedPlan();
+    plan.destination.recommendation = {
+      ...legacyRecommendation,
+      algorithmVersion: "e1-v2",
+      purpose,
+    };
+    expect(isSavedPlan({ ...plan, savedAt: "2026-09-01T00:00:00Z" })).toBe(
+      true,
+    );
+    expect(savePlan(plan).error).toBeUndefined();
+    expect(
+      readSavedPlans().plans[0].destination.recommendation?.purpose,
+    ).toEqual(purpose);
+  });
+
+  it("망가진 purpose(점수 상한 초과)는 저장본을 거절한다", () => {
+    const plan = savedPlan();
+    plan.destination.recommendation = {
+      ...legacyRecommendation,
+      algorithmVersion: "e1-v2",
+      purpose: { ...purpose, score: 1.5 },
+    };
+    expect(isSavedPlan({ ...plan, savedAt: "2026-09-01T00:00:00Z" })).toBe(
+      false,
+    );
+  });
+});
