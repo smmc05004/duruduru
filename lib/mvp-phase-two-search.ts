@@ -166,7 +166,7 @@ function recommendationFor(
   const distance = actualDistanceMetrics(candidate);
   return {
     role,
-    algorithmVersion: "e1-v2",
+    algorithmVersion: "e1-v3",
     ...(purpose ? { purpose } : {}),
     roundTripMinutes: candidate.oneWayMinutes * 2,
     fulfilledInterestCount: fulfilled.length,
@@ -181,12 +181,27 @@ function recommendationFor(
   };
 }
 
-/** 저장본에 근거가 없거나(`unavailable`) 중심 자료가 없으면 0으로 정렬한다. */
-function purposeScoreOf(recommendation: CandidateRecommendation): number {
+/**
+ * `interest` 정렬의 2번째 키(D4). 저장본에 근거가 없으면(`unavailable`) 0으로 둔다.
+ * 중심 자료가 없어도(`no-central-data`) 구간은 실제 일정 지표로 정상 계산된다.
+ */
+function purposeFitBandOf(recommendation: CandidateRecommendation): number {
   const purpose = recommendation.purpose;
-  if (!purpose || purpose.status === "unavailable" || purpose.score === null)
+  if (!purpose || purpose.status === "unavailable" || purpose.fitBand == null)
     return 0;
-  return purpose.score;
+  return purpose.fitBand;
+}
+
+/**
+ * `interest` 정렬의 보조 동점 키(D4). 확정 연결된 초안 배치 시설 수(상한 적용).
+ * 하위 구 개수·구별 순위 숫자에 불변이다.
+ */
+function matchedFacilityCountOf(
+  recommendation: CandidateRecommendation,
+): number {
+  const purpose = recommendation.purpose;
+  if (!purpose || purpose.status === "unavailable") return 0;
+  return purpose.matchedFacilityCount ?? 0;
 }
 
 function compareByRole(
@@ -204,12 +219,14 @@ function compareByRole(
       compareNumber(b.attractionCount, a.attractionCount) ||
       compareNumber(b.categoryDiversity, a.categoryDiversity);
   if (role === "interest")
+    // D4: 충족 관심사 수 ↓ → 목적 적합성 구간 ↓ → 왕복시간 ↑ → 상한 적용 중심
+    // 연결 시설 수 ↓ → groupId ↑. 같은 구간에서 원점수·관광 수를 왕복시간 앞에
+    // 다시 넣지 않는다. 더 높은 구간이면 먼 지역도 선정될 수 있다.
     result =
       compareNumber(b.fulfilledInterestCount, a.fulfilledInterestCount) ||
-      compareNumber(purposeScoreOf(b), purposeScoreOf(a)) ||
-      compareNumber(b.categoryDiversity, a.categoryDiversity) ||
-      compareNumber(b.attractionCount, a.attractionCount) ||
-      compareNumber(a.roundTripMinutes, b.roundTripMinutes);
+      compareNumber(purposeFitBandOf(b), purposeFitBandOf(a)) ||
+      compareNumber(a.roundTripMinutes, b.roundTripMinutes) ||
+      compareNumber(matchedFacilityCountOf(b), matchedFacilityCountOf(a));
   if (role === "relaxed") {
     result =
       compareNumber(
@@ -225,32 +242,53 @@ function compareByRole(
   return result || compareText(left.groupId, right.groupId);
 }
 
+const bandLabel = ["보통", "충실", "매우 충실"];
+
 /**
- * 목적 근거 문구. 원천명·기준월·연결 상태·세부 점수는 카드 본문이 아니라 근거
- * 펼치기에 들어간다(D4). 중심 근거가 없는 카드에는 중심 관광지 문구를 붙이지 않는다.
+ * 목적 적합성 근거 문구(D4). 실제 초안의 관심사별 시설·세부 유형 수로 만든 구간과
+ * 보조(중심 연결) 근거를 구분한다. 원천명·기준월은 근거 펼치기에 둔다. 중심 근거가
+ * 없는 카드에는 중심 관광지 문구를 붙이지 않는다.
  */
-function purposeReasons(purpose?: PurposeEvidence): string[] {
-  if (!purpose || purpose.status === "unavailable") return [];
+function purposeReasons(
+  purpose: PurposeEvidence | undefined,
+  requestedInterests: MvpCategoryId[],
+): string[] {
+  if (!purpose || purpose.status === "unavailable" || purpose.fitBand == null)
+    return [];
   const baseYm = purpose.baseYm
     ? `${purpose.baseYm.slice(0, 4)}-${purpose.baseYm.slice(4, 6)}`
     : "미상";
-  if (purpose.status === "no-central-data")
-    return [
-      "이 지역은 중심 관광지 자료가 없어 목적 근거 점수는 0이에요. 지역의 매력이 없다는 뜻이 아니에요.",
-    ];
-  if (!purpose.contributingContentIds.length)
-    return [
-      `실제 초안 관광지 중 확정 연결된 중심 관광지가 없어 목적 근거 점수는 0이에요 (기준월 ${baseYm}).`,
-    ];
-  const score = (purpose.score ?? 0).toFixed(2);
-  return [
-    `실제 초안에 배치한 중심 관광지 ${purpose.contributingContentIds.length}곳으로 목적 근거 점수 ${score}를 계산했어요. 티맵 기반 지역 연계 방문 중심성(기준월 ${baseYm})이며 전국 인기·평점·영업 보장이 아니에요.`,
-    ...(purpose.centralEmptyRegionIds.length
-      ? [
-          `구성 지역 ${purpose.centralEmptyRegionIds.length}곳은 중심 관광지 자료가 없어 점수에 반영되지 않았어요.`,
-        ]
-      : []),
+  const perInterestText = requestedInterests
+    .map((interest) => {
+      const fit = purpose.fitByInterest?.[interest];
+      if (!fit) return null;
+      return `${categoryLabels.get(interest)} 시설 ${fit.facilities}곳·세부 유형 ${fit.types}종`;
+    })
+    .filter((value): value is string => value !== null)
+    .join(" · ");
+  const lines = [
+    `실제 초안의 목적 적합성 구간 ${bandLabel[purpose.fitBand] ?? purpose.fitBand}${
+      perInterestText ? ` (${perInterestText})` : ""
+    }. 요청 관심사·장소 수를 늘려도 상한까지만 반영해요.`,
   ];
+  const matchedFacilityCount = purpose.matchedFacilityCount ?? 0;
+  if (purpose.status === "no-central-data")
+    lines.push(
+      "이 지역은 중심 관광지 연계 자료가 없어 보조 근거는 없어요. 지역의 매력이 없다는 뜻이 아니에요.",
+    );
+  else if (matchedFacilityCount > 0)
+    lines.push(
+      `보조 근거: 초안 배치 시설 중 ${matchedFacilityCount}곳이 중심 관광지에 확정 연결돼요. 티맵 기반 지역 연계 방문 중심성(기준월 ${baseYm})이며 전국 인기·평점·영업 보장이 아니에요.`,
+    );
+  else
+    lines.push(
+      `보조 근거: 초안 배치 시설 중 중심 관광지에 확정 연결된 곳이 없어요 (기준월 ${baseYm}).`,
+    );
+  if (purpose.centralEmptyRegionIds.length)
+    lines.push(
+      `구성 지역 ${purpose.centralEmptyRegionIds.length}곳은 중심 관광지 자료가 없어 보조 근거에 반영되지 않았어요.`,
+    );
+  return lines;
 }
 
 function reasonsFor(recommendation: CandidateRecommendation): string[] {
@@ -271,7 +309,10 @@ function reasonsFor(recommendation: CandidateRecommendation): string[] {
   return [
     `${roleTitle[recommendation.role]} · 왕복 자동차 일반 예상시간 ${recommendation.roundTripMinutes}분`,
     `${included || "선택 관심사 없음"} 포함 · 관광 ${recommendation.attractionCount}곳 · 현지 낮 자유시간 ${recommendation.localFreeMinutes}분${missing ? ` · ${missing} 미포함` : ""}`,
-    ...purposeReasons(recommendation.purpose),
+    ...purposeReasons(
+      recommendation.purpose,
+      recommendation.requestedInterests,
+    ),
     ...(recommendation.proximityComparable
       ? [
           `당일 연속 관광지 ${recommendation.distancePairCount}쌍의 직선거리 근거를 확인했어요. 지역 내부 이동시간은 계산하지 않아요.`,

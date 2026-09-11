@@ -12,10 +12,39 @@
  * - 중심 자료가 없는 지역은 점수 0의 사유를 보존하고 지역 매력 0으로 표현하지 않는다.
  */
 import evidence from "@/data/tourism-evidence.json";
-import type { Attraction, PurposeEvidence } from "@/lib/mvp-phase-two-types";
+import type {
+  Attraction,
+  PurposeEvidence,
+  PurposeFitInterest,
+} from "@/lib/mvp-phase-two-types";
 import type { MvpCategoryId } from "@/lib/mvp-region-data";
 import { MVP_CATEGORY_IDS } from "@/lib/mvp-region-data";
 import { facilityGroups } from "@/lib/mvp-phase-two-planner";
+import { detailClassificationStrict } from "@/lib/interest-classification";
+
+/**
+ * T7 / D4 목적 적합성 지표의 고정 상수. 공식 API가 주는 수치가 아니라 T7-1에서
+ * 기존 48개 사례로 제한 비교해 확정한 제품 휴리스틱이다. 선정 근거는
+ * `docs/product/TOURISM_RECOMMENDATION_UPGRADE.md` D4와
+ * `docs/development/TOURISM_RECOMMENDATION_T6_REPORT.md` T7 절에 있다.
+ *
+ * - `facilityCap`/`typeCap`: 관심사별 `fit = min(시설 수, facilityCap) + min(세부 유형 수, typeCap)`.
+ *   요청하지 않은 관심사·장소를 늘려 점수를 못 올리게 하는 포화 상한.
+ * - `bandBoundaries`: 요청 관심사 평균 `fit`를 3개 고정 구간(0·1·2)으로 나눈다.
+ *   `band = bandBoundaries.filter((b) => avg >= b).length`.
+ * - `matchedFacilityCap`: 보조(중심 연결) 근거 시설 수 상한.
+ */
+export const PURPOSE_FIT_METRIC = {
+  facilityCap: 4,
+  typeCap: 3,
+  bandBoundaries: [4.5, 6.5] as const,
+  matchedFacilityCap: 4,
+} as const;
+
+export function purposeFitBand(average: number): number {
+  return PURPOSE_FIT_METRIC.bandBoundaries.filter((bound) => average >= bound)
+    .length;
+}
 
 type RawMatched = {
   contentId: string;
@@ -104,8 +133,11 @@ export function hubRankForSelection(attraction: Attraction): number | null {
 const scoreValue = (hubRank: number) => 1 / Math.log2(1 + hubRank);
 
 /**
- * D4 목적 근거 점수. `placed`는 **실제 초안에 배치된 관광지**만 넘긴다.
- * 요청 관심사별로 중복 시설을 제거한 상위 3개 값의 합 ÷ 3, 전체 평균이 점수(0~1)다.
+ * D4 목적 적합성 근거. `placed`는 **실제 초안에 배치된 관광지**만 넘긴다.
+ *
+ * 정렬에 쓰는 값은 `fitBand`(요청 관심사별 서로 다른 시설 수·세부 유형 수에 포화
+ * 상한을 적용한 지표의 고정 구간)와 `matchedFacilityCount`(보조: 확정 연결 시설 수,
+ * 상한 적용)뿐이다. `score`(이전 `1/log2(1+hubRank)` 평균)는 참고용으로 보존한다.
  */
 export function computePurposeEvidence(
   placed: Attraction[],
@@ -120,6 +152,8 @@ export function computePurposeEvidence(
   );
 
   const groups = facilityGroups(placed);
+  const groupOf = (attraction: Attraction) =>
+    groups.get(attraction.contentId) ?? attraction.contentId;
   const withEvidence = placed
     .map((attraction) => ({
       attraction,
@@ -130,17 +164,41 @@ export function computePurposeEvidence(
         entry.hub !== null,
     );
 
+  const { facilityCap, typeCap, matchedFacilityCap } = PURPOSE_FIT_METRIC;
+  const fitByInterest: Partial<Record<MvpCategoryId, PurposeFitInterest>> = {};
   const perInterest: Partial<Record<MvpCategoryId, number>> = {};
   const contributing = new Set<string>();
+  /** 보조 근거: 확정 연결된, 초안 배치 관심사 시설의 서로 다른 시설 그룹. */
+  const matchedFacilityGroups = new Set<string>();
+
   for (const interest of requestedInterests) {
-    // 이 관심사의 근거가 될 수 있는, 초안에 배치된 관광지만.
-    const relevant = withEvidence.filter((entry) =>
+    const relevantPlaced = placed.filter((attraction) =>
+      attraction.categories.includes(interest),
+    );
+    // 서로 다른 시설 수: E2 시설 그룹으로 중복 제거.
+    const facilityGroupIds = new Set(relevantPlaced.map(groupOf));
+    // 세부 유형 수: D1 새 분류 우선, 분류 결측은 세지 않는다.
+    const typeKeys = new Set(
+      relevantPlaced
+        .map((attraction) => detailClassificationStrict(attraction))
+        .filter((value): value is string => value !== null),
+    );
+    const facilities = facilityGroupIds.size;
+    const types = typeKeys.size;
+    fitByInterest[interest] = {
+      facilities,
+      types,
+      fit: Math.min(facilities, facilityCap) + Math.min(types, typeCap),
+    };
+
+    // 참고 원점수(이전 e1-v2 의미): 관심사별 상위 3개 1/log2(1+hubRank) 합 ÷ 3.
+    const relevantWithHub = withEvidence.filter((entry) =>
       entry.attraction.categories.includes(interest),
     );
-    // 중복 시설 제거: 같은 시설 그룹은 가장 높은(작은 hubRank) 값 하나만 인정.
     const bestByGroup = new Map<string, { contentId: string; value: number }>();
-    for (const { attraction, hub } of relevant) {
-      const groupId = groups.get(attraction.contentId) ?? attraction.contentId;
+    for (const { attraction, hub } of relevantWithHub) {
+      const groupId = groupOf(attraction);
+      matchedFacilityGroups.add(groupId);
       const value = scoreValue(hub.hubRank);
       const current = bestByGroup.get(groupId);
       if (!current || value > current.value)
@@ -154,11 +212,18 @@ export function computePurposeEvidence(
     for (const entry of top3) contributing.add(entry.contentId);
   }
 
-  const score = requestedInterests.length
+  const requested = requestedInterests.length;
+  const score = requested
     ? requestedInterests.reduce(
         (sum, interest) => sum + (perInterest[interest] ?? 0),
         0,
-      ) / requestedInterests.length
+      ) / requested
+    : 0;
+  const fitAverage = requested
+    ? requestedInterests.reduce(
+        (sum, interest) => sum + (fitByInterest[interest]?.fit ?? 0),
+        0,
+      ) / requested
     : 0;
 
   return {
@@ -168,6 +233,13 @@ export function computePurposeEvidence(
       !anyCentral && centralEmptyRegionIds.length > 0
         ? "no-central-data"
         : "scored",
+    fitBand: purposeFitBand(fitAverage),
+    fitAverage,
+    fitByInterest,
+    matchedFacilityCount: Math.min(
+      matchedFacilityGroups.size,
+      matchedFacilityCap,
+    ),
     score,
     perInterest,
     contributingContentIds: [...contributing].sort(),

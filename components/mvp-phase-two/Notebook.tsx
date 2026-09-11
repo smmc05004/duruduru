@@ -193,11 +193,16 @@ export function NotebookCandidate({
               {recommendation.validDistancePairCount}/
               {recommendation.distancePairCount}개
               {recommendation.purpose &&
-              recommendation.purpose.status !== "unavailable"
-                ? ` · 목적 근거 점수 ${(recommendation.purpose.score ?? 0).toFixed(2)}${
+              recommendation.purpose.status !== "unavailable" &&
+              recommendation.purpose.fitBand != null
+                ? ` · 목적 적합성 구간 ${
+                    ["보통", "충실", "매우 충실"][
+                      recommendation.purpose.fitBand
+                    ] ?? recommendation.purpose.fitBand
+                  }${
                     recommendation.purpose.status === "scored" &&
-                    recommendation.purpose.contributingContentIds.length
-                      ? ` (중심 관광지 ${recommendation.purpose.contributingContentIds.length}곳 · 기준월 ${
+                    (recommendation.purpose.matchedFacilityCount ?? 0) > 0
+                      ? ` · 중심 관광지 확정 연결 시설 ${recommendation.purpose.matchedFacilityCount}곳 (기준월 ${
                           recommendation.purpose.baseYm
                             ? `${recommendation.purpose.baseYm.slice(0, 4)}-${recommendation.purpose.baseYm.slice(4, 6)}`
                             : "미상"

@@ -31,8 +31,12 @@ const normalizeFacilityAddress = (text: string) =>
     .replace(/\s*-\s*/gu, "-")
     .replace(/\s+/gu, " ")
     .trim();
-/** e2-v2: 초안 관광 선정에 중심 관광지 근거(hubRank) 동점 규칙을 추가(D4). */
-export const E2_ITINERARY_ALGORITHM_VERSION = "e2-v2" as const;
+/**
+ * e2-v3 (T7 / D4): 초안 관광 선정 순서를 미충족 관심사 → 세부 유형 다양성·근접성 →
+ * 중심 근거(확정 연결 여부, 보조) → 안정 ID로 재정렬. hubRank 숫자의 전국 공통
+ * 비교를 제거해 총순서(추이성)를 유지한다.
+ */
+export const E2_ITINERARY_ALGORITHM_VERSION = "e2-v3" as const;
 const GENERIC_FACILITY_TOKENS = new Set(
   [
     "관광지",
@@ -309,24 +313,25 @@ export function selectPlaces(
           }
           const interest = missing(b) - missing(a);
           if (interest) return interest;
-          if (centralHubRank) {
-            const rankA = centralHubRank(a);
-            const rankB = centralHubRank(b);
-            const hasEvidence = Number(rankB !== null) - Number(rankA !== null);
-            if (hasEvidence) return hasEvidence;
-            if (rankA !== null && rankB !== null && rankA !== rankB)
-              return rankA - rankB;
-          }
           const categoryDifference =
             Number(dayCategories.has(detailCategory(a))) -
             Number(dayCategories.has(detailCategory(b)));
           if (categoryDifference) return categoryDifference;
-          if (!previous) return compareId(a.contentId, b.contentId);
-          return (
-            (distanceKm(previous.coordinates, a.coordinates) ?? Infinity) -
-              (distanceKm(previous.coordinates, b.coordinates) ?? Infinity) ||
-            compareId(a.contentId, b.contentId)
-          );
+          const proximity = previous
+            ? (distanceKm(previous.coordinates, a.coordinates) ?? Infinity) -
+              (distanceKm(previous.coordinates, b.coordinates) ?? Infinity)
+            : 0;
+          if (proximity) return proximity;
+          if (centralHubRank) {
+            // D4: 중심 근거는 세부 유형 다양성·근접성 뒤의 **보조 신호**다.
+            // 다른 구의 hubRank 숫자를 전국 공통 척도로 비교하지 않으려고 "확정
+            // 연결 여부"(불리언)만 쓴다 — 불리언이라 총순서(추이성)를 유지한다.
+            const hasEvidence =
+              Number(centralHubRank(b) !== null) -
+              Number(centralHubRank(a) !== null);
+            if (hasEvidence) return hasEvidence;
+          }
+          return compareId(a.contentId, b.contentId);
         });
         const place = ordered[0];
         if (!place) break;

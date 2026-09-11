@@ -541,3 +541,21 @@ export function detailClassification(input: DetailClassificationInput): string {
     (input.categories ?? []).join("+")
   );
 }
+
+/**
+ * 목적 적합성 지표(T7 / D4)의 "세부 유형" 값. `detailClassification`과 달리 관심사
+ * 조합 문자열 fallback을 쓰지 않는다 — D4는 "분류 결측을 독립 유형으로 세지 않는다".
+ * 새 공식 세부 분류(`lclsSystm3` → `lclsSystm2`)를 우선하고, 없을 때만 구 `cat3` →
+ * `cat2`를 본다. 아무 분류도 없으면 `null`이다.
+ */
+export function detailClassificationStrict(
+  input: DetailClassificationInput,
+): string | null {
+  return (
+    clean(input.lclsSystm3) ||
+    clean(input.lclsSystm2) ||
+    clean(input.cat3) ||
+    clean(input.cat2) ||
+    null
+  );
+}
