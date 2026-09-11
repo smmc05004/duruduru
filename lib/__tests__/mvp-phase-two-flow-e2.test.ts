@@ -77,7 +77,7 @@ describe("E2 검색 → 계획 → 음식 목록 Route Handler 흐름", () => {
       status: 200,
       foodResult: { kind: "success" },
     });
-    expect(plan.destination.itineraryAlgorithmVersion).toBe("e2-v2");
+    expect(plan.destination.itineraryAlgorithmVersion).toBe("e2-v3");
     expect(plan.blocks.some((block) => block.sessionId)).toBe(true);
   });
 });

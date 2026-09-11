@@ -153,3 +153,155 @@ describe("T5 목적 근거 점수 (D4)", () => {
     expect(a).toEqual(b);
   });
 });
+
+describe("T7 목적 적합성 구간 (D4)", () => {
+  const withType = (
+    contentId: string,
+    categories: MvpCategoryId[],
+    lclsSystm3: string,
+  ) =>
+    place(contentId, "region-x", categories, {
+      lclsSystm1: "HS",
+      lclsSystm3,
+      // 서로 다른 시설로 보이도록 주소를 다르게.
+      address: `주소 ${contentId}`,
+      coordinates: null,
+    });
+
+  it("관심사별 fit = min(시설,4) + min(유형,3), 평균으로 구간을 만든다", () => {
+    const placed = [
+      withType("a1", ["history"], "HS010100"),
+      withType("a2", ["history"], "HS020100"),
+      withType("a3", ["history"], "HS030100"),
+    ];
+    const r = computePurposeEvidence(placed, ["history"], ["region-x"]);
+    expect(r.fitByInterest?.history).toEqual({
+      facilities: 3,
+      types: 3,
+      fit: 6,
+    });
+    expect(r.fitAverage).toBe(6);
+    expect(r.fitBand).toBe(1); // 4.5 <= 6 < 6.5
+  });
+
+  it("포화: 상한 이후 시설/유형을 늘려도 구간이 오르지 않는다", () => {
+    const base = [
+      withType("b1", ["history"], "HS010100"),
+      withType("b2", ["history"], "HS020100"),
+      withType("b3", ["history"], "HS030100"),
+      withType("b4", ["history"], "HS040100"),
+    ];
+    const saturated = computePurposeEvidence(base, ["history"], ["region-x"]);
+    expect(saturated.fitByInterest?.history).toEqual({
+      facilities: 4,
+      types: 4,
+      fit: 7, // min(4,4) + min(4,3)
+    });
+    const more = computePurposeEvidence(
+      [
+        ...base,
+        withType("b5", ["history"], "HS010200"),
+        withType("b6", ["history"], "HS020200"),
+      ],
+      ["history"],
+      ["region-x"],
+    );
+    expect(more.fitByInterest?.history?.fit).toBe(7);
+    expect(more.fitBand).toBe(saturated.fitBand);
+  });
+
+  it("요청하지 않은 관심사 장소를 더해도 구간이 오르지 않는다", () => {
+    const requested = [
+      withType("c1", ["history"], "HS010100"),
+      withType("c2", ["history"], "HS020100"),
+      withType("c3", ["history"], "HS030100"),
+    ];
+    const baseline = computePurposeEvidence(
+      requested,
+      ["history"],
+      ["region-x"],
+    );
+    const padded = computePurposeEvidence(
+      [
+        ...requested,
+        place("pad1", "region-x", ["nature"], { lclsSystm1: "NA" }),
+        place("pad2", "region-x", ["nature"], { lclsSystm1: "NA" }),
+      ],
+      ["history"],
+      ["region-x"],
+    );
+    expect(padded.fitBand).toBe(baseline.fitBand);
+    expect(padded.fitAverage).toBe(baseline.fitAverage);
+  });
+
+  it("분류 결측 시설은 독립 세부 유형으로 세지 않는다", () => {
+    const placed = [
+      place("d1", "region-x", ["history"], { address: "주소 d1" }),
+      place("d2", "region-x", ["history"], { address: "주소 d2" }),
+      place("d3", "region-x", ["history"], { address: "주소 d3" }),
+    ];
+    const r = computePurposeEvidence(placed, ["history"], ["region-x"]);
+    expect(r.fitByInterest?.history?.types).toBe(0);
+    expect(r.fitByInterest?.history?.facilities).toBe(3);
+  });
+
+  it("여러 관심사 시설은 관심사별 fit에 각각 기여한다", () => {
+    const placed = [
+      place("e1", "region-x", ["history", "culture"], {
+        lclsSystm1: "HS",
+        lclsSystm3: "HS010100",
+        address: "주소 e1",
+      }),
+      place("e2", "region-x", ["history"], {
+        lclsSystm1: "HS",
+        lclsSystm3: "HS020100",
+        address: "주소 e2",
+      }),
+      place("e3", "region-x", ["culture"], {
+        lclsSystm1: "VE",
+        lclsSystm2: "VE06",
+        address: "주소 e3",
+      }),
+    ];
+    const r = computePurposeEvidence(
+      placed,
+      ["history", "culture"],
+      ["region-x"],
+    );
+    expect(r.fitByInterest?.history?.facilities).toBe(2); // e1, e2
+    expect(r.fitByInterest?.culture?.facilities).toBe(2); // e1, e3
+  });
+
+  it("중심 자료가 없어도 구간은 실제 일정으로 계산하고 보조 근거만 0이다", () => {
+    const placed = [
+      withType("f1", ["history"], "HS010100"),
+      withType("f2", ["history"], "HS020100"),
+      withType("f3", ["history"], "HS030100"),
+    ];
+    const r = computePurposeEvidence(
+      placed.map((p) => ({ ...p, regionId: "ktdb-zone-61" })),
+      ["history"],
+      ["ktdb-zone-61"],
+    );
+    expect(r.status).toBe("no-central-data");
+    expect(r.fitBand).toBe(1);
+    expect(r.matchedFacilityCount).toBe(0);
+  });
+
+  it("보조(중심 연결) 시설 수는 상한 4로 제한된다", () => {
+    // 종로구(ktdb-zone-1) 확정 연결 역사 허브가 다수인 실제 정상본 사용.
+    const placed = [
+      place("126537", "ktdb-zone-1", ["history"], { address: "주소 1" }),
+      place("126512", "ktdb-zone-1", ["history"], { address: "주소 2" }),
+      place("126511", "ktdb-zone-1", ["history"], { address: "주소 3" }),
+      place("126514", "ktdb-zone-1", ["history"], { address: "주소 4" }),
+      place("126479", "ktdb-zone-1", ["nature"], { address: "주소 5" }),
+    ];
+    const r = computePurposeEvidence(
+      placed,
+      ["history", "nature"],
+      ["ktdb-zone-1"],
+    );
+    expect(r.matchedFacilityCount).toBeLessThanOrEqual(4);
+  });
+});
