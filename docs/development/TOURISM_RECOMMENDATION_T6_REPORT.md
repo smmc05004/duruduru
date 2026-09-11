@@ -1,6 +1,6 @@
 # T6 — 관광 데이터·목적 적합성 고도화 결과 비교·검증 보고
 
-> **후속 결정(2026-09-10):** 이 보고서는 T7 이전 구현의 비교 이력이다. 사용자가 목적 적합성 보완(T7)만 추가 승인했다. 최신 정책은 [제품 D4](../product/TOURISM_RECOMMENDATION_UPGRADE.md), 진행 순서는 [작업 계획 T7](TOURISM_RECOMMENDATION_WORK_PLAN.md)을 따른다. 아래 6.1의 제안은 채택 대기 중인 최신 규칙이 아니다. 관심사 우선·실제 일정 중심·유사 적합성 내 이동 부담 비교를 적용하며, 추가 입력·시간당 점수 나눗셈·지역 수 나눗셈·근거리 우선 복귀는 채택하지 않는다. T7 구현/검증은 아직 완료되지 않았다.
+> **후속(2026-09-10): §1~§6은 T7 이전(`e1-v2`/`e2-v2`) 구현의 비교 이력이다. T7 목적 적합성 보완은 같은 PR에 반영 완료 → 결과·검증은 §7.** 최신 정책은 [제품 D4·D4-a](../product/TOURISM_RECOMMENDATION_UPGRADE.md), 진행 순서는 [작업 계획 T7](TOURISM_RECOMMENDATION_WORK_PLAN.md). §6.1의 5개 제안 중 채택한 것은 없다(추가 입력·시간당 나눗셈·지역 수 나눗셈·근거리 우선 복귀 모두 미채택). 대신 D4-a의 포화 상한 구간 + 관광 선정 재정렬로 §6.1의 원거리 쏠림이 해소됐다(§7.2).
 
 > 기준일: 2026-09-10. 브랜치 `docs/tourism-recommendation-upgrade`. 제품 SSOT: [관광 데이터·목적 적합성 기획서](../product/TOURISM_RECOMMENDATION_UPGRADE.md). 작업 계획: [TOURISM_RECOMMENDATION_WORK_PLAN.md](TOURISM_RECOMMENDATION_WORK_PLAN.md).
 >
@@ -180,12 +180,91 @@ D4 정렬 규칙 자체의 산출물이 제품 원칙("가용시간 우선", "�
 - **회귀 테스트.** 공유 함수 3종, ID 누락 페이지 미저장·`--resume` 복구·오래된 체크포인트 배제, `onProgress` 페이지별·재시작 호출 — 공통(`collectPagedUnit`)·프로필·중심 세 레벨. 추가로 `scripts/__tests__/collector-cli-resume.test.js`가 `child_process`로 두 CLI를 실제 실행한다(통제된 fetch를 `DURUDURU_TEST_FETCH_MODULE`로 주입, 프로덕션은 전역 `fetch` 그대로): 하드 크래시 후 3페이지부터 재개·1·2 미호출·정상본 교체·실패 중 정상본 보존, 재시작 폐기 상태의 즉시 영속, 프로필 ID 누락 페이지 복구.
 - **검증.** `npm run verify` 통과. `npm run test:enhancement` 150 통과. `npx jest scripts/__tests__/` 123 통과. `npx jest` 381 통과 / 19 실패(전부 기존 PoC `page.test.tsx`, 신규 회귀 0). `npm run test:e2e -- --repeat-each=2` 24 통과.
 
+## 7. T7 결과 — 목적 적합성 보완 (2026-09-10, 같은 PR)
+
+> T6 §2·§6.1의 `interest` 원거리 쏠림을 D4 규칙으로 보완했다. T1~T6 이력과 구분한다.
+> 확정 상수·수식은 [제품 D4-a](../product/TOURISM_RECOMMENDATION_UPGRADE.md#d4-a--확정-상수-t7-1-2026-09-10).
+
+### 7.1 무엇을 바꿨나
+
+| 영역            | T5/T6                                                                                     | T7 (`e1-v3` / `e2-v3`)                                                                                                     |
+| --------------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `interest` 정렬 | 충족 수 → **원점수(`1/log2(1+hubRank)` 평균)** → 세부 분류 → 관광 수 → 왕복시간 → groupId | 충족 수 → **목적 적합성 구간(0·1·2)** → **왕복시간** → 상한 적용 중심 연결 시설 수 → groupId                               |
+| 목적 지표       | 지역 내 중심 순위의 역로그 합(대도시·구 밀집 지역 유리)                                   | 실제 초안의 관심사별 서로 다른 시설 수·세부 유형 수에 포화 상한(`fit_i = min(f,4)+min(t,3)`), 요청 관심사 평균 → 고정 구간 |
+| 중심 연결       | 정렬 2번째 키(원점수)에 직접 반영                                                         | **보조 동점 근거만**(같은 구간·왕복시간까지 같을 때). 확정 연결 시설 수, 상한 4, 행정구역 분할·구별 순위에 불변            |
+| 관광 선정 순서  | 미충족 관심사 → **중심 hubRank** → 세부 유형 다양성 → 근접성                              | 미충족 관심사 → **세부 유형 다양성 → 근접성** → 중심 근거(확정 연결 여부 불리언) → 안정 ID                                 |
+| `hubRank` 숫자  | 지역 간·구 간 크기 비교(전국 공통 척도)                                                   | 정렬·선정에서 **크기 비교 제거**. "확정 연결 여부" 불리언만 → 총순서(추이성) 유지                                          |
+
+`score`·`perInterest`·`contributingContentIds`는 참고 필드로 그대로 보존한다(카드 근거 펼치기에서 "목적 적합성 구간"으로 표시, 원점수는 숨김). `easy`/`relaxed` 정렬, 시간 엔진, 음식점·상세 호출, 편집·저장 흐름은 불변.
+
+### 7.2 48개 입력 재실행 (T6와 같은 매트릭스)
+
+재현: `T7_OUT=/tmp/t7.json npx jest enhancement-t7-comparison --runInBand` → `node scripts/report-t7-selection.mjs /tmp/t7.json --md`.
+
+| 지표                                      |            T5/T6 |             T7 |
+| ----------------------------------------- | ---------------: | -------------: |
+| `interest` 왕복시간 min/중앙/max          | 20 / 358 / 474분 | 18 / 48 / 80분 |
+| `interest` 왕복 > 240분 셀                |          34 / 48 |     **0 / 48** |
+| `interest` 구간 분포(보통/충실/매우 충실) |                — |    4 / 14 / 30 |
+
+48개 전부 `interest` 후보가 바뀌었다. 전 셀에서 근거리(편도 ≤ 40분) 후보가 T5/T6의 원거리 후보와 **같은 구간**에 들어와 왕복시간으로 이겼다. 대표 셀:
+
+| 출발  | 관심사          | 시간  | T7 interest (구간·왕복·관심사별 시설/유형/보조) | T5/T6 interest   |
+| ----- | --------------- | ----- | ----------------------------------------------- | ---------------- |
+| seoul | history         | day   | 고양 · 매우 충실 · 30분 · h6/4/3                | 창원 rt434       |
+| seoul | nature          | day   | 고양 · 매우 충실 · 30분 · n6/5/2                | 부산광역시 rt474 |
+| seoul | rest            | day   | 구리 · 매우 충실 · 28분 · r6/4/2                | 울산광역시 rt448 |
+| seoul | history+culture | day   | 구리 · 충실 · 28분 · h1/1/0 c5/4/4              | 고령 rt358       |
+| busan | culture         | day   | 김해 · 매우 충실 · 48분 · c6/4/5                | 서울특별시 rt470 |
+| busan | rest            | night | 김해 · 충실 · 48분 · r3/2/2                     | 서울특별시 rt470 |
+| suwon | history         | day   | 화성 · 매우 충실 · 18분 · h6/5/**0**            | 창원 rt400       |
+| suwon | rest            | night | 화성 · 매우 충실 · 18분 · r4/4/**0**            | 서울특별시 rt42  |
+
+### 7.3 긴 이동을 선택한 경우 (D4: "명확히 높은 적합성 → 먼 후보")
+
+| 셀                                  | 선택                                  | 왜 더 먼 후보인가                                                                                        |
+| ----------------------------------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| gangneung · culture · day           | 삼척(왕복 80분) — 양양(62분)보다 멀다 | 삼척 문화 시설 6·유형 5(구간 매우 충실). 양양 문화는 유형 3(충실). 한 구간 차이라 더 먼 삼척이 선택된다. |
+| gangneung · history+culture · night | 속초(왕복 80분) — 양양(62분)보다 멀다 | 양양 야간 초안은 문화 시설 0곳 → 충족 관심사 1개. 속초는 역사+문화 둘 다 충족(2개) → 충족 수에서 앞선다. |
+| suwon · leisure · night             | 용인(왕복 20분) — 화성(18분)보다 멀다 | 화성 야간 레저는 세부 유형 2 → 구간 충실. 용인은 시설 4·유형 4 → 구간 매우 충실.                         |
+
+낮은 왕복 중앙값(48분)은 **목표가 아니라** (a) 세부 유형 다양성을 중심 근거보다 앞세운 관광 선정 재정렬과 (b) 포화 상한이 함께 만든 결과다. 특정 도시를 올리거나 중앙값을 낮추려는 반복 튜닝은 하지 않았다. 상한·경계는 D4-a의 후보안 비교로 골랐다.
+
+### 7.4 중심 결측 지역 (수용 기준: "중심 결측 지역도 기본 적합성 평가")
+
+수원 출발 12셀 중 11셀에서 `interest` = 화성. 화성은 중심 관광지 `empty` 28개 지역 중 하나로 보조 근거가 0(`m0`)이지만, 실제 초안의 시설 6·유형 4~5로 구간 "매우 충실"에 도달해 정상 선정된다. T5/T6에서는 목적 점수 0으로 밀려 한 번도 `interest`가 되지 못했다.
+
+### 7.5 검증 (T7-4)
+
+| 항목                                                            | 방법                                                                                                                              | 결과 |
+| --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ---- |
+| 동구간 → 짧은 이동 우선 / 높은 구간 → 먼 후보 가능              | `lib/__tests__/enhancement-t7-selection.test.ts` 합성 + `lib/__tests__/enhancement-t7-comparison.test.ts` 48셀 불변식             | 통과 |
+| 포화 상한(상한 이후 개수 증가 무효)                             | `lib/__tests__/enhancement-tourism-evidence.test.ts` T7 블록                                                                      | 통과 |
+| 분류 결측·다중 관심사·중심 결측 영향                            | 같은 블록                                                                                                                         | 통과 |
+| 행정구역 분할/보조 상한 초과 개수 불변                          | `lib/__tests__/enhancement-t7-selection.test.ts` "행정구역 분할…"                                                                 | 통과 |
+| 정렬 추이성·결정성(총순서 comparator)                           | `lib/__tests__/enhancement-t7-selection.test.ts` 40회 셔플 불변 + `lib/__tests__/enhancement-t7-comparison.test.ts` 2회 실행 동일 | 통과 |
+| 저장 호환(구 `e1-v2`/`e2-v2` 복원·`e1-v3` round-trip·손상 거절) | `lib/__tests__/mvp-phase-two-storage-v3.test.ts` T5 블록(값 불변) + 신규 필드 검증                                                | 통과 |
+| 검색 중 외부 fetch 0회                                          | `lib/__tests__/enhancement-t6-search-no-network.test.ts`(모듈 그래프 불변)                                                        | 통과 |
+| 관광·식사·휴식·이동·귀가 제약 유지                              | `lib/__tests__/enhancement-t6-comparison.test.ts`·E2E                                                                             | 통과 |
+
+- `npm run verify` 통과.
+- `npm run test:enhancement` 통과(신규 `enhancement-t7-selection` + `enhancement-t7-comparison` + `enhancement-tourism-evidence` T7 블록 포함).
+- `npx jest` : 기존 PoC `app/__tests__/page.test.tsx` 19실패만 유지(T7 전부터 동일, 신규 회귀 0).
+- `npm run test:e2e -- --repeat-each=2` 통과. `gh pr checks 76` Verify·E2E 초록.
+
+### 7.6 남은 위험·범위 밖
+
+- 목적 적합성 구간이 하루 6곳 근거리 대도시 일정 다수를 "매우 충실"(30/48)에 둔다. 의도된 포화이며, 변별은 야간·저다양성 셀(14+4)과 인접 시·군 비교(김해 vs 양산 등)에서 작동한다.
+- 연결률 16%(§6.2), 중심 `empty` 28지역(§3.3), 예약 수집 자동화(§6.4)는 T7 범위 밖이며 그대로다.
+- `matchedFacilityCount`는 허브 관심사와 장소 관심사의 엄밀 대조 대신 "확정 연결이면 신호"로 단순화한다(T5 인계 (4)와 동일, 원천 `interestCategories`가 같은 분류기 산출).
+
 ## 부록: 재현 스크립트
 
-| 목적                       | 명령                                                                                         |
-| -------------------------- | -------------------------------------------------------------------------------------------- |
-| 비교 매트릭스 덤프(after)  | `T6_OUT=/tmp/after.json npx jest enhancement-t6-comparison`                                  |
-| 비교 매트릭스 덤프(before) | before 워크트리에서 동일 스펙 실행 → `/tmp/before.json`                                      |
-| 비교 표 생성               | `node scripts/report-tourism-recommendation-comparison.mjs /tmp/before.json /tmp/after.json` |
-| 품질 표                    | `node scripts/report-tourism-evidence-quality.mjs [--md]`                                    |
-| 외부 호출 0 검증           | `npx jest enhancement-t6-search-no-network`                                                  |
+| 목적                       | 명령                                                                                                                            |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| 비교 매트릭스 덤프(after)  | `T6_OUT=/tmp/after.json npx jest enhancement-t6-comparison`                                                                     |
+| 비교 매트릭스 덤프(before) | before 워크트리에서 동일 스펙 실행 → `/tmp/before.json`                                                                         |
+| 비교 표 생성               | `node scripts/report-tourism-recommendation-comparison.mjs /tmp/before.json /tmp/after.json`                                    |
+| T7 선정 덤프·표            | `T7_OUT=/tmp/t7.json npx jest enhancement-t7-comparison --runInBand` → `node scripts/report-t7-selection.mjs /tmp/t7.json --md` |
+| 품질 표                    | `node scripts/report-tourism-evidence-quality.mjs [--md]`                                                                       |
+| 외부 호출 0 검증           | `npx jest enhancement-t6-search-no-network`                                                                                     |

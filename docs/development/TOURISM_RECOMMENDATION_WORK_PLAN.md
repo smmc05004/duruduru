@@ -1,6 +1,6 @@
 # 관광 데이터·목적 적합성 고도화 작업 계획
 
-> **최신 인계(2026-09-10): T7 목적 적합성 보완만 추가 승인, 구현 미착수.** 아래 T1~T6 완료 기록은 이전 규칙의 구현 이력이다. 같은 `docs/tourism-recommendation-upgrade` 브랜치/기존 PR에서 T7까지 마무리한다. 새 API·입력 옵션·수집 자동화·연결률 확대는 추가하지 않는다. 최신 정책은 제품 기획서 D4이며 과거 T5 수식과 PM 판단 대기 기록보다 우선한다.
+> **최신(2026-09-10): T1~T7 구현 완료.** 같은 `docs/tourism-recommendation-upgrade` 브랜치/PR #76에 T7 목적 적합성 보완까지 반영했다(`e1-v3`/`e2-v3`). 결과·검증은 [T6 보고서 §7](TOURISM_RECOMMENDATION_T6_REPORT.md#7-t7-결과--목적-적합성-보완-2026-09-10-같은-pr), 확정 상수는 [제품 D4-a](../product/TOURISM_RECOMMENDATION_UPGRADE.md#d4-a--확정-상수-t7-1-2026-09-10). 새 API·입력 옵션·수집 자동화·연결률 확대는 추가하지 않았다. 병합은 사용자 지시/하네스에 따른다.
 
 > 2026-09-10: **T1~T6 구현 완료.** 브랜치 `docs/tourism-recommendation-upgrade`에서 커밋 `3ba31e1`~T6 커밋, PR 생성(병합은 지시 대기). 결과·검증·미해소 항목은 [T6 보고서](TOURISM_RECOMMENDATION_T6_REPORT.md).
 >
@@ -34,11 +34,11 @@ T1→T2→T3→T4→T5→T6 순서로 진행했다. 남은 작업은 아래 T7 �
 4. **검증:** 동구간이면 짧은 이동 우선, 높은 구간이면 먼 후보 선택 가능, 상한 이후 개수 증가의 무효, 중복 시설·분류 결측·다중 관심사·중심 결측·행정구역 분할/순위 숫자 변경의 영향, 정렬 추이성·결정성·저장 호환을 검증한다. 관광·식사·휴식·이동·귀가 제약과 검색 외부 호출 0회를 유지한다.
 5. **비교·인계:** T6 48개 입력을 재실행하고 각 interest 선정/탈락 후보의 시설·다양성·구간·보조 근거·왕복/현지시간·실제 장소를 보고한다. 특히 긴 이동을 선택한 이유를 확인한다. T6 이력과 T7 결과를 구분하고 변경 범위 Jest·verify·핵심 E2E·CI 결과를 기록한다. 새 기능을 이어 붙이지 않고 같은 PR에 반영해 이번 작업을 마무리한다. 병합은 사용자 지시/기존 하네스에 따른다.
 
-- [ ] T7-1 수치 비교와 D4 확정
-- [ ] T7-2 선정·점수·역할 구현
-- [ ] T7-3 표시·저장 호환
-- [ ] T7-4 회귀·48개 사례 검증
-- [ ] T7-5 문서·기존 PR 인계
+- [x] T7-1 수치 비교와 D4 확정 — 상한 4/3·구간 경계 `[4.5, 6.5]`·보조 상한 4, 후보안 비교·선정 근거는 [제품 D4-a](../product/TOURISM_RECOMMENDATION_UPGRADE.md#d4-a--확정-상수-t7-1-2026-09-10). 구현 상수 `PURPOSE_FIT_METRIC`.
+- [x] T7-2 선정·점수·역할 구현 — `lib/tourism-evidence.ts`(구간 지표·보조 시설 수), `lib/mvp-phase-two-search.ts`(interest 정렬 = 충족 → 구간 → 왕복시간 → 보조 → groupId, 원점수 정렬 제거), `lib/mvp-phase-two-planner.ts`(관광 선정 = 세부 유형 다양성·근접성 → 중심 근거 불리언 → ID, hubRank 크기 비교 제거). `e1-v2→e1-v3`, `e2-v2→e2-v3`.
+- [x] T7-3 표시·저장 호환 — `PurposeEvidence`에 `fitBand`/`fitAverage`/`fitByInterest`/`matchedFacilityCount` 추가(선택 필드, `score` 의미 보존). `mvp-phase-two-storage.ts` 검증·`cleanPurpose` 화이트리스트, 구 `e1-v2`/`e2-v2` 저장본 재선정 없이 복원. `Notebook.tsx` 근거 펼치기에 "목적 적합성 구간" 표시, 원점수 숨김.
+- [x] T7-4 회귀·48개 사례 검증 — 신규 `lib/__tests__/enhancement-t7-selection.test.ts`·`lib/__tests__/enhancement-t7-comparison.test.ts`, `lib/__tests__/enhancement-tourism-evidence.test.ts` T7 블록. 동구간→짧은 이동, 높은 구간→먼 후보, 포화, 분류 결측·다중 관심사·중심 결측, 행정구역 분할 불변, 추이성·결정성, 저장 호환, 검색 fetch 0회 모두 통과.
+- [x] T7-5 문서·기존 PR 인계 — [T6 보고서 §7](TOURISM_RECOMMENDATION_T6_REPORT.md#7-t7-결과--목적-적합성-보완-2026-09-10-같은-pr), 제품 D4-a, 이 체크리스트 갱신. `scripts/report-t7-selection.mjs`. 같은 PR #76에 반영.
 
 ### T1: 새 분류 계약
 
@@ -145,7 +145,7 @@ T1→T2→T3→T4→T5→T6 순서로 진행했다. 남은 작업은 아래 T7 �
 - **역할 순서.** 선택·표시 순서 `easy→interest→relaxed` → `interest→easy→relaxed`. `interest` 정렬 키: 충족 관심사 수 ↓ → 목적 근거 점수 ↓ → 세부 분류 다양성 ↓ → 실제 관광 수 ↓ → 왕복시간 ↑ → groupId ↑. `easy`/`relaxed`는 기존 이동 부담/여유 정렬 유지, 선행 선택 그룹 제외. 저장본·픽스처의 근거 결측(`unavailable`)과 `no-central-data`는 정렬에서 0으로 처리(결정적). `algorithmVersion` `e1-v1 → e1-v2`.
 - **카드.** 대표 장소·추천 이유는 본문 유지. 원천명(티맵 기반)·기준월·연결 수·목적 점수는 `방문 미리보기·추천 근거`(근거 펼치기)에만 표시. 중심 근거가 없으면(`contributingContentIds` 빈 값·`no-central-data`) 중심 관광지 문구를 넣지 않고 "지역 매력 0 아님" 안내만 남긴다. `전국 역사 1위`·`가장 인기`·`영업 보장` 문구 없음.
 - **저장 하위호환.** `recommendation` 검증: `algorithmVersion ∈ {e1-v1, e1-v2}`, `purpose`는 선택 필드(누락 시 그대로 복원 — 재계산·외부 조회 없음). `itineraryAlgorithmVersion ∈ {e2-v1, e2-v2}`. `cleanRecommendation`이 `purpose`를 화이트리스트로 통과, 손상된 `purpose`(점수>1 등)는 저장본 거절.
-- **검증.** `npm run verify` 통과. `npm run test:enhancement` 97/97. 신규 `lib/__tests__/enhancement-tourism-evidence.test.ts`(9) + `mvp-phase-two-search.test.ts` T5 블록(2) + `mvp-phase-two-storage-v3.test.ts` T5 블록(3), 기존 역할 순서 테스트 갱신. 전체 `npx jest`는 `app/__tests__/page.test.tsx` 19실패(작업 전부터 깨진 PoC)만 남고 그 외 272 통과. 검색 경로 외부 fetch 0회(flow-e2가 tour-api mock 미호출 확인).
+- **검증.** `npm run verify` 통과. `npm run test:enhancement` 97/97. 신규 `lib/__tests__/enhancement-tourism-evidence.test.ts`(9) + `mvp-phase-two-search.test.ts` T5 블록(2) + `lib/__tests__/mvp-phase-two-storage-v3.test.ts` T5 블록(3), 기존 역할 순서 테스트 갱신. 전체 `npx jest`는 `app/__tests__/page.test.tsx` 19실패(작업 전부터 깨진 PoC)만 남고 그 외 272 통과. 검색 경로 외부 fetch 0회(flow-e2가 tour-api mock 미호출 확인).
 - **T6로 넘길 사항.** (1) 서울·부산·비광역시 출발 변경 전/후 후보·대표 명소·근거 점수 비교 보고. (2) 전국 연결률 16%(숙박·쇼핑 분모 포함)가 `interest` 역할 순위에 주는 영향 — 중심 자료 있는 지역이 동점에서 유리, `no-central-data` 28개 지역은 목적 점수 0. (3) Playwright 입력→3지역→선택→음식→계획→저장/복원과 중심 근거 실제 방문 일치. (4) `hubRankForSelection`이 허브 관심사와 장소 관심사 일치를 엄밀히 대조하지 않고 "matched면 신호"로 단순화한 점(원천 `interestCategories`가 같은 분류기 산출이라 실무상 일치).
 
 ### T6: 검증·완료
@@ -169,9 +169,8 @@ T1→T2→T3→T4→T5→T6 순서로 진행했다. 남은 작업은 아래 T7 �
 
 ## 다음 세션 시작점
 
-**T1~T6 구현 완료, T7 추가 승인·미착수(2026-09-10).** 다음 세션은:
+**T1~T7 구현 완료(2026-09-10). PR #76 병합 대기.** 남은 일은 병합 절차와 그 이후다:
 
-1. [T6 보고서](TOURISM_RECOMMENDATION_T6_REPORT.md) 6절의 미해소 항목을 읽는다.
-2. 최신 제품 D4와 위 T7 절을 읽고 목적 적합성 보완만 진행한다. 이동시간 입력을 사용자에게 다시 요구하지 않는다.
-3. 같은 작업 브랜치/기존 PR에 구현·비교·검증 결과를 반영한다. 새 브랜치나 별도 후속 이슈로 이번 승인 작업을 미루지 않는다.
-4. 완료 체크리스트와 검증 결과를 실제 상태로 갱신하고 인계한다. 이전 T6 통과만으로 T7 완료라고 표시하지 않는다.
+1. `gh pr checks 76` Verify·E2E 초록 확인 후 사용자 지시/하네스에 따라 병합. 병합 후 작업 브랜치 삭제.
+2. 범위 밖으로 남긴 항목([T6 보고서](TOURISM_RECOMMENDATION_T6_REPORT.md) §6.2 연결률 16%, §3.3 중심 `empty` 28지역, §6.4 예약 수집 자동화, §7.6 목적 구간의 대도시 포화)은 별도 데이터·운영 작업으로 분리해 다룬다.
+3. 새 KTDB 자료·새 중심 관광지 기준월을 확보하면 D2 절차로 재수집한다(과거 월 자동 혼합 금지).
