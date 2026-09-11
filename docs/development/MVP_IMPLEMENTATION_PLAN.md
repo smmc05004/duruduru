@@ -1,5 +1,7 @@
 # MVP 구현 계획
 
+> **현재 다음 작업(2026-09-11): [관광 추천 작업 계획 R1~R5](TOURISM_RECOMMENDATION_WORK_PLAN.md#재작업-r1r5)의 R1 후보별 원인 진단.** PR #76은 병합·배포됐으나 근거리 쏠림 개선에 실패했다. [재작업 제품 기준](../product/RECOMMENDATION_QUALITY_RECOVERY.md)에 따라 기존 데이터로 실제 후보를 비교한 뒤 새 정렬을 확정한다. 현재는 재작업 문서 작성만 완료했으며 코드 수정·비교 실험은 미착수다. 아래 시점별 인계와 MVP 단계의 미착수·병합 대기 문구는 과거 기록이며 다음 작업으로 해석하지 않는다.
+
 > **최우선 인계(2026-09-10):** 관광 데이터 고도화의 마지막 추가 작업은 [작업 계획 T7](TOURISM_RECOMMENDATION_WORK_PLAN.md)의 목적 적합성 보완이다. 사용자 승인·문서 반영 완료, 코드 구현은 미착수다. [제품 D4](../product/TOURISM_RECOMMENDATION_UPGRADE.md)에 따라 관심사 우선과 기존 입력을 유지하고 실제 일정 적합성 구간 안에서 이동 부담을 비교한다. 같은 작업 브랜치/기존 PR에서 T7만 마무리한다. 아래 PM 판단 대기·별도 후속 결정 문구는 과거 이력이다.
 
 > **최신 인계(2026-09-10):** [관광 데이터·목적 적합성 기획서](../product/TOURISM_RECOMMENDATION_UPGRADE.md)의 D1~D4를 **T1~T6으로 구현 완료**(브랜치 `docs/tourism-recommendation-upgrade`, PR 병합 대기). 새 공식 분류(`lclsSystm*`) 해석기·전국 재수집(schemaVersion 2)·중심 관광지 수집(202608)·보수적 원천 연결·목적 근거 점수·`interest` 우선 역할 순서가 반영됐다. 결과·검증·미해소 항목은 [T6 보고서](TOURISM_RECOMMENDATION_T6_REPORT.md). 아래 2장의 관심사 코드 규칙(`A01`·`A0201` 등)은 새 분류가 없는 레코드의 하위 호환 경로로만 유효하다. **PM 판단 대기: `interest` 역할의 원거리 대도시 쏠림(D4 정렬 산출물).** 아래 과거의 ‘다음 작업’ 문구보다 이 항목이 우선한다.
