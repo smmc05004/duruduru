@@ -123,7 +123,11 @@ export type RecommendationRole = "easy" | "interest" | "relaxed";
 export type PurposeFitInterest = {
   /** 초안에 배치된, 이 관심사에 해당하는 서로 다른 시설 수(E2 시설 중복 제거). */
   facilities: number;
-  /** 그 시설들의 서로 다른 세부 유형 수(D1 새 분류 우선, 분류 결측은 세지 않음). */
+  /**
+   * 그 시설들의 서로 다른 세부 유형 수. 시설 그룹당 대표 유형 하나만 기여한 뒤
+   * 대표들을 다시 중복 제거해 센다(D1 새 분류 우선, 분류 결측 그룹은 대표 없이
+   * 기여 0). 같은 시설의 세부 항목을 늘리는 것만으로 오르지 않는다.
+   */
   types: number;
   /** `min(facilities, facilityCap) + min(types, typeCap)`. 포화 상한 적용. */
   fit: number;

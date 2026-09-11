@@ -288,6 +288,100 @@ describe("T7 목적 적합성 구간 (D4)", () => {
     expect(r.matchedFacilityCount).toBe(0);
   });
 
+  it("같은 시설의 세부 항목을 늘려도 유형 수가 오르지 않는다 (그룹당 대표 유형 하나)", () => {
+    const shared = {
+      address: "서울 종로구 세종대로 1",
+      coordinates: { latitude: 37.579, longitude: 126.977 },
+    };
+    const placed = [
+      place("g1", "region-x", ["history"], {
+        ...shared,
+        title: "경복궁 근정전",
+        lclsSystm1: "HS",
+        lclsSystm3: "HS010100",
+      }),
+      place("g2", "region-x", ["history"], {
+        ...shared,
+        title: "경복궁 향원정",
+        lclsSystm1: "HS",
+        lclsSystm3: "HS020100",
+      }),
+    ];
+    const r = computePurposeEvidence(placed, ["history"], ["region-x"]);
+    // 같은 시설 그룹(경복궁)이므로 시설 수는 1이며, 유형도 그룹당 대표 하나만
+    // 기여해 1이어야 한다. 수정 전에는 세부 항목이 늘어난 만큼 types가 2로
+    // 잘못 집계돼 fit이 3이 됐다.
+    expect(r.fitByInterest?.history).toEqual({
+      facilities: 1,
+      types: 1,
+      fit: 2,
+    });
+  });
+
+  it("그룹 대표 유형은 유효 분류가 있는 장소 중 안정적인 콘텐츠 ID 순서로 뽑고, 입력 순서를 바꿔도 동일하다", () => {
+    const shared = {
+      address: "서울 종로구 세종대로 1",
+      coordinates: { latitude: 37.579, longitude: 126.977 },
+    };
+    const withMissing = [
+      place("h1", "region-x", ["history"], {
+        ...shared,
+        title: "경복궁 근정전",
+        // 분류 결측 — 대표 후보에서 제외되어야 한다.
+      }),
+      place("h2", "region-x", ["history"], {
+        ...shared,
+        title: "경복궁 향원정",
+        lclsSystm1: "HS",
+        lclsSystm3: "HS020100",
+      }),
+      place("h3", "region-x", ["history"], {
+        ...shared,
+        title: "경복궁 경회루",
+        lclsSystm1: "HS",
+        lclsSystm3: "HS030100",
+      }),
+    ];
+    const forward = computePurposeEvidence(
+      withMissing,
+      ["history"],
+      ["region-x"],
+    );
+    const reversed = computePurposeEvidence(
+      [...withMissing].reverse(),
+      ["history"],
+      ["region-x"],
+    );
+    // 유효 분류가 있는 h2, h3 중 안정적인 콘텐츠 ID 순서(h2 < h3)로 h2가 대표.
+    expect(forward.fitByInterest?.history).toEqual({
+      facilities: 1,
+      types: 1,
+      fit: 2,
+    });
+    expect(forward).toEqual(reversed);
+  });
+
+  it("독립 시설(다른 주소)은 세부 항목이 여러 개여도 시설·유형 모두 그대로 늘어난다", () => {
+    const placed = [
+      place("i1", "region-x", ["history"], {
+        address: "주소 i1",
+        lclsSystm1: "HS",
+        lclsSystm3: "HS010100",
+      }),
+      place("i2", "region-x", ["history"], {
+        address: "주소 i2",
+        lclsSystm1: "HS",
+        lclsSystm3: "HS020100",
+      }),
+    ];
+    const r = computePurposeEvidence(placed, ["history"], ["region-x"]);
+    expect(r.fitByInterest?.history).toEqual({
+      facilities: 2,
+      types: 2,
+      fit: 4,
+    });
+  });
+
   it("보조(중심 연결) 시설 수는 상한 4로 제한된다", () => {
     // 종로구(ktdb-zone-1) 확정 연결 역사 허브가 다수인 실제 정상본 사용.
     const placed = [

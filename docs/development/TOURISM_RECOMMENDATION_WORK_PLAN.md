@@ -1,6 +1,8 @@
 # 관광 데이터·목적 적합성 고도화 작업 계획
 
-> **최신(2026-09-10): T1~T7 구현 완료.** 같은 `docs/tourism-recommendation-upgrade` 브랜치/PR #76에 T7 목적 적합성 보완까지 반영했다(`e1-v3`/`e2-v3`). 결과·검증은 [T6 보고서 §7](TOURISM_RECOMMENDATION_T6_REPORT.md#7-t7-결과--목적-적합성-보완-2026-09-10-같은-pr), 확정 상수는 [제품 D4-a](../product/TOURISM_RECOMMENDATION_UPGRADE.md#d4-a--확정-상수-t7-1-2026-09-10). 새 API·입력 옵션·수집 자동화·연결률 확대는 추가하지 않았다. 병합은 사용자 지시/하네스에 따른다.
+> **최신(2026-09-11): T7-6 세부 유형 중복 계산 결함 수정 완료.** 같은 `docs/tourism-recommendation-upgrade` 브랜치/PR #76에 반영했다. `computePurposeEvidence`의 세부 유형 수가 시설(E2) 중복 제거 전 전체 장소에서 계산되던 결함을 시설 그룹당 대표 유형 하나만 기여하도록 수정했다(제품 D4-a 갱신, [T6 보고서 §8](TOURISM_RECOMMENDATION_T6_REPORT.md#8-t7-6-결과--세부-유형-중복-계산-결함-수정-2026-09-11-같은-pr)). 시설 상한 4·유형 상한 3·구간 경계 `[4.5, 6.5]`·정렬 순서·다른 점수 정책은 변경하지 않았다. 병합은 사용자 지시/하네스에 따른다.
+>
+> **(2026-09-10): T1~T7 구현 완료.** 같은 `docs/tourism-recommendation-upgrade` 브랜치/PR #76에 T7 목적 적합성 보완까지 반영했다(`e1-v3`/`e2-v3`). 결과·검증은 [T6 보고서 §7](TOURISM_RECOMMENDATION_T6_REPORT.md#7-t7-결과--목적-적합성-보완-2026-09-10-같은-pr), 확정 상수는 [제품 D4-a](../product/TOURISM_RECOMMENDATION_UPGRADE.md#d4-a--확정-상수-t7-1-2026-09-10). 새 API·입력 옵션·수집 자동화·연결률 확대는 추가하지 않았다. 병합은 사용자 지시/하네스에 따른다.
 
 > 2026-09-10: **T1~T6 구현 완료.** 브랜치 `docs/tourism-recommendation-upgrade`에서 커밋 `3ba31e1`~T6 커밋, PR 생성(병합은 지시 대기). 결과·검증·미해소 항목은 [T6 보고서](TOURISM_RECOMMENDATION_T6_REPORT.md).
 >
@@ -39,6 +41,7 @@ T1→T2→T3→T4→T5→T6 순서로 진행했다. 남은 작업은 아래 T7 �
 - [x] T7-3 표시·저장 호환 — `PurposeEvidence`에 `fitBand`/`fitAverage`/`fitByInterest`/`matchedFacilityCount` 추가(선택 필드, `score` 의미 보존). `mvp-phase-two-storage.ts` 검증·`cleanPurpose` 화이트리스트, 구 `e1-v2`/`e2-v2` 저장본 재선정 없이 복원. `Notebook.tsx` 근거 펼치기에 "목적 적합성 구간" 표시, 원점수 숨김.
 - [x] T7-4 회귀·48개 사례 검증 — 신규 `lib/__tests__/enhancement-t7-selection.test.ts`·`lib/__tests__/enhancement-t7-comparison.test.ts`, `lib/__tests__/enhancement-tourism-evidence.test.ts` T7 블록. 동구간→짧은 이동, 높은 구간→먼 후보, 포화, 분류 결측·다중 관심사·중심 결측, 행정구역 분할 불변, 추이성·결정성, 저장 호환, 검색 fetch 0회 모두 통과.
 - [x] T7-5 문서·기존 PR 인계 — [T6 보고서 §7](TOURISM_RECOMMENDATION_T6_REPORT.md#7-t7-결과--목적-적합성-보완-2026-09-10-같은-pr), 제품 D4-a, 이 체크리스트 갱신. `scripts/report-t7-selection.mjs`. 같은 PR #76에 반영.
+- [x] T7-6 세부 유형 중복 계산 결함 수정(2026-09-11) — `computePurposeEvidence`(`lib/tourism-evidence.ts`)의 `types_i`가 시설(E2) 중복 제거 **전** 전체 배치 장소에서 계산돼, 같은 시설의 세부 항목만 늘려도 유형 수·구간이 오르는 결함을 고쳤다. 관심사별로 `facilityGroups` 기준 그룹을 만들고, 그룹당 유효 분류가 있는 장소 중 안정적인 콘텐츠 ID 순서로 대표 하나만 골라 세부 유형에 기여시킨 뒤 그 대표들을 다시 중복 제거한다. 유효 분류가 없는 그룹은 시설 수에는 포함하되 유형 수에는 기여하지 않는다. 중심 연결 근거의 시설 중복 제거는 변경하지 않았다. 시설 상한 4·유형 상한 3·구간 경계 `[4.5, 6.5]`·정렬 순서·기존 48개 비교 결과는 그대로다(재실행 시 fitBand/fitAverage 차이 0/48). TDD로 결함을 재현하는 실패 테스트를 먼저 추가한 뒤 수정했다(`lib/__tests__/enhancement-tourism-evidence.test.ts`). 제품 D4-a, [T6 보고서 §8](TOURISM_RECOMMENDATION_T6_REPORT.md#8-t7-6-결과--세부-유형-중복-계산-결함-수정-2026-09-11-같은-pr) 갱신. 같은 PR #76에 반영, 병합 대기.
 
 ### T1: 새 분류 계약
 
@@ -169,7 +172,7 @@ T1→T2→T3→T4→T5→T6 순서로 진행했다. 남은 작업은 아래 T7 �
 
 ## 다음 세션 시작점
 
-**T1~T7 구현 완료(2026-09-10). PR #76 병합 대기.** 남은 일은 병합 절차와 그 이후다:
+**T1~T7 구현 완료(2026-09-10), T7-6 세부 유형 중복 계산 결함 수정 완료(2026-09-11). PR #76 병합 대기.** 남은 일은 병합 절차와 그 이후다:
 
 1. `gh pr checks 76` Verify·E2E 초록 확인 후 사용자 지시/하네스에 따라 병합. 병합 후 작업 브랜치 삭제.
 2. 범위 밖으로 남긴 항목([T6 보고서](TOURISM_RECOMMENDATION_T6_REPORT.md) §6.2 연결률 16%, §3.3 중심 `empty` 28지역, §6.4 예약 수집 자동화, §7.6 목적 구간의 대도시 포화)은 별도 데이터·운영 작업으로 분리해 다룬다.

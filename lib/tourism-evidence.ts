@@ -29,7 +29,10 @@ import { detailClassificationStrict } from "@/lib/interest-classification";
  * `docs/development/TOURISM_RECOMMENDATION_T6_REPORT.md` T7 절에 있다.
  *
  * - `facilityCap`/`typeCap`: 관심사별 `fit = min(시설 수, facilityCap) + min(세부 유형 수, typeCap)`.
- *   요청하지 않은 관심사·장소를 늘려 점수를 못 올리게 하는 포화 상한.
+ *   요청하지 않은 관심사·장소를 늘려 점수를 못 올리게 하는 포화 상한. 세부 유형 수는
+ *   시설(`facilityGroups`) 그룹당 대표 유형 하나만 기여한 뒤 그 대표들을 다시 중복
+ *   제거해 계산한다 — 같은 시설의 세부 항목을 늘리는 것만으로 유형 수·구간이 오르지
+ *   않게 하는 결함 수정(2026-09-11)이다.
  * - `bandBoundaries`: 요청 관심사 평균 `fit`를 3개 고정 구간(0·1·2)으로 나눈다.
  *   `band = bandBoundaries.filter((b) => avg >= b).length`.
  * - `matchedFacilityCap`: 보조(중심 연결) 근거 시설 수 상한.
@@ -71,6 +74,7 @@ export const TOURISM_EVIDENCE_BASE_YM = String(
 );
 
 const INTEREST_SET = new Set<string>(MVP_CATEGORY_IDS);
+const compareId = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
 export type HubEvidence = {
   contentId: string;
@@ -177,12 +181,26 @@ export function computePurposeEvidence(
     );
     // 서로 다른 시설 수: E2 시설 그룹으로 중복 제거.
     const facilityGroupIds = new Set(relevantPlaced.map(groupOf));
-    // 세부 유형 수: D1 새 분류 우선, 분류 결측은 세지 않는다.
-    const typeKeys = new Set(
-      relevantPlaced
-        .map((attraction) => detailClassificationStrict(attraction))
-        .filter((value): value is string => value !== null),
-    );
+    // 세부 유형 수: 시설 그룹당 대표 유형 하나만 기여한다(D4 결함 수정). 그룹 내
+    // 대표는 유효한 세부 분류(D1 새 분류 우선, 분류 결측 제외)가 있는 장소 중
+    // 안정적인 콘텐츠 ID 순서로 고른다. 유효 분류가 없는 그룹은 시설 수에는
+    // 포함되지만 대표가 없어 유형 수에는 기여하지 않는다. 대표 유형을 그룹 간에
+    // 다시 중복 제거해 다양성을 계산한다.
+    const relevantByGroup = new Map<string, Attraction[]>();
+    for (const attraction of relevantPlaced) {
+      const groupId = groupOf(attraction);
+      const members = relevantByGroup.get(groupId);
+      if (members) members.push(attraction);
+      else relevantByGroup.set(groupId, [attraction]);
+    }
+    const typeKeys = new Set<string>();
+    for (const members of relevantByGroup.values()) {
+      const representative = members
+        .filter((attraction) => detailClassificationStrict(attraction) !== null)
+        .toSorted((a, b) => compareId(a.contentId, b.contentId))[0];
+      if (representative)
+        typeKeys.add(detailClassificationStrict(representative)!);
+    }
     const facilities = facilityGroupIds.size;
     const types = typeKeys.size;
     fitByInterest[interest] = {
