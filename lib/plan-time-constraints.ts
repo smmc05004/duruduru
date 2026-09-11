@@ -14,6 +14,19 @@ export function localActivityWindow(
   };
 }
 
+/**
+ * 저장된 이동 구간의 `distanceKm`와 다시 계산한 값을 비교한다. 이 값은
+ * `Math.sin/cos/asin`으로 만드는데, 초월함수 결과는 JS 엔진(서버 Node ↔ 브라우저
+ * Chromium)마다 최대 1 ULP까지 다를 수 있다. 서버가 만든 계획을 브라우저에서
+ * 검증할 때 이 미세한 차이로 저장이 거부되던 회귀가 있어, 1mm(1e-6km) 허용
+ * 오차로 비교한다. 분 단위 값(`estimatedMinutes` 등)은 `Math.ceil`로 안정적이라
+ * 그대로 정확 비교한다.
+ */
+function sameDistanceKm(a: number | null, b: number | null): boolean {
+  if (a === null || b === null) return a === b;
+  return Math.abs(a - b) <= 1e-6;
+}
+
 export function planTimeError(
   plan: PlanSnapshot,
   enforceEditingRules = true,
@@ -108,7 +121,7 @@ export function planTimeError(
           l.status !== estimate.status ||
           l.estimatedMinutes !== estimate.estimatedMinutes ||
           l.reservedMinutes !== estimate.reservedMinutes ||
-          l.distanceKm !== estimate.distanceKm ||
+          !sameDistanceKm(l.distanceKm, estimate.distanceKm) ||
           l.policyVersion !== estimate.policyVersion
         )
           return "장소 간 이동시간과 일정이 일치하지 않아요.";

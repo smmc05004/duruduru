@@ -262,7 +262,7 @@ test("R6 부산 개인 일정 날짜/시간·14시 고정·숙소 메모·불가
   });
 });
 
-test("T6 중심 근거 카드의 목적 점수·중심 관광지 수가 실제 초안 배치와 맞고 시간표 제약을 지킨다", async ({
+test("T7 카드의 목적 적합성 구간·확정 연결 시설 수가 실제 초안 배치와 맞고 시간표 제약을 지킨다", async ({
   page,
 }) => {
   let response: { candidates: PlanSnapshot["destination"][] };
@@ -337,9 +337,12 @@ test("T6 중심 근거 카드의 목적 점수·중심 관광지 수가 실제 �
   // 목적 점수는 노출하되 과장 표현("전국 1위"·"가장 인기")은 없어야 한다(D4).
   // 면책 문구 "…평점·영업 보장이 아니에요"는 허용한다.
   expect(basisText).not.toMatch(/전국 역사 1위|가장 인기 있는/);
-  expect(basisText).toMatch(/목적 근거 점수/);
-  const hubMatch = basisText.match(/중심 관광지 (\d+)곳/);
-  const claimedHubCount = hubMatch ? Number(hubMatch[1]) : 0;
+  // T7(D4): 원점수 대신 목적 적합성 구간을 노출한다.
+  expect(basisText).toMatch(/목적 적합성 구간/);
+  const hubMatch = basisText.match(
+    /확정 연결 시설 (\d+)곳|(\d+)곳이 중심 관광지에 확정 연결/,
+  );
+  const claimedHubCount = hubMatch ? Number(hubMatch[1] ?? hubMatch[2]) : 0;
 
   await interestCard.getByRole("button", { name: /일정 보기$/ }).click();
   const plan = page.getByRole("region", { name: "여행 계획" });
