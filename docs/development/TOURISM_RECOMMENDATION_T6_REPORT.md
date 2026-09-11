@@ -252,6 +252,10 @@ D4 정렬 규칙 자체의 산출물이 제품 원칙("가용시간 우선", "�
 - `npx jest` : 기존 PoC `app/__tests__/page.test.tsx` 19실패만 유지(T7 전부터 동일, 신규 회귀 0).
 - `npm run test:e2e -- --repeat-each=2` 통과. `gh pr checks 76` Verify·E2E 초록.
 
+### 7.6a e2e에서 발견한 사전 존재 결함 수정 (같은 PR)
+
+T7 정렬 변경으로 `interest` 후보가 서울·역사+자연 검색에서 창원→과천으로 바뀌자, `test:e2e --repeat-each=2`의 숙소 메모 저장·복원 시나리오(`e2e/home.spec.ts:378`)가 결정적으로 실패했다. 추적 결과 T7과 무관한 **사전 존재 결함**을 발견했다: `lib/plan-time-constraints.ts`의 `planTimeError`가 저장된 이동 구간 `distanceKm`(서버 Node가 `Math.sin/cos/asin`으로 계산)와 브라우저(Chromium)가 다시 계산한 값을 정확 `!==`로 비교했다. 두 JS 엔진의 초월함수 결과가 최대 1 ULP 달라 특정 좌표 조합에서 저장이 거부됐다(공주 fixture 등 이전 `interest` 후보의 좌표는 우연히 이 문제를 피했다). `distanceKm` 비교에 1mm(1e-6km) 허용 오차를 두고(`sameDistanceKm`), 분 단위 파생값(`estimatedMinutes` 등, `Math.ceil` 기반이라 안정적)은 정확 비교를 유지했다. `lib/__tests__/enhancement-local-plan.test.ts`에 1 ULP 섭동은 통과·1mm 초과 불일치는 거절하는 회귀를 추가했다. 정렬 규칙·가중치·역할 순서는 이 수정으로 변경되지 않는다.
+
 ### 7.6 남은 위험·범위 밖
 
 - 목적 적합성 구간이 하루 6곳 근거리 대도시 일정 다수를 "매우 충실"(30/48)에 둔다. 의도된 포화이며, 변별은 야간·저다양성 셀(14+4)과 인접 시·군 비교(김해 vs 양산 등)에서 작동한다.
