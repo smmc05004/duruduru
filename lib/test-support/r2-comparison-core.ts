@@ -38,6 +38,7 @@ import { originRegion } from "@/lib/origin-regions";
 import mapping from "@/data/region-mapping.json";
 import profiles from "@/data/region-profiles.json";
 import travelTimes from "@/data/ktdb/interregional-travel-times-2024.json";
+import centralAttractions from "@/data/central-attractions.json";
 import type {
   MvpCategoryId,
   RegionAttraction,
@@ -598,3 +599,198 @@ export function alt4RelaxedCompare(a: DiagCandidate, b: DiagCandidate) {
 }
 
 export type MvpCategoryIdList = MvpCategoryId[];
+
+// ---------------------------------------------------------------------------
+// R2 보완 (재작업 기준 문서 사용자 지적 1·2·3) — 허브 풀 크기, 장거리 셀 실질 판정,
+// 최종 3장 구성 자체를 바꾸는 대안. 배포 코드는 여전히 수정하지 않는다.
+// ---------------------------------------------------------------------------
+
+type RawCentralRegion = {
+  regionId: string;
+  name: string;
+  province: string;
+  status: "ok" | "empty";
+  totalCount: number;
+};
+// `data/central-attractions.json`의 `regions`는 배열이다(맵이 아님) — T4의
+// `data/tourism-evidence.json`(regionId 키 맵)과 스키마가 다르다. regionId로
+// 조회하려면 인덱스를 직접 만들어야 한다.
+const centralRegionList =
+  centralAttractions.regions as unknown as RawCentralRegion[];
+const centralRegions = new Map<string, RawCentralRegion>(
+  centralRegionList.map((row) => [row.regionId, row]),
+);
+
+export type HubPoolInfo = {
+  regionId: string;
+  name: string;
+  status: "ok" | "empty" | "unknown";
+  /** 해당 지역에서 실제 조회된 중심 관광지(허브) 총 개수. status가 ok가 아니면 0. */
+  totalCount: number;
+};
+
+/**
+ * 지적 1(hubRank 지역 내 순위 오기 정정) 후속 — "상위 N위 이내 개수"로 지표를
+ * 바꿔도 지역 간 비교가 타당한지 확인하려면, 각 후보 지역이 실제로 조회한 허브
+ * 풀 크기(`totalCount`, TourAPI `LocgoHubTarService1`이 그 지역 조회에서 돌려준
+ * 총 항목 수, 최대 100)가 같은지부터 확인해야 한다. `data/central-attractions.json`
+ * (T3 산출물)만 읽는다 — 새 API 호출 없음.
+ */
+export function hubPoolForRegion(regionId: string): HubPoolInfo | null {
+  const row = centralRegions.get(regionId);
+  if (!row) return null;
+  return {
+    regionId,
+    name: row.name,
+    status: row.status,
+    totalCount: row.status === "ok" ? row.totalCount : 0,
+  };
+}
+
+/**
+ * 후보 그룹(광역시는 여러 구, 시·군은 보통 1개 지역)의 합산 허브 풀 크기.
+ * 지역별 상세를 함께 반환해 어느 구성원이 얼마를 기여하는지 보존한다.
+ */
+export function hubPoolForGroup(candidate: DiagCandidate): {
+  totalPool: number;
+  memberCount: number;
+  perRegion: HubPoolInfo[];
+} {
+  const perRegion = candidate.memberRegionIds
+    .map((id) => hubPoolForRegion(id))
+    .filter((row): row is HubPoolInfo => row !== null);
+  return {
+    totalPool: perRegion.reduce((sum, row) => sum + row.totalCount, 0),
+    memberCount: candidate.memberRegionIds.length,
+    perRegion,
+  };
+}
+
+export type NationalHubPoolSummary = {
+  regionCount: number;
+  okCount: number;
+  emptyCount: number;
+  min: number;
+  p10: number;
+  median: number;
+  p90: number;
+  max: number;
+  /** 광역시 그룹(시·도 전체) 합산 허브 풀 크기 — 개별 시·군의 풀 크기와 비교용. */
+  metropolitanGroupSums: Record<string, number>;
+};
+
+/**
+ * 전국 249개 매핑 지역 전체의 허브 풀 크기 분포. "익산·공주·경주 등 실제 비교
+ * 대상 지역들의 허브 풀 크기를 표로 남겨서 이 문제가 실제로 존재하는지 데이터로
+ * 확인한다"는 지시의 전국 배경값이다. 시·군 단위(최대 100~103)와 광역시 그룹
+ * 합산(수백~수천)의 규모 차이를 함께 보여준다.
+ */
+export function nationalHubPoolSummary(): NationalHubPoolSummary {
+  const rows = centralRegionList;
+  const ok = rows.filter((row) => row.status === "ok");
+  const counts = ok.map((row) => row.totalCount).toSorted((a, b) => a - b);
+  const pick = (p: number) =>
+    counts.length
+      ? counts[Math.min(counts.length - 1, Math.floor(counts.length * p))]
+      : 0;
+  const metropolitanGroupSums: Record<string, number> = {};
+  for (const row of rows) {
+    if (!/(?:특별시|광역시|특별자치시)$/u.test(row.province)) continue;
+    metropolitanGroupSums[row.province] =
+      (metropolitanGroupSums[row.province] ?? 0) +
+      (row.status === "ok" ? row.totalCount : 0);
+  }
+  return {
+    regionCount: rows.length,
+    okCount: ok.length,
+    emptyCount: rows.length - ok.length,
+    min: counts[0] ?? 0,
+    p10: pick(0.1),
+    median: pick(0.5),
+    p90: pick(0.9),
+    max: counts[counts.length - 1] ?? 0,
+    metropolitanGroupSums,
+  };
+}
+
+/**
+ * 지적 2(편도 2h+ 단순 부작용 카운트 금지) — 장거리 후보 하나의 "실질" 판정.
+ * 구성 가능성(왕복+식사+휴식+관광 시간 제약 충족)은 `diagnoseAll`이 `scheduleTrip`을
+ * 실제 실행해 성공한 그룹만 `candidate` 단계로 넘기므로 **이미 보장**돼 있다(별도
+ * 재확인 불필요, `lib/mvp-phase-two-planner.ts`의 `scheduleBaseTrip`/`scheduleTrip`
+ * 참고). 이 함수는 그 다음 질문 — "선택한 관심사에 맞는 실질적 방문을 제공하는가,
+ * 아니면 시간만 채우는 구색 맞추기 1곳뿐인가" — 만 판정한다.
+ */
+export type LongDistanceSubstance = {
+  groupId: string;
+  displayName: string;
+  roundTripMinutes: number;
+  requestedInterestCount: number;
+  fulfilledInterestCount: number;
+  /** 실제 배치 장소 중 요청 관심사 중 하나 이상과 일치하는 서로 다른 시설 수(E2 그룹 기준 근사: contentId 중복 없음). */
+  interestRelevantPlacedCount: number;
+  /** 그 시설들의 서로 다른 세부 유형 수(문서 D4-a `types_i`와 달리 그룹 대표 보정 없이 placed 배열 그대로 근사). */
+  interestRelevantDetailTypeCount: number;
+  matchedFacilityCount: number;
+  localFreeMinutes: number;
+  /** 구성 가능성: scheduleTrip이 이미 성공했으므로 항상 true(diagnoseAll 불변식). */
+  itineraryConstructable: true;
+  /** 요청 관심사를 전부 충족하지 못했거나, 관심사에 맞는 서로 다른 시설이 1곳 이하다. */
+  isTokenOnly: boolean;
+  /** 요청 관심사를 전부 충족하고 서로 다른 시설이 2곳 이상이다. */
+  isSubstantive: boolean;
+};
+
+export function assessLongDistanceSubstance(
+  candidate: DiagCandidate,
+  interests: MvpCategoryId[],
+): LongDistanceSubstance {
+  const relevant = candidate.placed.filter((place) =>
+    place.categories.some((category) => interests.includes(category)),
+  );
+  const detailTypes = new Set(
+    relevant
+      .map((place) => place.detailType)
+      .filter((type): type is string => type !== null),
+  );
+  const fulfilledInterestCount = candidate.fulfilledInterestCount;
+  const isTokenOnly =
+    fulfilledInterestCount < interests.length || relevant.length <= 1;
+  return {
+    groupId: candidate.groupId,
+    displayName: candidate.displayName,
+    roundTripMinutes: candidate.roundTripMinutes,
+    requestedInterestCount: interests.length,
+    fulfilledInterestCount,
+    interestRelevantPlacedCount: relevant.length,
+    interestRelevantDetailTypeCount: detailTypes.size,
+    matchedFacilityCount: candidate.matchedFacilityCount,
+    localFreeMinutes: candidate.localFreeMinutes,
+    itineraryConstructable: true,
+    isTokenOnly,
+    isSubstantive: !isTokenOnly,
+  };
+}
+
+/**
+ * 지적 3(최종 3장 "구성" 자체를 비교) — 추가 대안: 세 역할을 독립적으로 각각
+ * 정렬하는 대신, **단일 관심사 적합성 순위에서 서로 다른 groupId 상위 3개**를
+ * 그대로 뽑는다. easy/relaxed의 별도 정의를 없애고 "가장 목적에 맞는 순서대로
+ * 3장"이라는 가장 단순한 구성 규칙과 비교하기 위함이다. 새 사용자 입력이나 거리
+ * 하한/가점을 넣지 않는다 — 정렬 키는 `interest` 비교자를 그대로 재사용한다.
+ */
+export function selectTopThreeBySingleRanking(
+  candidates: DiagCandidate[],
+  compare: (a: DiagCandidate, b: DiagCandidate) => number,
+): [DiagCandidate | null, DiagCandidate | null, DiagCandidate | null] {
+  const ranked = [...candidates].toSorted(compare);
+  const seen = new Set<string>();
+  const picked: DiagCandidate[] = [];
+  for (const candidate of ranked) {
+    if (seen.has(candidate.groupId)) continue;
+    seen.add(candidate.groupId);
+    picked.push(candidate);
+    if (picked.length === 3) break;
+  }
+  return [picked[0] ?? null, picked[1] ?? null, picked[2] ?? null];
+}

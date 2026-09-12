@@ -30,13 +30,17 @@ import type { SearchInput } from "@/lib/mvp-phase-two-types";
 import {
   alt1InterestCompare,
   alt4RelaxedCompare,
+  assessLongDistanceSubstance,
   baselineEasyCompare,
   baselineInterestCompare,
   baselineRelaxedCompare,
   diagnoseAll,
+  hubPoolForGroup,
   makeAlt2InterestCompare,
   makeAlt3InterestCompare,
+  nationalHubPoolSummary,
   selectFinalThree,
+  selectTopThreeBySingleRanking,
   verifyReconstruction,
   type DiagCandidate,
   type FinalThree,
@@ -139,6 +143,11 @@ function summarizeCandidate(
     }
     return best;
   })();
+  // R2 보완(지적 2·1) — 구성 가능성은 diagnoseAll의 scheduleTrip 성공으로 이미
+  // 보장됨(itineraryConstructable: true). 여기서는 실질(구색맞추기 여부)과 허브
+  // 풀 크기만 추가한다. 새 API 호출 없음, 이미 계산된 필드만 재조합한다.
+  const substance = assessLongDistanceSubstance(c, interests);
+  const hubPool = hubPoolForGroup(c);
   return {
     groupId: c.groupId,
     displayName: c.displayName,
@@ -153,6 +162,13 @@ function summarizeCandidate(
     bestHubTitle: bestHub?.title ?? null,
     localFreeMinutes: c.localFreeMinutes,
     placedTitles: c.placed.map((p) => p.title),
+    fulfilledInterestCount: substance.fulfilledInterestCount,
+    interestRelevantPlacedCount: substance.interestRelevantPlacedCount,
+    interestRelevantDetailTypeCount: substance.interestRelevantDetailTypeCount,
+    isTokenOnly: substance.isTokenOnly,
+    isSubstantive: substance.isSubstantive,
+    hubPoolTotal: hubPool.totalPool,
+    hubPoolMemberCount: hubPool.memberCount,
   };
 }
 
@@ -211,12 +227,28 @@ describe("R2 오프라인 대안 비교 — 48개 입력 매트릭스", () => {
             JSON.stringify(summarizeFinalThree(repeat, set.interests)),
           ).toBe(JSON.stringify(byAlt.baseline));
 
+          // R2 보완(지적 3) — 최종 3장 "구성" 자체를 바꾼 대안: 역할을 나누지
+          // 않고 단일 관심사 적합성 순위(기준선 interest 비교자)에서 서로 다른
+          // groupId 상위 3개를 그대로 뽑는다. 새 사용자 입력·거리 하한/가점 없음.
+          const composeSingleRankingRaw = selectTopThreeBySingleRanking(
+            candidates,
+            baselineInterestCompare,
+          );
+          const composeGroupIds = composeSingleRankingRaw
+            .filter((c): c is DiagCandidate => c !== null)
+            .map((c) => c.groupId);
+          expect(new Set(composeGroupIds).size).toBe(composeGroupIds.length);
+          const composeSingleRanking = composeSingleRankingRaw.map((c) =>
+            summarizeCandidate(c, set.interests),
+          );
+
           rows.push({
             origin: origin.key,
             interests: set.key,
             time: time.key,
             candidateCount: candidates.length,
             ...byAlt,
+            composeSingleRanking,
           });
         });
       }
@@ -304,6 +336,84 @@ describe("R2 오프라인 대안 비교 — R1 고정 입력의 6개 지정 지�
     );
   }
 
+  // R2 보완(지적 1) — 허브 풀 크기. `data/central-attractions.json`(T3 산출물)의
+  // 실제 `totalCount`(그 지역 중심 관광지 API 조회에서 돌려준 총 개수)를 6개
+  // 지정 지역과 전국 분포로 확인한다. 값은 정상본 데이터의 실측이며, 아래
+  // 구체값이 바뀌면 정상본이 갱신됐다는 뜻이므로 문서 재검증이 필요하다.
+  const hubPoolByFocus = Object.fromEntries(
+    Object.entries(FOCUS_GROUPS).map(([label, groupId]) => {
+      const candidate = candidates.find((c) => c.groupId === groupId)!;
+      return [label, hubPoolForGroup(candidate)];
+    }),
+  );
+  const nationalPool = nationalHubPoolSummary();
+
+  it("허브 풀 크기 — 5개 시·군은 100(또는 API 원본 상한), 과천만 63으로 더 작다", () => {
+    expect(hubPoolByFocus["남양주"].totalPool).toBe(100);
+    expect(hubPoolByFocus["하남"].totalPool).toBe(100);
+    expect(hubPoolByFocus["과천"].totalPool).toBe(63);
+    expect(hubPoolByFocus["공주"].totalPool).toBe(100);
+    expect(hubPoolByFocus["익산"].totalPool).toBe(100);
+    expect(hubPoolByFocus["경주"].totalPool).toBe(100);
+    // 6개 전부 단일 시·군(구 분할 없음)이라 memberCount는 1이다 — 광역시 그룹과
+    // 달리 이 6개 지역 사이에서는 "구성원 수가 다른 풀 합산" 문제가 없다.
+    for (const info of Object.values(hubPoolByFocus))
+      expect(info.memberCount).toBe(1);
+  });
+
+  it("허브 풀 크기 — 전국적으로는 지역마다 실제 조회 개수가 다르다(30~103)", () => {
+    expect(nationalPool.min).toBeLessThan(50);
+    expect(nationalPool.max).toBeGreaterThanOrEqual(100);
+    expect(nationalPool.median).toBe(100);
+  });
+
+  it("허브 풀 크기 — 광역시 그룹 합산은 단일 시·군보다 자릿수가 다르게 크다", () => {
+    // 광역시 그룹은 소속 구 전부의 풀을 합산한다(groupForMapping). 6개 지정
+    // 지역(단일 시·군, 최대 100~103)과 비교해 최소 한 자릿수 이상 크다는 것을
+    // 확인해, "풀이 큰 지역이 상위 N위 이내 개수에서 구조적으로 유리하다"는
+    // 우려가 데이터로 실재하는지 검증한다.
+    const busanSum = nationalPool.metropolitanGroupSums["부산광역시"];
+    expect(busanSum).toBeGreaterThan(1000);
+    expect(busanSum).toBeGreaterThan(hubPoolByFocus["경주"].totalPool * 10);
+  });
+
+  // R2 보완(지적 3) — 역할을 나누지 않는 단일 순위 top-3 구성을, 이 고정 입력
+  // (서울·역사·주간)에서도 계산해 6개 지정 지역과의 관계를 함께 남긴다.
+  const composeSingleRanking = selectTopThreeBySingleRanking(
+    candidates,
+    baselineInterestCompare,
+  );
+
+  // R2 보완(지적 4) — 근거리 vs 공주/익산/경주의 실제 방문 시각. R1/R2는 배치
+  // 장소 목록만 보존했고 방문 시각은 없었다. `preview.blocks`(scheduleTrip이
+  // 실제로 만든 시간표, diagnoseAll이 이미 계산해 둔 값)에서 그대로 추출한다 —
+  // 재선정 없음.
+  const focusSchedules = Object.fromEntries(
+    Object.entries(FOCUS_GROUPS).map(([label, groupId]) => {
+      const candidate = candidates.find((c) => c.groupId === groupId)!;
+      return [
+        label,
+        candidate.preview.blocks
+          .toSorted((a, b) => a.day - b.day || (a.startAt < b.startAt ? -1 : 1))
+          .map((block) => ({
+            day: block.day,
+            startAt: block.startAt,
+            endAt: block.endAt,
+            kind: block.kind,
+            title: block.title,
+            reason: block.reason,
+          })),
+      ];
+    }),
+  );
+
+  it("구성 대안(단일 순위 top-3) — 서로 다른 groupId 3개를 만든다", () => {
+    const ids = composeSingleRanking
+      .filter((c): c is DiagCandidate => c !== null)
+      .map((c) => c.groupId);
+    expect(new Set(ids).size).toBe(3);
+  });
+
   it("데이터 덤프(R2_OUT)", () => {
     if (process.env.R2_OUT_FOCUS)
       writeFileSync(
@@ -313,6 +423,12 @@ describe("R2 오프라인 대안 비교 — R1 고정 입력의 6개 지정 지�
             input: R1_FIXED_INPUT,
             candidateCount: candidates.length,
             focus: focusDump,
+            hubPoolByFocus,
+            nationalHubPoolSummary: nationalPool,
+            composeSingleRanking: composeSingleRanking.map((c) =>
+              summarizeCandidate(c, R1_FIXED_INPUT.interests),
+            ),
+            focusSchedules,
           },
           null,
           2,
