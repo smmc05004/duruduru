@@ -11,6 +11,9 @@ export default defineConfig({
   // 재시도는 실패 케이스만 다시 돌리므로 실제 회귀는 그대로 드러난다.
   // 기존 `trace: "on-first-retry"` 설정도 재시도가 있어야 의미가 있다.
   retries: process.env.CI ? 2 : 0,
+  // GitHub runners에서 Next 개발 서버 초기 컴파일·검색 응답이 느릴 수 있어
+  // 로컬과 동일한 상호작용을 기다리되 회귀 자체는 그대로 실패시킨다.
+  expect: { timeout: 15_000 },
   use: {
     baseURL: e2eUrl,
     trace: "on-first-retry",
