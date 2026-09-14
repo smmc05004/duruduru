@@ -8,6 +8,7 @@ import type {
   Attraction,
   Candidate,
   Coordinates,
+  PurposeEvidence,
   Restaurant,
   TimeBlock,
 } from "@/lib/mvp-phase-two-types";
@@ -48,6 +49,7 @@ function attractionBlock(
     durationMinutes: 60,
     contentId: place.contentId,
     attraction: place,
+    facilityGroupId: `facility-${id}`,
     reason: "fixture",
   };
 }
@@ -61,9 +63,14 @@ function candidate(
     points?: Array<Coordinates | null>;
   },
 ): Omit<Candidate, "recommendation" | "reasons"> {
-  const blocks = (options.points ?? [point(37, 127), point(37.01, 127.01)]).map(
-    (coordinates, index) =>
-      attractionBlock(`${groupId}-${index}`, 1, coordinates),
+  const blocks = (
+    options.points ?? [
+      point(37, 127),
+      point(37.01, 127.01),
+      point(37.02, 127.02),
+    ]
+  ).map((coordinates, index) =>
+    attractionBlock(`${groupId}-${index}`, index < 2 ? 1 : 2, coordinates),
   );
   return {
     groupId,
@@ -101,71 +108,107 @@ function candidate(
   };
 }
 
+function purpose(
+  fitAverage: number,
+  facilities = 3,
+  types = 3,
+): PurposeEvidence {
+  return {
+    version: "test",
+    baseYm: "202608",
+    status: "scored",
+    fitBand: fitAverage >= 6.5 ? 2 : fitAverage >= 4.5 ? 1 : 0,
+    fitAverage,
+    fitByInterest: {
+      nature: { facilities, types, fit: fitAverage },
+      history: { facilities, types, fit: fitAverage },
+      culture: { facilities, types, fit: fitAverage },
+    },
+    matchedFacilityCount: Math.min(facilities, 4),
+    score: 0,
+    perInterest: {},
+    contributingContentIds: [],
+    centralEmptyRegionIds: [],
+    matchedHubCount: 0,
+  };
+}
+
 describe("E1 목적지 역할 선택", () => {
-  it("가까운 A, 관심사가 다양한 B, 자유시간이 긴 C를 순서대로 선택한다", () => {
+  it("가까운 A, 1박2일 B, 관심사 중심 C를 순서대로 선택한다", () => {
     const selected = selectCandidateRoles(
       [
         candidate("A", {
-          oneWayMinutes: 60,
-          fulfilledInterests: ["history"],
-          categoryDiversity: 1,
-          freeMinutes: 300,
+          oneWayMinutes: 40,
+          fulfilledInterests: ["nature", "history", "culture"],
+          categoryDiversity: 3,
+          freeMinutes: 500,
         }),
         candidate("B", {
-          oneWayMinutes: 130,
+          oneWayMinutes: 120,
           fulfilledInterests: ["nature", "history", "culture"],
-          categoryDiversity: 4,
-          freeMinutes: 300,
+          categoryDiversity: 3,
+          freeMinutes: 500,
         }),
         candidate("C", {
           oneWayMinutes: 180,
-          fulfilledInterests: ["history"],
-          categoryDiversity: 1,
-          freeMinutes: 900,
+          fulfilledInterests: ["nature", "history", "culture"],
+          categoryDiversity: 3,
+          freeMinutes: 500,
         }),
       ],
       [...input],
+      new Map([
+        ["A", purpose(7, 4, 3)],
+        ["B", purpose(7, 4, 3)],
+        ["C", purpose(7, 4, 3)],
+      ]),
     );
 
-    // 표시 순서는 interest → easy → relaxed (D4): 관심사가 다양한 B가 먼저다.
-    expect(selected.map((item) => item.groupId)).toEqual(["B", "A", "C"]);
+    // 표시 순서는 nearby → overnight → interestRich.
+    expect(selected.map((item) => item.groupId)).toEqual(["A", "B", "C"]);
     expect(selected.map((item) => item.recommendation.role)).toEqual([
-      "interest",
-      "easy",
-      "relaxed",
+      "nearby",
+      "overnight",
+      "interestRich",
     ]);
   });
 
-  it("단독 우승자가 겹쳐도 이미 고른 그룹은 제외하고 1~2곳만 그대로 반환한다", () => {
+  it("역할 조건을 만족하지 않으면 다른 역할 후보로 억지 보충하지 않는다", () => {
     const first = candidate("A", {
-      oneWayMinutes: 60,
+      oneWayMinutes: 40,
       fulfilledInterests: ["nature", "history", "culture"],
-      categoryDiversity: 4,
-      freeMinutes: 900,
+      categoryDiversity: 3,
+      freeMinutes: 500,
     });
     const second = candidate("B", {
-      oneWayMinutes: 120,
-      fulfilledInterests: ["history"],
-      categoryDiversity: 1,
-      freeMinutes: 200,
+      oneWayMinutes: 90,
+      fulfilledInterests: ["nature", "history", "culture"],
+      categoryDiversity: 3,
+      freeMinutes: 120,
     });
 
-    const selected = selectCandidateRoles([first, second], [...input]);
+    const selected = selectCandidateRoles(
+      [first, second],
+      [...input],
+      new Map([
+        ["A", purpose(7, 4, 3)],
+        ["B", purpose(7, 4, 3)],
+      ]),
+    );
 
-    expect(selected.map((item) => item.groupId)).toEqual(["A", "B"]);
+    expect(selected.map((item) => item.groupId)).toEqual(["A"]);
     expect(selected.map((item) => item.recommendation.role)).toEqual([
-      "interest",
-      "easy",
+      "nearby",
     ]);
   });
 
   it("모든 비교 지표가 같으면 groupId 사전순으로 역할을 결정한다", () => {
     const options = {
       oneWayMinutes: 120,
-      fulfilledInterests: ["history"] as const,
-      categoryDiversity: 1,
+      fulfilledInterests: ["nature", "history", "culture"] as const,
+      categoryDiversity: 3,
       freeMinutes: 300,
-      points: [point(37, 127), point(37.01, 127.01)],
+      points: [point(37, 127), point(37.01, 127.01), point(37.02, 127.02)],
     };
 
     const selected = selectCandidateRoles(
@@ -175,9 +218,14 @@ describe("E1 목적지 역할 선택", () => {
         candidate("B", options),
       ],
       [...input],
+      new Map([
+        ["A", purpose(7, 4, 3)],
+        ["B", purpose(7, 4, 3)],
+        ["C", purpose(7, 4, 3)],
+      ]),
     );
 
-    expect(selected.map((item) => item.groupId)).toEqual(["A", "B", "C"]);
+    expect(selected.map((item) => item.groupId)).toEqual(["A", "B"]);
   });
 
   it("좌표가 일부 또는 전부 빠진 초안은 숨기지 않고 근접성 비교 불가 근거를 보존한다", () => {
@@ -185,20 +233,24 @@ describe("E1 목적지 역할 선택", () => {
       [
         candidate("partial", {
           oneWayMinutes: 60,
-          fulfilledInterests: ["history"],
+          fulfilledInterests: ["nature", "history", "culture"],
           categoryDiversity: 1,
           freeMinutes: 200,
           points: [point(37, 127), null, point(37.02, 127.02)],
         }),
         candidate("missing", {
           oneWayMinutes: 120,
-          fulfilledInterests: ["history"],
+          fulfilledInterests: ["nature", "history", "culture"],
           categoryDiversity: 1,
           freeMinutes: 500,
-          points: [null, null],
+          points: [null, null, null],
         }),
       ],
       [...input],
+      new Map([
+        ["partial", purpose(7, 4, 3)],
+        ["missing", purpose(7, 4, 3)],
+      ]),
     );
 
     expect(selected).toHaveLength(2);
@@ -230,7 +282,10 @@ describe("E1 목적지 역할 선택", () => {
       result.candidates.length,
     );
     expect(result.candidates.map((item) => item.recommendation?.role)).toEqual(
-      ["interest", "easy", "relaxed"].slice(0, result.candidates.length),
+      ["nearby", "overnight", "interestRich"].slice(
+        0,
+        result.candidates.length,
+      ),
     );
 
     const selected = result.candidates[0];
@@ -319,9 +374,9 @@ describe("T5 목적 근거 점수의 초안 일치·결정성", () => {
       b.candidates.map((c) => c.recommendation?.purpose?.score),
     );
     expect(a.candidates.map((c) => c.recommendation?.role)).toEqual([
-      "interest",
-      "easy",
-      "relaxed",
+      "nearby",
+      "overnight",
+      "interestRich",
     ]);
   });
 });

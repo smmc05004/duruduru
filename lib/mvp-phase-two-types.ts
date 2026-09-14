@@ -118,7 +118,8 @@ export type DataMetadata = {
   representativePoint: string;
   searchedAt: string;
 };
-export type RecommendationRole = "easy" | "interest" | "relaxed";
+export type RecommendationRole =
+  "easy" | "interest" | "relaxed" | "nearby" | "overnight" | "interestRich";
 /** 요청 관심사 하나의 목적 적합성 세부 지표 (T7 / D4). */
 export type PurposeFitInterest = {
   /** 초안에 배치된, 이 관심사에 해당하는 서로 다른 시설 수(E2 시설 중복 제거). */
@@ -182,7 +183,7 @@ export type PurposeEvidence = {
 };
 export type CandidateRecommendation = {
   role: RecommendationRole;
-  algorithmVersion: "e1-v1" | "e1-v2" | "e1-v3";
+  algorithmVersion: "e1-v1" | "e1-v2" | "e1-v3" | "e1-v4";
   roundTripMinutes: number;
   fulfilledInterestCount: number;
   attractionCount: number;

@@ -509,8 +509,7 @@ describe("R1 진단 — 고정 입력(서울·역사·08:00→익일20:00) 전�
     }
   });
 
-  it("정합성 검증 2: 이 파일이 옮겨 적은 interest/easy/relaxed 비교자로 직접 정렬한 승자가 실제 출력과 같다", () => {
-    if (real.kind !== "success") throw new Error("전제 실패");
+  it("정합성 검증 2: R1 당시 interest/easy/relaxed baseline 승자가 고정 fixture와 같다", () => {
     const interestWinner = [...candidates].sort(interestCompare)[0];
     const easyWinner = [...candidates]
       .filter((c) => c.groupId !== interestWinner.groupId)
@@ -523,13 +522,9 @@ describe("R1 진단 — 고정 입력(서울·역사·08:00→익일20:00) 전�
       )
       .sort(relaxedCompare)[0];
     const expected = {
-      interest: real.candidates.find(
-        (c) => c.recommendation!.role === "interest",
-      )!.groupId,
-      easy: real.candidates.find((c) => c.recommendation!.role === "easy")
-        ?.groupId,
-      relaxed: real.candidates.find((c) => c.recommendation!.role === "relaxed")
-        ?.groupId,
+      interest: "municipality:경기도:고양시",
+      easy: "municipality:경기도:과천시",
+      relaxed: "municipality:경기도:의왕시",
     };
     expect(interestWinner.groupId).toBe(expected.interest);
     expect(easyWinner?.groupId).toBe(expected.easy);

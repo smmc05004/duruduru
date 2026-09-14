@@ -224,6 +224,39 @@ describe("T5 목적 근거 필드 저장 하위호환", () => {
     ).toEqual(purpose);
   });
 
+  it("e1-v4 새 역할 저장본은 허용하고 role/version 불일치는 거절한다", () => {
+    const plan = savedPlan();
+    plan.destination.recommendation = {
+      ...legacyRecommendation,
+      role: "nearby",
+      algorithmVersion: "e1-v4",
+      purpose,
+    };
+    expect(isSavedPlan({ ...plan, savedAt: "2026-09-01T00:00:00Z" })).toBe(
+      true,
+    );
+    const oldVersionNewRole = savedPlan();
+    oldVersionNewRole.destination.recommendation = {
+      ...legacyRecommendation,
+      role: "nearby",
+      algorithmVersion: "e1-v3",
+      purpose,
+    };
+    expect(
+      isSavedPlan({ ...oldVersionNewRole, savedAt: "2026-09-01T00:00:00Z" }),
+    ).toBe(false);
+    const newVersionOldRole = savedPlan();
+    newVersionOldRole.destination.recommendation = {
+      ...legacyRecommendation,
+      role: "interest",
+      algorithmVersion: "e1-v4",
+      purpose,
+    };
+    expect(
+      isSavedPlan({ ...newVersionOldRole, savedAt: "2026-09-01T00:00:00Z" }),
+    ).toBe(false);
+  });
+
   it("망가진 purpose(점수 상한 초과)는 저장본을 거절한다", () => {
     const plan = savedPlan();
     plan.destination.recommendation = {

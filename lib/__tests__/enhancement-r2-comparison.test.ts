@@ -26,7 +26,7 @@
 import { writeFileSync } from "node:fs";
 import { afterAll, describe, expect, it } from "@jest/globals";
 import type { MvpCategoryId } from "@/lib/mvp-region-data";
-import type { SearchInput } from "@/lib/mvp-phase-two-types";
+import type { Attraction, SearchInput } from "@/lib/mvp-phase-two-types";
 import {
   alt1InterestCompare,
   alt4RelaxedCompare,
@@ -65,6 +65,251 @@ const TIME_CASES = [
   { key: "night", startAt: "2026-09-12T18:00", returnBy: "2026-09-13T20:00" },
 ];
 const SEARCHED_AT = "2026-09-11T00:00:00.000Z";
+const R2_BASELINE_SNAPSHOT: Record<
+  string,
+  { interest: string; easy: string; relaxed: string }
+> = {
+  "seoul|history|day": {
+    interest: "municipality:경기도:고양시",
+    easy: "municipality:경기도:과천시",
+    relaxed: "municipality:경기도:의왕시",
+  },
+  "seoul|history|night": {
+    interest: "municipality:경기도:고양시",
+    easy: "municipality:경기도:과천시",
+    relaxed: "municipality:경기도:의정부시",
+  },
+  "seoul|nature|day": {
+    interest: "municipality:경기도:고양시",
+    easy: "municipality:경기도:과천시",
+    relaxed: "municipality:경기도:광명시",
+  },
+  "seoul|nature|night": {
+    interest: "municipality:경기도:고양시",
+    easy: "municipality:경기도:과천시",
+    relaxed: "municipality:경기도:광명시",
+  },
+  "seoul|culture|day": {
+    interest: "municipality:경기도:구리시",
+    easy: "municipality:경기도:과천시",
+    relaxed: "municipality:경기도:하남시",
+  },
+  "seoul|culture|night": {
+    interest: "municipality:경기도:구리시",
+    easy: "municipality:경기도:고양시",
+    relaxed: "municipality:경기도:부천시",
+  },
+  "seoul|leisure|day": {
+    interest: "municipality:경기도:고양시",
+    easy: "municipality:경기도:구리시",
+    relaxed: "municipality:경기도:오산시",
+  },
+  "seoul|leisure|night": {
+    interest: "municipality:경기도:고양시",
+    easy: "municipality:경기도:구리시",
+    relaxed: "municipality:경기도:부천시",
+  },
+  "seoul|rest|day": {
+    interest: "municipality:경기도:구리시",
+    easy: "municipality:경기도:과천시",
+    relaxed: "municipality:경기도:광명시",
+  },
+  "seoul|rest|night": {
+    interest: "municipality:경기도:구리시",
+    easy: "municipality:경기도:고양시",
+    relaxed: "municipality:경기도:부천시",
+  },
+  "seoul|history+culture|day": {
+    interest: "municipality:경기도:구리시",
+    easy: "municipality:경기도:과천시",
+    relaxed: "municipality:경기도:군포시",
+  },
+  "seoul|history+culture|night": {
+    interest: "municipality:경기도:구리시",
+    easy: "municipality:경기도:고양시",
+    relaxed: "municipality:경기도:부천시",
+  },
+  "busan|history|day": {
+    interest: "municipality:경상남도:김해시",
+    easy: "municipality:경상남도:양산시",
+    relaxed: "municipality:경상북도:영양군",
+  },
+  "busan|history|night": {
+    interest: "municipality:경상남도:김해시",
+    easy: "municipality:경상남도:양산시",
+    relaxed: "municipality:경상남도:창원시",
+  },
+  "busan|nature|day": {
+    interest: "municipality:경상남도:김해시",
+    easy: "municipality:경상남도:양산시",
+    relaxed: "municipality:경상남도:창원시",
+  },
+  "busan|nature|night": {
+    interest: "municipality:경상남도:김해시",
+    easy: "municipality:경상남도:양산시",
+    relaxed: "municipality:경상남도:밀양시",
+  },
+  "busan|culture|day": {
+    interest: "municipality:경상남도:김해시",
+    easy: "municipality:경상남도:양산시",
+    relaxed: "municipality:경상남도:함양군",
+  },
+  "busan|culture|night": {
+    interest: "municipality:경상남도:김해시",
+    easy: "municipality:경상남도:양산시",
+    relaxed: "municipality:경상남도:창원시",
+  },
+  "busan|leisure|day": {
+    interest: "municipality:경상남도:김해시",
+    easy: "municipality:경상남도:양산시",
+    relaxed: "municipality:경상북도:청도군",
+  },
+  "busan|leisure|night": {
+    interest: "municipality:경상남도:김해시",
+    easy: "municipality:경상남도:양산시",
+    relaxed: "municipality:경상남도:밀양시",
+  },
+  "busan|rest|day": {
+    interest: "municipality:경상남도:김해시",
+    easy: "municipality:경상남도:양산시",
+    relaxed: "municipality:경상남도:의령군",
+  },
+  "busan|rest|night": {
+    interest: "municipality:경상남도:김해시",
+    easy: "municipality:경상남도:양산시",
+    relaxed: "municipality:경상남도:창원시",
+  },
+  "busan|history+culture|day": {
+    interest: "municipality:경상남도:김해시",
+    easy: "municipality:경상남도:양산시",
+    relaxed: "municipality:경상남도:밀양시",
+  },
+  "busan|history+culture|night": {
+    interest: "municipality:경상남도:김해시",
+    easy: "municipality:경상남도:양산시",
+    relaxed: "municipality:경상남도:창원시",
+  },
+  "gangneung|history|day": {
+    interest: "municipality:강원특별자치도:양양군",
+    easy: "municipality:강원특별자치도:동해시",
+    relaxed: "municipality:경상북도:영양군",
+  },
+  "gangneung|history|night": {
+    interest: "municipality:강원특별자치도:양양군",
+    easy: "municipality:강원특별자치도:동해시",
+    relaxed: "municipality:강원특별자치도:속초시",
+  },
+  "gangneung|nature|day": {
+    interest: "municipality:강원특별자치도:양양군",
+    easy: "municipality:강원특별자치도:동해시",
+    relaxed: "municipality:경기도:의정부시",
+  },
+  "gangneung|nature|night": {
+    interest: "municipality:강원특별자치도:양양군",
+    easy: "municipality:강원특별자치도:동해시",
+    relaxed: "municipality:강원특별자치도:속초시",
+  },
+  "gangneung|culture|day": {
+    interest: "municipality:강원특별자치도:삼척시",
+    easy: "municipality:강원특별자치도:양양군",
+    relaxed: "municipality:강원특별자치도:동해시",
+  },
+  "gangneung|culture|night": {
+    interest: "municipality:강원특별자치도:양양군",
+    easy: "municipality:강원특별자치도:동해시",
+    relaxed: "municipality:강원특별자치도:속초시",
+  },
+  "gangneung|leisure|day": {
+    interest: "municipality:강원특별자치도:양양군",
+    easy: "municipality:강원특별자치도:동해시",
+    relaxed: "municipality:경상북도:울진군",
+  },
+  "gangneung|leisure|night": {
+    interest: "municipality:강원특별자치도:양양군",
+    easy: "municipality:강원특별자치도:동해시",
+    relaxed: "municipality:강원특별자치도:속초시",
+  },
+  "gangneung|rest|day": {
+    interest: "municipality:강원특별자치도:양양군",
+    easy: "municipality:강원특별자치도:동해시",
+    relaxed: "municipality:강원특별자치도:태백시",
+  },
+  "gangneung|rest|night": {
+    interest: "municipality:강원특별자치도:양양군",
+    easy: "municipality:강원특별자치도:동해시",
+    relaxed: "municipality:강원특별자치도:속초시",
+  },
+  "gangneung|history+culture|day": {
+    interest: "municipality:강원특별자치도:양양군",
+    easy: "municipality:강원특별자치도:동해시",
+    relaxed: "municipality:강원특별자치도:삼척시",
+  },
+  "gangneung|history+culture|night": {
+    interest: "municipality:강원특별자치도:속초시",
+    easy: "municipality:강원특별자치도:양양군",
+    relaxed: "municipality:강원특별자치도:동해시",
+  },
+  "suwon|history|day": {
+    interest: "municipality:경기도:화성시",
+    easy: "municipality:경기도:용인시",
+    relaxed: "municipality:경기도:의왕시",
+  },
+  "suwon|history|night": {
+    interest: "municipality:경기도:화성시",
+    easy: "municipality:경기도:용인시",
+    relaxed: "municipality:경기도:안양시",
+  },
+  "suwon|nature|day": {
+    interest: "municipality:경기도:화성시",
+    easy: "municipality:경기도:용인시",
+    relaxed: "municipality:경기도:오산시",
+  },
+  "suwon|nature|night": {
+    interest: "municipality:경기도:화성시",
+    easy: "municipality:경기도:용인시",
+    relaxed: "municipality:경기도:안양시",
+  },
+  "suwon|culture|day": {
+    interest: "municipality:경기도:화성시",
+    easy: "municipality:경기도:용인시",
+    relaxed: "municipality:경기도:하남시",
+  },
+  "suwon|culture|night": {
+    interest: "municipality:경기도:화성시",
+    easy: "municipality:경기도:용인시",
+    relaxed: "municipality:경기도:안양시",
+  },
+  "suwon|leisure|day": {
+    interest: "municipality:경기도:화성시",
+    easy: "municipality:경기도:용인시",
+    relaxed: "municipality:경기도:오산시",
+  },
+  "suwon|leisure|night": {
+    interest: "municipality:경기도:용인시",
+    easy: "municipality:경기도:화성시",
+    relaxed: "municipality:경기도:안양시",
+  },
+  "suwon|rest|day": {
+    interest: "municipality:경기도:화성시",
+    easy: "municipality:경기도:용인시",
+    relaxed: "municipality:경기도:오산시",
+  },
+  "suwon|rest|night": {
+    interest: "municipality:경기도:화성시",
+    easy: "municipality:경기도:용인시",
+    relaxed: "municipality:경기도:오산시",
+  },
+  "suwon|history+culture|day": {
+    interest: "municipality:경기도:화성시",
+    easy: "municipality:경기도:용인시",
+    relaxed: "municipality:경기도:군포시",
+  },
+  "suwon|history+culture|night": {
+    interest: "municipality:경기도:화성시",
+    easy: "municipality:경기도:용인시",
+    relaxed: "municipality:경기도:오산시",
+  },
+};
 
 /** R1이 지정한 6개 지역의 groupId(재작업 기준 문서 배경 사례). */
 const FOCUS_GROUPS: Record<string, string> = {
@@ -163,7 +408,10 @@ function summarizeCandidate(
     localFreeMinutes: c.localFreeMinutes,
     placedTitles: c.placed.map((p) => p.title),
     fulfilledInterestCount: substance.fulfilledInterestCount,
-    interestRelevantPlacedCount: substance.interestRelevantPlacedCount,
+    interestRelevantPlacedRecordCount:
+      substance.interestRelevantPlacedRecordCount,
+    interestRelevantFacilityGroupCount:
+      substance.interestRelevantFacilityGroupCount,
     interestRelevantDetailTypeCount: substance.interestRelevantDetailTypeCount,
     isTokenOnly: substance.isTokenOnly,
     isSubstantive: substance.isSubstantive,
@@ -195,19 +443,15 @@ describe("R2 오프라인 대안 비교 — 48개 입력 매트릭스", () => {
             interests: set.interests,
           };
           const { candidates } = diagnoseAll(input);
-          if (candidates.length === 0) {
-            rows.push({
-              origin: origin.key,
-              interests: set.key,
-              time: time.key,
-              candidateCount: 0,
-            });
-            return;
-          }
+          expect(candidates.length).toBeGreaterThan(0);
+          const snapshotKey = `${origin.key}|${set.key}|${time.key}`;
+          const expectedBaseline = R2_BASELINE_SNAPSHOT[snapshotKey];
+          expect(expectedBaseline).toBeDefined();
           const verification = verifyReconstruction(
             input,
             candidates,
             SEARCHED_AT,
+            expectedBaseline,
           );
           expect(verification.ok).toBe(true);
 
@@ -220,6 +464,11 @@ describe("R2 오프라인 대안 비교 — 48개 입력 매트릭스", () => {
             const three = selectFinalThree(candidates, roleCompares);
             byAlt[altKey] = summarizeFinalThree(three, set.interests);
           }
+          expect({
+            interest: byAlt.baseline.interest?.groupId,
+            easy: byAlt.baseline.easy?.groupId,
+            relaxed: byAlt.baseline.relaxed?.groupId,
+          }).toEqual(expectedBaseline);
 
           // 결정성: 같은 후보 배열을 다시 정렬해도 같은 결과.
           const repeat = selectFinalThree(candidates, compares.baseline);
@@ -412,6 +661,88 @@ describe("R2 오프라인 대안 비교 — R1 고정 입력의 6개 지정 지�
       .filter((c): c is DiagCandidate => c !== null)
       .map((c) => c.groupId);
     expect(new Set(ids).size).toBe(3);
+  });
+
+  it("장거리 관심사 배치 판정은 배치 레코드 수와 E2 시설 그룹 수를 구분한다", () => {
+    const iksan = candidates.find((c) => c.groupId === FOCUS_GROUPS["익산"])!;
+    const substance = assessLongDistanceSubstance(
+      iksan,
+      R1_FIXED_INPUT.interests,
+    );
+    expect(substance.interestRelevantPlacedRecordCount).toBe(6);
+    expect(substance.interestRelevantFacilityGroupCount).toBe(
+      iksan.purpose.fitByInterest.history!.facilities,
+    );
+    expect(substance.interestRelevantFacilityGroupCount).toBeLessThanOrEqual(
+      substance.interestRelevantPlacedRecordCount,
+    );
+  });
+
+  it("장거리 관심사 배치 판정은 실제 E2 시설 중복 그룹을 센다", () => {
+    const attraction = (
+      contentId: string,
+      title: string,
+      lclsSystm3: string,
+    ): Attraction => ({
+      contentId,
+      contentTypeId: "12",
+      regionId: "synthetic-region",
+      title,
+      address: "전북 익산시 금마면 미륵사지로 362",
+      imageUrl: "",
+      coordinates: { latitude: 36.011, longitude: 127.031 },
+      categories: ["history"],
+      cat1: "",
+      cat2: "",
+      cat3: "",
+      lclsSystm1: "HS",
+      lclsSystm2: "HS01",
+      lclsSystm3,
+    });
+    const first = attraction("synthetic-1", "미륵사지 동탑", "HS010100");
+    const second = attraction("synthetic-2", "미륵사지 서탑", "HS010200");
+    const candidate = {
+      groupId: "synthetic",
+      displayName: "합성",
+      roundTripMinutes: 300,
+      fulfilledInterestCount: 1,
+      matchedFacilityCount: 0,
+      localFreeMinutes: 120,
+      preview: {
+        metrics: {},
+        blocks: [
+          {
+            id: "a",
+            day: 1,
+            startAt: "2026-09-12T09:00",
+            endAt: "2026-09-12T10:00",
+            kind: "attraction",
+            title: first.title,
+            durationMinutes: 60,
+            attraction: first,
+            reason: "",
+          },
+          {
+            id: "b",
+            day: 1,
+            startAt: "2026-09-12T10:05",
+            endAt: "2026-09-12T11:05",
+            kind: "attraction",
+            title: second.title,
+            durationMinutes: 60,
+            attraction: second,
+            reason: "",
+          },
+        ],
+      },
+    } as unknown as DiagCandidate;
+
+    const substance = assessLongDistanceSubstance(candidate, ["history"]);
+
+    expect(substance.interestRelevantPlacedRecordCount).toBe(2);
+    expect(substance.interestRelevantFacilityGroupCount).toBe(1);
+    expect(substance.interestRelevantDetailTypeCount).toBe(1);
+    expect(substance.isTokenOnly).toBe(true);
   });
 
   it("데이터 덤프(R2_OUT)", () => {

@@ -13,14 +13,11 @@
  * 이미 만든 `fitByInterest[interest].facilities`/`.types`(원시, 상한 적용 전)와
  * `placed[].hub`(확정 연결 hubRank)를 그대로 재사용해 새 지표를 계산한다.
  */
-import {
-  attractionFor,
-  searchPhaseTwo,
-  selectCandidateRoles,
-} from "@/lib/mvp-phase-two-search";
+import { attractionFor } from "@/lib/mvp-phase-two-search";
 import { groupForMapping } from "@/lib/mvp-phase-two-regions";
 import {
   distinctAttractions,
+  facilityGroups,
   scheduleTrip,
   validateSearchInput,
   type SchedulingCache,
@@ -391,33 +388,53 @@ export function toSearchCandidates(
 }
 
 /**
- * 재구성한 후보 배열이 실제 배포 `searchPhaseTwo` 출력과 일치하는지 확인한다
- * (R1의 정합성 검증 1을 임의 입력으로 일반화). 불일치 시 그 자체가 이 하네스의
- * 재구성 오류를 뜻하며, 대안 비교의 기준선(baseline)이 신뢰할 수 없다는 신호다.
+ * R2 당시 배포 기준선(interest→easy→relaxed)을 이 파일 안의 비교자 사본으로
+ * 고정 검증한다. production `selectCandidateRoles`는 R4에서 새 역할 정책으로 바뀌므로
+ * 여기서 다시 import하면 과거 R1/R2 보고 숫자가 새 정책 결과로 덮인다.
  */
 export function verifyReconstruction(
   input: SearchInput,
   candidates: DiagCandidate[],
   searchedAt: string,
+  expected?: {
+    interest?: string;
+    easy?: string;
+    relaxed?: string;
+  },
 ): { ok: true } | { ok: false; reason: string } {
-  const real = searchPhaseTwo(input, "r2-verify", searchedAt);
-  if (real.kind !== "success")
-    return { ok: false, reason: `real=${real.kind}` };
-  const purposeByGroupId = new Map(
-    candidates.map((c) => [c.groupId, c.purpose]),
-  );
-  const reconstructed = selectCandidateRoles(
-    toSearchCandidates(candidates, searchedAt),
-    input.interests,
-    purposeByGroupId,
-  );
-  const a = reconstructed.map((c) => [c.recommendation.role, c.groupId]);
-  const b = real.candidates.map((c) => [c.recommendation!.role, c.groupId]);
-  if (JSON.stringify(a) !== JSON.stringify(b))
+  void input;
+  void searchedAt;
+  const baseline = selectFinalThree(candidates, {
+    interest: baselineInterestCompare,
+    easy: baselineEasyCompare,
+    relaxed: baselineRelaxedCompare,
+  });
+  const reconstructed = [
+    ["interest", baseline.interest?.groupId ?? null],
+    ["easy", baseline.easy?.groupId ?? null],
+    ["relaxed", baseline.relaxed?.groupId ?? null],
+  ];
+  if (reconstructed.some(([, groupId]) => groupId === null))
     return {
       ok: false,
-      reason: `역할/지역 불일치: 재구성=${JSON.stringify(a)} 실제=${JSON.stringify(b)}`,
+      reason: `R2 기준선 재구성 실패: ${JSON.stringify(reconstructed)}`,
     };
+  if (expected) {
+    const actual = {
+      interest: baseline.interest?.groupId,
+      easy: baseline.easy?.groupId,
+      relaxed: baseline.relaxed?.groupId,
+    };
+    if (
+      actual.interest !== expected.interest ||
+      actual.easy !== expected.easy ||
+      actual.relaxed !== expected.relaxed
+    )
+      return {
+        ok: false,
+        reason: `R2 기준선 fixture 불일치: actual=${JSON.stringify(actual)} expected=${JSON.stringify(expected)}`,
+      };
+  }
   return { ok: true };
 }
 
@@ -511,9 +528,9 @@ export function alt1InterestCompare(a: DiagCandidate, b: DiagCandidate) {
 }
 
 /** 배치된 관심사 시설 중 확정 연결된 것들의 **단일 최고**(가장 작은 hubRank) 점수.
- * 여러 시설을 평균·합산하지 않는다 — 후보 풀 크기(대도시 그룹의 많은 소속 지역)가
- * 커질수록 유리해지는 합산·평균 방식과 달리, "그 지역이 확보한 가장 강한 확정
- * 연결 근거 하나"만 본다. [0,1] 범위, 확정 연결이 없으면 0. */
+ * 여러 시설을 평균·합산하지 않고 "가장 낮은 지역 내 순위 하나"만 보는 실험 지표다.
+ * `hubRank`는 전국 순위가 아니며, 이 지표 자체가 지역 간 비교 타당성을 보장하지 않는다.
+ * [0,1] 범위, 확정 연결이 없으면 0. */
 function bestHubScore(candidate: DiagCandidate, interests: MvpCategoryId[]) {
   let best = 0;
   for (const place of candidate.placed) {
@@ -525,10 +542,10 @@ function bestHubScore(candidate: DiagCandidate, interests: MvpCategoryId[]) {
   return best;
 }
 
-/** 대안 2: 단일 최고 확정 연결 순위(정규화, 상한 없음이지만 [0,1] 유계)를 fitBand
- * 다음·왕복시간 이전의 보조 근거로 쓴다. 익산(hub1)·공주(hub2)·경주(hub4) 같은
- * "전국적으로 매우 강한 단일 지점"을 근거리 후보(약한 순위)와 구별하되, 합산이
- * 아니므로 후보 풀이 큰 지역이 구조적으로 유리해지지 않는다(재작업 기준 원칙 4). */
+/** 대안 2: 단일 최고 확정 연결 순위(점수 변환으로 [0,1] 유계)를 fitBand
+ * 다음·왕복시간 이전의 보조 근거로 쓰는 실험 비교자다. 익산(hub1)·공주(hub2)·
+ * 경주(hub4)처럼 각 지역 조회 안에서 앞선 시설을 현재 기준선과 다르게 취급하면
+ * 어떤 결과가 나오는지만 확인한다. */
 export function makeAlt2InterestCompare(interests: MvpCategoryId[]) {
   return (a: DiagCandidate, b: DiagCandidate) =>
     compareNumber(b.fulfilledInterestCount, a.fulfilledInterestCount) ||
@@ -727,9 +744,11 @@ export type LongDistanceSubstance = {
   roundTripMinutes: number;
   requestedInterestCount: number;
   fulfilledInterestCount: number;
-  /** 실제 배치 장소 중 요청 관심사 중 하나 이상과 일치하는 서로 다른 시설 수(E2 그룹 기준 근사: contentId 중복 없음). */
-  interestRelevantPlacedCount: number;
-  /** 그 시설들의 서로 다른 세부 유형 수(문서 D4-a `types_i`와 달리 그룹 대표 보정 없이 placed 배열 그대로 근사). */
+  /** 실제 배치 장소 중 요청 관심사 중 하나 이상과 일치하는 관광지 레코드 수(contentId 기준). */
+  interestRelevantPlacedRecordCount: number;
+  /** 실제 배치 장소 중 요청 관심사 중 하나 이상과 일치하는 서로 다른 시설 수(E2 `facilityGroups` 기준). */
+  interestRelevantFacilityGroupCount: number;
+  /** 그 시설들의 서로 다른 세부 유형 수(E2 그룹당 대표 유형 하나만 기여). */
   interestRelevantDetailTypeCount: number;
   matchedFacilityCount: number;
   localFreeMinutes: number;
@@ -745,24 +764,47 @@ export function assessLongDistanceSubstance(
   candidate: DiagCandidate,
   interests: MvpCategoryId[],
 ): LongDistanceSubstance {
-  const relevant = candidate.placed.filter((place) =>
+  const placedAttractions = candidate.preview.blocks.flatMap((block) =>
+    block.kind === "attraction" && block.attraction ? [block.attraction] : [],
+  );
+  const relevant = placedAttractions.filter((place) =>
     place.categories.some((category) => interests.includes(category)),
   );
+  const groups = facilityGroups(placedAttractions);
+  const groupOf = (attraction: Attraction) =>
+    groups.get(attraction.contentId) ?? attraction.contentId;
+  const relevantFacilityGroups = new Set(relevant.map(groupOf));
+  const relevantByGroup = new Map<string, Attraction[]>();
+  for (const attraction of relevant) {
+    const groupId = groupOf(attraction);
+    const members = relevantByGroup.get(groupId);
+    if (members) members.push(attraction);
+    else relevantByGroup.set(groupId, [attraction]);
+  }
   const detailTypes = new Set(
-    relevant
-      .map((place) => place.detailType)
+    [...relevantByGroup.values()]
+      .map(
+        (members) =>
+          members
+            .filter((place) => detailClassificationStrict(place) !== null)
+            .toSorted((a, b) => compareText(a.contentId, b.contentId))[0],
+      )
+      .filter((place): place is Attraction => place !== undefined)
+      .map((place) => detailClassificationStrict(place)!)
       .filter((type): type is string => type !== null),
   );
   const fulfilledInterestCount = candidate.fulfilledInterestCount;
   const isTokenOnly =
-    fulfilledInterestCount < interests.length || relevant.length <= 1;
+    fulfilledInterestCount < interests.length ||
+    relevantFacilityGroups.size <= 1;
   return {
     groupId: candidate.groupId,
     displayName: candidate.displayName,
     roundTripMinutes: candidate.roundTripMinutes,
     requestedInterestCount: interests.length,
     fulfilledInterestCount,
-    interestRelevantPlacedCount: relevant.length,
+    interestRelevantPlacedRecordCount: relevant.length,
+    interestRelevantFacilityGroupCount: relevantFacilityGroups.size,
     interestRelevantDetailTypeCount: detailTypes.size,
     matchedFacilityCount: candidate.matchedFacilityCount,
     localFreeMinutes: candidate.localFreeMinutes,

@@ -159,9 +159,14 @@ function recommendation(v: unknown): v is CandidateRecommendation {
   const validPairCount = v.validDistancePairCount;
   const requestedInterests = v.requestedInterests;
   const missingInterests = v.missingInterests;
+  const role = String(v.role);
+  const algorithmVersion = String(v.algorithmVersion);
+  const oldRole = ["easy", "interest", "relaxed"].includes(role);
+  const newRole = ["nearby", "overnight", "interestRich"].includes(role);
+  const oldVersion = ["e1-v1", "e1-v2", "e1-v3"].includes(algorithmVersion);
+  const newVersion = algorithmVersion === "e1-v4";
   return (
-    ["easy", "interest", "relaxed"].includes(String(v.role)) &&
-    ["e1-v1", "e1-v2", "e1-v3"].includes(String(v.algorithmVersion)) &&
+    ((oldRole && oldVersion) || (newRole && newVersion)) &&
     purposeEvidence(v.purpose) &&
     [
       v.roundTripMinutes,
