@@ -1126,17 +1126,27 @@ function rebuildActivities(
   targetId?: string,
 ): EditResult {
   const fail = (reason: string): EditResult => ({ ok: false, plan, reason });
+  const maxAttractions =
+    plan.longGapEnrichmentVersion === "long-gap-v1" ? 8 : 6;
+  const maxDailyAttractions =
+    plan.longGapEnrichmentVersion === "long-gap-v1" ? 4 : 3;
   if (
-    activities.filter((activity) => activity.kind === "attraction").length > 6
+    activities.filter((activity) => activity.kind === "attraction").length >
+    maxAttractions
   )
-    return fail("관광지는 여행 전체 최대 6곳까지 추가할 수 있어요.");
+    return fail(
+      `관광지는 여행 전체 최대 ${maxAttractions}곳까지 추가할 수 있어요.`,
+    );
   if (activities.filter((activity) => activity.kind === "personal").length > 4)
     return fail("개인 일정은 여행 전체 최대 4개까지 추가할 수 있어요.");
   const scheduledBlocks: TimeBlock[] = [];
   for (const day of [1, 2] as const) {
     const daily = activities.filter((activity) => activity.day === day);
-    if (daily.filter((activity) => activity.kind === "attraction").length > 3)
-      return fail("해당 날짜 관광 3곳 한도예요.");
+    if (
+      daily.filter((activity) => activity.kind === "attraction").length >
+      maxDailyAttractions
+    )
+      return fail(`해당 날짜 관광 ${maxDailyAttractions}곳 한도예요.`);
     for (const activity of daily) {
       if (!activity.fixedStartAt) continue;
       const fixed = parseLocalDate(activity.fixedStartAt);

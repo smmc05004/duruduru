@@ -233,6 +233,33 @@ export type PlanSnapshot = {
   accommodation?: AccommodationNote;
   itineraryRuleVersion: "e4-v1" | "e4-v2";
   localTravelVersion?: "straight-line-v1";
+  longGapEnrichmentVersion?: "long-gap-v1";
+  longGapEnrichmentSummary?: LongGapEnrichmentSummary;
+};
+export type LongGapBlockMetric = {
+  day: 1 | 2;
+  startAt: string;
+  endAt: string;
+  durationMinutes: number;
+};
+export type LongGapPlanMetrics = {
+  totalFreeMinutes: number;
+  maxFreeMinutes: number;
+  excessFreeMinutes: number;
+  blocks: LongGapBlockMetric[];
+};
+export type LongGapEnrichmentSummary = {
+  addedAttractionCount: number;
+  movedAttractionCount: number;
+  remainingLongGapCount: number;
+  before: LongGapPlanMetrics;
+  after: LongGapPlanMetrics;
+  preservedTargets: LongGapBlockMetric[];
+  performance: {
+    evaluatedCandidates: number;
+    elapsedMs: number;
+    capped: boolean;
+  };
 };
 export type SearchResponse =
   | {

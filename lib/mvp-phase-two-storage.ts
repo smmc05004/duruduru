@@ -2,6 +2,7 @@ import type {
   Attraction,
   Candidate,
   CandidateRecommendation,
+  LongGapEnrichmentSummary,
   PlanMetrics,
   PlanSnapshot,
   Restaurant,
@@ -98,6 +99,48 @@ function metrics(v: unknown): v is PlanMetrics {
     ].every(finite) &&
     categories(v.fulfilledInterests) &&
     (v.averageDistanceKm === null || finite(v.averageDistanceKm))
+  );
+}
+function longGapMetrics(v: unknown): boolean {
+  return (
+    object(v) &&
+    finite(v.totalFreeMinutes) &&
+    finite(v.maxFreeMinutes) &&
+    finite(v.excessFreeMinutes) &&
+    Array.isArray(v.blocks) &&
+    v.blocks.length <= 40 &&
+    v.blocks.every(
+      (block) =>
+        object(block) &&
+        (block.day === 1 || block.day === 2) &&
+        parseLocalDate(block.startAt) !== null &&
+        parseLocalDate(block.endAt) !== null &&
+        finite(block.durationMinutes),
+    )
+  );
+}
+function longGapSummary(v: unknown): v is LongGapEnrichmentSummary {
+  return (
+    object(v) &&
+    finite(v.addedAttractionCount) &&
+    finite(v.movedAttractionCount) &&
+    finite(v.remainingLongGapCount) &&
+    longGapMetrics(v.before) &&
+    longGapMetrics(v.after) &&
+    Array.isArray(v.preservedTargets) &&
+    v.preservedTargets.length <= 20 &&
+    v.preservedTargets.every(
+      (block) =>
+        object(block) &&
+        (block.day === 1 || block.day === 2) &&
+        parseLocalDate(block.startAt) !== null &&
+        parseLocalDate(block.endAt) !== null &&
+        finite(block.durationMinutes),
+    ) &&
+    object(v.performance) &&
+    finite(v.performance.evaluatedCandidates) &&
+    finite(v.performance.elapsedMs) &&
+    typeof v.performance.capped === "boolean"
   );
 }
 function purposeEvidence(v: unknown): boolean {
@@ -358,6 +401,12 @@ export function isSavedPlan(value: unknown): value is PlanSnapshot {
       !validDate(value.savedAt) ||
       typeof value.edited !== "boolean" ||
       !["e4-v1", "e4-v2"].includes(String(value.itineraryRuleVersion)) ||
+      (value.longGapEnrichmentVersion !== undefined &&
+        value.longGapEnrichmentVersion !== "long-gap-v1") ||
+      (value.longGapEnrichmentVersion === "long-gap-v1" &&
+        !longGapSummary(value.longGapEnrichmentSummary)) ||
+      (value.longGapEnrichmentVersion === undefined &&
+        value.longGapEnrichmentSummary !== undefined) ||
       !candidate(value.destination) ||
       !metrics(value.metrics) ||
       (value.accommodation !== undefined &&
@@ -561,6 +610,37 @@ function cleanMetrics(m: PlanMetrics): PlanMetrics {
     averageDistanceKm: m.averageDistanceKm,
   };
 }
+function cleanLongGapSummary(
+  summary: LongGapEnrichmentSummary,
+): LongGapEnrichmentSummary {
+  const block = (
+    item: LongGapEnrichmentSummary["before"]["blocks"][number],
+  ) => ({
+    day: item.day,
+    startAt: item.startAt,
+    endAt: item.endAt,
+    durationMinutes: item.durationMinutes,
+  });
+  const metric = (value: LongGapEnrichmentSummary["before"]) => ({
+    totalFreeMinutes: value.totalFreeMinutes,
+    maxFreeMinutes: value.maxFreeMinutes,
+    excessFreeMinutes: value.excessFreeMinutes,
+    blocks: value.blocks.map(block),
+  });
+  return {
+    addedAttractionCount: summary.addedAttractionCount,
+    movedAttractionCount: summary.movedAttractionCount,
+    remainingLongGapCount: summary.remainingLongGapCount,
+    before: metric(summary.before),
+    after: metric(summary.after),
+    preservedTargets: summary.preservedTargets.map(block),
+    performance: {
+      evaluatedCandidates: summary.performance.evaluatedCandidates,
+      elapsedMs: summary.performance.elapsedMs,
+      capped: summary.performance.capped,
+    },
+  };
+}
 function cleanPurpose(
   purpose: NonNullable<CandidateRecommendation["purpose"]>,
 ): NonNullable<CandidateRecommendation["purpose"]> {
@@ -664,6 +744,10 @@ function snapshot(plan: PlanSnapshot): PlanSnapshot {
     metrics: cleanMetrics(plan.metrics),
     itineraryRuleVersion: plan.itineraryRuleVersion,
     localTravelVersion: plan.localTravelVersion,
+    longGapEnrichmentVersion: plan.longGapEnrichmentVersion,
+    longGapEnrichmentSummary: plan.longGapEnrichmentSummary
+      ? cleanLongGapSummary(plan.longGapEnrichmentSummary)
+      : undefined,
     accommodation: plan.accommodation
       ? {
           name: plan.accommodation.name,

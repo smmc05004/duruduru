@@ -133,14 +133,20 @@ export function planTimeError(
   } else if (plan.blocks.some((b) => b.localTravel))
     return "이동시간 규칙이 누락됐어요.";
   if (!enforceEditingRules) return;
-  if (contents.size > 6)
-    return "관광지는 여행 전체 최대 6곳까지 추가할 수 있어요.";
+  const maxAttractions =
+    plan.longGapEnrichmentVersion === "long-gap-v1" ? 8 : 6;
+  const maxDailyAttractions =
+    plan.longGapEnrichmentVersion === "long-gap-v1" ? 4 : 3;
+  if (contents.size > maxAttractions)
+    return `관광지는 여행 전체 최대 ${maxAttractions}곳까지 추가할 수 있어요.`;
   if (plan.blocks.filter((b) => b.kind === "personal").length > 4)
     return "개인 일정은 여행 전체 최대 4개까지 추가할 수 있어요.";
   for (const day of [1, 2] as const) {
     const daily = plan.blocks.filter((b) => b.day === day);
-    if (daily.filter((b) => b.kind === "attraction").length > 3)
-      return "해당 날짜 관광 3곳 한도예요.";
+    if (
+      daily.filter((b) => b.kind === "attraction").length > maxDailyAttractions
+    )
+      return `해당 날짜 관광 ${maxDailyAttractions}곳 한도예요.`;
     const activities = daily.filter(
       (b) => b.kind === "attraction" || b.kind === "personal",
     );
