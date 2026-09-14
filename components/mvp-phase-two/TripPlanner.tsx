@@ -39,6 +39,10 @@ import {
   validateSearchInput,
 } from "@/lib/mvp-phase-two-planner";
 import {
+  enrichLongGaps,
+  type LongGapEnrichmentResult,
+} from "@/lib/long-gap-enrichment";
+import {
   assignRestaurants,
   replaceRestaurant,
   restaurantAlternatives,
@@ -80,17 +84,53 @@ const labels = (values: SearchInput["interests"]) =>
   INTERESTS.filter((i) => values.includes(i.id))
     .map((i) => i.label)
     .join(" · ");
+function messageForLongGap(result: LongGapEnrichmentResult): string {
+  if (result.status === "applied") {
+    const parts = [
+      result.summary.addedAttractionCount
+        ? `관광 ${result.summary.addedAttractionCount}곳 추가`
+        : "",
+      result.summary.movedAttractionCount ? "기존 관광 시간 조정" : "",
+    ].filter(Boolean);
+    const remaining = result.summary.remainingLongGapCount
+      ? " 아직 긴 여유시간이 남아 있어요."
+      : "";
+    return `긴 여유시간을 보완했어요${parts.length ? ` · ${parts.join(" · ")}` : ""}.${remaining}`;
+  }
+  switch (result.reason) {
+    case "no-target-gap":
+      return "보완할 긴 여유시간이 없어 기존 계획을 유지했어요.";
+    case "candidate-missing":
+      return "조건에 맞는 가까운 관광지가 없어 기존 여유시간을 유지했어요.";
+    case "limit-reached":
+      return "관광 한도 때문에 기존 여유시간을 유지했어요.";
+    case "boundary-conflict":
+      return "식사·개인 일정·고정 시각을 지키면 보완할 수 없어요.";
+    case "free-preservation-failed":
+      return "60분 여유를 남길 수 없어 기존 계획을 유지했어요.";
+    default:
+      return "조건에 맞는 개선을 찾지 못해 기존 여유시간을 유지했어요.";
+  }
+}
 type MealRequest = {
   planId: string;
   planUpdatedAt: string;
+  editGeneration: number;
+  autoEnrich: boolean;
   groupId: string;
   visits: { contentId: string; regionId: string }[];
   nonce: number;
 };
-function requestFor(plan: PlanSnapshot): MealRequest {
+function requestFor(
+  plan: PlanSnapshot,
+  editGeneration: number,
+  autoEnrich: boolean,
+): MealRequest {
   return {
     planId: plan.id,
     planUpdatedAt: plan.updatedAt,
+    editGeneration,
+    autoEnrich,
     groupId: plan.destination.groupId,
     visits: plan.blocks.flatMap((b) =>
       b.attraction
@@ -151,12 +191,15 @@ export function TripPlanner() {
   const savedOpen = useTripUi((s) => s.savedOpen),
     setSavedOpen = useTripUi((s) => s.setSavedOpen);
   const generation = useRef(0);
+  const editGeneration = useRef(0);
   const activeMealRequest = useRef<MealRequest | null>(null);
   const mealSequence = useRef(0);
+  const automaticLongGapToken = useRef<string | null>(null);
   const visitGeneration = useRef(0);
   const automaticVisitPlan = useRef<string | null>(null);
   const visitWorkController = useRef<AbortController | null>(null);
   const latestPlanId = useRef<string | null>(null);
+  const latestPlan = useRef<PlanSnapshot | null>(null);
   const automaticVisitSnapshot = useRef<{
     planId: string;
     attractions: Attraction[];
@@ -176,7 +219,8 @@ export function TripPlanner() {
   const closeDetail = useCallback(() => setSelected(null), []);
   useEffect(() => {
     latestPlanId.current = plan?.id ?? null;
-  }, [plan?.id]);
+    latestPlan.current = plan;
+  }, [plan]);
   function cancelVisitRequests() {
     ++visitGeneration.current;
     visitWorkController.current?.abort();
@@ -300,8 +344,12 @@ export function TripPlanner() {
         },
       }),
     onSuccess: (data, request) => {
-      if (activeMealRequest.current !== request || data.kind === "data-error")
+      if (activeMealRequest.current !== request) return;
+      if (data.kind === "data-error") {
+        if (!request.autoEnrich) return;
+        applyAutomaticLongGap(request);
         return;
+      }
       const restaurants =
         queryClient.setQueryData<Restaurant[]>(
           ["restaurant-pool", request.planId],
@@ -314,12 +362,18 @@ export function TripPlanner() {
             return [...merged.values()];
           },
         ) ?? data.restaurants;
-      setPlan((current) =>
-        current?.id === request.planId &&
-        current.updatedAt === request.planUpdatedAt
-          ? assignRestaurants(current, restaurants)
-          : current,
-      );
+      const current = currentForMealRequest(request);
+      if (!current) return;
+      const assigned = assignRestaurants(current, restaurants);
+      if (!request.autoEnrich) {
+        setPlan(assigned);
+        return;
+      }
+      applyAutomaticLongGap(request, assigned);
+    },
+    onError: (_error, request) => {
+      if (activeMealRequest.current !== request || !request.autoEnrich) return;
+      applyAutomaticLongGap(request);
     },
   });
   const pool = useQuery<Restaurant[]>({
@@ -338,9 +392,47 @@ export function TripPlanner() {
     setMealRequest(null);
     meals.reset();
   }
-  function collectMeals(current: PlanSnapshot) {
+  function currentForMealRequest(request: MealRequest): PlanSnapshot | null {
+    const current = latestPlan.current;
+    return current?.id === request.planId &&
+      current.updatedAt === request.planUpdatedAt &&
+      editGeneration.current === request.editGeneration
+      ? current
+      : null;
+  }
+  function longGapToken(request: MealRequest): string {
+    return `${request.planId}:${request.editGeneration}:${request.nonce}`;
+  }
+  function applyAutomaticLongGap(
+    request: MealRequest,
+    basePlan = currentForMealRequest(request),
+  ) {
+    const token = longGapToken(request);
+    if (
+      !request.autoEnrich ||
+      activeMealRequest.current !== request ||
+      !basePlan ||
+      basePlan.id !== request.planId ||
+      editGeneration.current !== request.editGeneration ||
+      automaticLongGapToken.current === token
+    )
+      return;
+    automaticLongGapToken.current = token;
+    const enriched = enrichLongGaps(basePlan);
+    if (
+      activeMealRequest.current !== request ||
+      editGeneration.current !== request.editGeneration
+    )
+      return;
+    setMessage(messageForLongGap(enriched));
+    setPlan(enriched.status === "applied" ? enriched.plan : basePlan);
+  }
+  function collectMeals(current: PlanSnapshot, autoEnrich = false) {
     clearMeals();
-    const request = { ...requestFor(current), nonce: ++mealSequence.current };
+    const request = {
+      ...requestFor(current, editGeneration.current, autoEnrich),
+      nonce: ++mealSequence.current,
+    };
     activeMealRequest.current = request;
     setMealRequest(request);
     meals.mutate(request);
@@ -399,6 +491,7 @@ export function TripPlanner() {
       id: crypto.randomUUID(),
     };
     ++generation.current;
+    ++editGeneration.current;
     cancelVisitInfo();
     automaticVisitSnapshot.current = {
       planId: next.id,
@@ -412,11 +505,12 @@ export function TripPlanner() {
     setMessage("");
     setSelected(null);
     setExpanded(null);
-    collectMeals(next);
+    collectMeals(next, true);
     window.scrollTo(0, 0);
   }
   function change(command: EditCommand) {
     if (!plan) return;
+    ++editGeneration.current;
     if (
       command.type === "add-attraction" ||
       command.type === "replace-attraction"
@@ -453,10 +547,35 @@ export function TripPlanner() {
     );
     setExpanded(null);
   }
+  function runLongGapEnrichment() {
+    if (!plan) return;
+    if (
+      !window.confirm(
+        "긴 여유시간 보완은 비고정 관광의 시간·순서를 조정하고 가까운 관광지를 추가할 수 있어요. 실행할까요?",
+      )
+    )
+      return;
+    ++editGeneration.current;
+    const result = enrichLongGaps(plan);
+    setMessage(messageForLongGap(result));
+    if (result.status !== "applied") return;
+    cancelVisitRequests();
+    setVisitInfo((previous) =>
+      retainVisitInfoForAttractions(
+        previous,
+        result.plan.blocks.flatMap((block) =>
+          block.attraction ? [block.attraction] : [],
+        ),
+      ),
+    );
+    setPlan(result.plan);
+    setExpanded(null);
+  }
   function saveAccommodation() {
     if (!plan) return;
     const result = planAccommodation(plan, accommodationDraft);
     if (!result.ok) return setMessage(result.reason);
+    ++editGeneration.current;
     setPlan(result.plan);
     setMessage("숙소 메모를 저장했어요. 야간 휴식 시간은 바꾸지 않아요.");
   }
@@ -468,6 +587,7 @@ export function TripPlanner() {
   }
   function persist() {
     if (!plan) return;
+    ++editGeneration.current;
     const result = savePlan(plan);
     if (result.error || !result.plan) {
       setMessage(result.error ?? "저장하지 못했어요");
@@ -483,6 +603,7 @@ export function TripPlanner() {
       return;
     }
     ++generation.current;
+    ++editGeneration.current;
     cancelVisitInfo();
     automaticVisitSnapshot.current = null;
     visitCoordinator.current.usePlan(saved.id);
@@ -536,6 +657,7 @@ export function TripPlanner() {
   function showInput() {
     if (plan) setPreviousDraft(plan);
     ++generation.current;
+    ++editGeneration.current;
     cancelVisitInfo();
     search.reset();
     clearMeals();
@@ -549,6 +671,7 @@ export function TripPlanner() {
   function showCandidates() {
     if (plan) setPreviousDraft(plan);
     ++generation.current;
+    ++editGeneration.current;
     cancelVisitInfo();
     setPlan(null);
     clearMeals();
@@ -585,6 +708,7 @@ export function TripPlanner() {
             className="p2-text-button"
             onClick={() => {
               ++generation.current;
+              ++editGeneration.current;
               search.reset();
               cancelVisitInfo();
               clearMeals();
@@ -892,6 +1016,9 @@ export function TripPlanner() {
               <button className="p2-control" onClick={requestAllVisitInfo}>
                 방문정보 확인
               </button>
+              <button className="p2-control" onClick={runLongGapEnrichment}>
+                긴 여유시간 보완
+              </button>
               <button
                 className="p2-control"
                 onClick={() =>
@@ -933,7 +1060,7 @@ export function TripPlanner() {
               <h3>관광지 추가</h3>
               <p className="p2-muted">
                 같은 선택 지역의 미사용 관심사 관광지만 추가해요. 하루 관광은
-                최대 3곳이에요.
+                최대 {plan.longGapEnrichmentVersion ? "4" : "3"}곳이에요.
               </p>
               <div className="p2-actions">
                 <label>
@@ -1642,6 +1769,7 @@ export function TripPlanner() {
                                       );
                                       return;
                                     }
+                                    ++editGeneration.current;
                                     setPlan(next);
                                     setExpanded(null);
                                     setMessage(

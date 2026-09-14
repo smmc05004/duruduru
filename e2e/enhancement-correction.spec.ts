@@ -88,7 +88,11 @@ async function setup(
     .getByRole("button", { name: `${selected!.displayName} 일정 보기` })
     .click();
   await expect(page.locator(".p2-block--restaurant").first()).toBeVisible();
-  const count = await page.locator(".p2-block--attraction").count();
+  // 선택 초안의 자동 상세 예산은 긴 여유 보완으로 장소가 늘어도 재시작하지 않는다.
+  const count = Math.min(
+    6,
+    selected!.preview.blocks.filter((b) => b.kind === "attraction").length,
+  );
   await expect.poll(() => calls.details).toBe(count);
   await expect.poll(() => calls.meals).toBe(1);
   return calls;
@@ -168,6 +172,10 @@ test("R6 서울 실제 검색→식당→관광 날짜/시간/순서 편집→�
     .getByRole("button", { name: "2일차로 이동" })
     .click();
   await expect(row.locator("time")).toHaveAttribute("datetime", /^2026-09-13/);
+  const beforeReorder = await stored(page);
+  const previousPosition = beforeReorder.blocks
+    .filter((b) => b.kind === "attraction" && b.day === 2)
+    .findIndex((b) => b.id === target.id);
   await (await tools(row)).getByRole("button", { name: "아래로 이동" }).click();
   const final = await stored(page);
   expect(final.blocks.find((b) => b.id === target.id)).toMatchObject({
@@ -176,8 +184,9 @@ test("R6 서울 실제 검색→식당→관광 날짜/시간/순서 편집→�
     durationMinutes: 30,
   });
   expect(
-    final.blocks.filter((b) => b.kind === "attraction" && b.day === 2).at(-1)
-      ?.id,
+    final.blocks.filter((b) => b.kind === "attraction" && b.day === 2)[
+      previousPosition + 1
+    ]?.id,
   ).toBe(target.id);
   expect(
     final.blocks.filter((b) => b.restaurant).map((b) => b.restaurant),
@@ -186,12 +195,12 @@ test("R6 서울 실제 검색→식당→관광 날짜/시간/순서 편집→�
   );
   expect(calls).toEqual({
     meals: 1,
-    details: original.metrics.attractionCount,
+    details: Math.min(6, original.destination.preview.metrics.attractionCount),
   });
   await restore(page, final);
   expect(calls).toEqual({
     meals: 1,
-    details: original.metrics.attractionCount,
+    details: Math.min(6, original.destination.preview.metrics.attractionCount),
   });
 });
 
@@ -271,7 +280,7 @@ test("R6 부산 개인 일정 날짜/시간·14시 고정·숙소 메모·불가
   );
   expect(calls).toEqual({
     meals: 1,
-    details: original.metrics.attractionCount,
+    details: Math.min(6, original.destination.preview.metrics.attractionCount),
   });
 });
 
