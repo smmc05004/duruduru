@@ -13,11 +13,15 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   // GitHub runners에서 Next 개발 서버 초기 컴파일·검색 응답이 느릴 수 있어
   // 로컬과 동일한 상호작용을 기다리되 회귀 자체는 그대로 실패시킨다.
-  expect: { timeout: 15_000 },
+  // 지역 프로필 전체를 순회하는 검색은 GitHub의 저사양 러너에서 초기 캐시
+  // 생성까지 수십 초가 걸릴 수 있다. 기능별 제한은 유지하고 공통 대기만 넉넉히 둔다.
+  expect: { timeout: 60_000 },
   use: {
     baseURL: e2eUrl,
     trace: "on-first-retry",
+    actionTimeout: 60_000,
   },
+  timeout: 120_000,
   webServer: {
     command: `E2E_FIXTURE=1 npm run dev -- --hostname 127.0.0.1 --port ${e2ePort}`,
     url: e2eUrl,

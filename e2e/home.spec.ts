@@ -288,6 +288,10 @@ test("당일 입력은 검색 요청 없이 1박 2일 오류를 표시한다", a
   await page.goto("/");
   await page.getByLabel("출발 일시").fill("2026-09-12T08:00");
   await page.getByLabel("다음날 귀가 완료 일시").fill("2026-09-12T20:00");
+  await expect(page.getByLabel("출발 일시")).toHaveValue("2026-09-12T08:00");
+  await expect(page.getByLabel("다음날 귀가 완료 일시")).toHaveValue(
+    "2026-09-12T20:00",
+  );
   const searchButton = page.getByRole("button", { name: "갈 수 있는 곳 찾기" });
   await expect(searchButton).toBeEnabled();
   await searchButton.click();
