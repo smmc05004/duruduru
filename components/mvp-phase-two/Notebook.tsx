@@ -97,6 +97,9 @@ export function NotebookCandidate({
         easy: "이동 부담을 줄인 여행",
         interest: "관심사를 깊게 즐기는 여행",
         relaxed: "여유롭게 머무는 여행",
+        nearby: "가까운 여행",
+        overnight: "1박 2일 여행",
+        interestRich: "관심사 중심 여행",
       }[recommendation.role]
     : "기존 추천";
   const fulfilled = INTERESTS.filter((interest) =>

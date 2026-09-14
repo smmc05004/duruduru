@@ -1,7 +1,7 @@
 /** @jest-environment node */
 /**
- * T7-4 선정·정렬 회귀. `selectCandidateRoles`(interest 정렬)와 `selectPlaces`
- * (지역 내 관광 선정)가 D4 순서·총순서(추이성)·결정성·행정구역 분할 불변을
+ * 선정·정렬 회귀. `selectCandidateRoles`(R3 역할 정책)와 `selectPlaces`
+ * (지역 내 관광 선정)가 정렬 순서·총순서(추이성)·결정성·행정구역 분할 불변을
  * 지키는지 합성 입력으로 검증한다. 정상본 JSON을 읽지만 외부 fetch는 없다.
  */
 import { describe, expect, it } from "@jest/globals";
@@ -22,8 +22,38 @@ function bareCandidate(
     oneWayMinutes: number;
     fulfilled: MvpCategoryId[];
     memberRegionIds?: string[];
+    freeMinutes?: number;
   },
 ): Bare {
+  const attractions = [1, 2, 3].map((index): Attraction => ({
+    contentId: `${groupId}-${index}`,
+    contentTypeId: "12",
+    regionId: groupId,
+    title: `${groupId}-${index}`,
+    address: "주소",
+    imageUrl: "",
+    coordinates: null,
+    categories: ["history"],
+    cat1: "",
+    cat2: "",
+    cat3: "",
+    lclsSystm1: "HS",
+    lclsSystm2: `HS0${index}`,
+    lclsSystm3: `HS0${index}0100`,
+  }));
+  const blocks = attractions.map((attraction, offset) => ({
+    id: `attraction-${attraction.contentId}`,
+    day: offset < 2 ? (1 as const) : (2 as const),
+    startAt: `2026-09-${offset < 2 ? "12" : "13"}T10:00`,
+    endAt: `2026-09-${offset < 2 ? "12" : "13"}T11:00`,
+    kind: "attraction" as const,
+    title: attraction.title,
+    durationMinutes: 60,
+    contentId: attraction.contentId,
+    attraction,
+    facilityGroupId: `facility-${attraction.contentId}`,
+    reason: "fixture",
+  }));
   return {
     groupId,
     memberRegionIds: opts.memberRegionIds ?? [groupId],
@@ -32,15 +62,15 @@ function bareCandidate(
     name: groupId,
     province: "검증도",
     oneWayMinutes: opts.oneWayMinutes,
-    attractions: [],
+    attractions,
     preview: {
-      blocks: [],
+      blocks,
       metrics: {
         arrivalAt: "2026-09-12T09:00",
         returnDepartureAt: "2026-09-13T18:00",
         localMinutes: 900,
-        freeMinutes: 400,
-        attractionCount: 4,
+        freeMinutes: opts.freeMinutes ?? 400,
+        attractionCount: blocks.length,
         localMealCount: 2,
         fulfilledInterests: opts.fulfilled,
         categoryDiversity: 2,
@@ -58,17 +88,26 @@ function bareCandidate(
   };
 }
 
-function purpose(
-  fitBand: number,
-  matchedFacilityCount: number,
-): PurposeEvidence {
+function purpose({
+  fitAverage = 7,
+  facilities = 4,
+  types = 3,
+  matchedFacilityCount = 3,
+}: {
+  fitAverage?: number;
+  facilities?: number;
+  types?: number;
+  matchedFacilityCount?: number;
+} = {}): PurposeEvidence {
   return {
     version: "test",
     baseYm: "202608",
     status: "scored",
-    fitBand,
-    fitAverage: fitBand === 2 ? 7 : fitBand === 1 ? 5 : 3,
-    fitByInterest: {},
+    fitBand: fitAverage >= 6.5 ? 2 : fitAverage >= 4.5 ? 1 : 0,
+    fitAverage,
+    fitByInterest: {
+      history: { facilities, types, fit: fitAverage },
+    },
     matchedFacilityCount,
     score: 0,
     perInterest: {},
@@ -80,93 +119,102 @@ function purpose(
 
 const INTERESTS: MvpCategoryId[] = ["history"];
 
-describe("T7-4 interest 정렬 (D4)", () => {
-  it("같은 구간이면 왕복시간이 짧은 후보를 interest로 고른다", () => {
+describe("R3 역할 정렬", () => {
+  it("가까운 여행은 편도 60분 이하에서 가장 가까운 후보를 고른다", () => {
     const selected = selectCandidateRoles(
       [
-        bareCandidate("far", { oneWayMinutes: 200, fulfilled: ["history"] }),
+        bareCandidate("near-b", { oneWayMinutes: 55, fulfilled: ["history"] }),
+        bareCandidate("near-a", { oneWayMinutes: 40, fulfilled: ["history"] }),
+        bareCandidate("far", { oneWayMinutes: 120, fulfilled: ["history"] }),
+      ],
+      INTERESTS,
+      new Map([
+        ["near-a", purpose()],
+        ["near-b", purpose()],
+        ["far", purpose()],
+      ]),
+    );
+    expect(selected[0].groupId).toBe("near-a");
+    expect(selected[0].recommendation.role).toBe("nearby");
+  });
+
+  it("1박 2일 여행은 120분에 가까운 후보를 선호한다", () => {
+    const selected = selectCandidateRoles(
+      [
         bareCandidate("near", { oneWayMinutes: 40, fulfilled: ["history"] }),
+        bareCandidate("target", { oneWayMinutes: 120, fulfilled: ["history"] }),
+        bareCandidate("longer", { oneWayMinutes: 170, fulfilled: ["history"] }),
       ],
       INTERESTS,
       new Map([
-        ["far", purpose(2, 4)],
-        ["near", purpose(2, 1)],
+        ["near", purpose()],
+        ["target", purpose()],
+        ["longer", purpose()],
       ]),
     );
-    expect(selected[0].groupId).toBe("near");
-    expect(selected[0].recommendation.role).toBe("interest");
+    expect(selected[1].groupId).toBe("target");
+    expect(selected[1].recommendation.role).toBe("overnight");
   });
 
-  it("더 높은 구간이면 먼 후보도 interest로 고른다", () => {
+  it("관심사 중심 여행은 유형·시설 cap 뒤에는 180분에 가까운 후보를 고른다", () => {
     const selected = selectCandidateRoles(
       [
-        bareCandidate("far", { oneWayMinutes: 200, fulfilled: ["history"] }),
         bareCandidate("near", { oneWayMinutes: 40, fulfilled: ["history"] }),
+        bareCandidate("overnight", {
+          oneWayMinutes: 120,
+          fulfilled: ["history"],
+        }),
+        bareCandidate("extreme", {
+          oneWayMinutes: 220,
+          fulfilled: ["history"],
+        }),
+        bareCandidate("balanced", {
+          oneWayMinutes: 180,
+          fulfilled: ["history"],
+        }),
       ],
       INTERESTS,
       new Map([
-        ["far", purpose(2, 3)],
-        ["near", purpose(1, 3)],
+        ["near", purpose()],
+        ["overnight", purpose()],
+        ["extreme", purpose({ facilities: 20, types: 20 })],
+        ["balanced", purpose({ facilities: 4, types: 3 })],
       ]),
     );
-    expect(selected[0].groupId).toBe("far");
+    expect(selected[2].groupId).toBe("balanced");
+    expect(selected[2].recommendation.role).toBe("interestRich");
   });
 
-  it("구간·왕복시간이 같으면 상한 적용 보조(중심 연결) 시설 수로만 정한다", () => {
+  it("역할 조건을 만족하지 못하면 억지로 세 장을 채우지 않는다", () => {
     const selected = selectCandidateRoles(
       [
-        bareCandidate("a", { oneWayMinutes: 60, fulfilled: ["history"] }),
-        bareCandidate("b", { oneWayMinutes: 60, fulfilled: ["history"] }),
+        bareCandidate("near", { oneWayMinutes: 40, fulfilled: ["history"] }),
+        bareCandidate("weak", {
+          oneWayMinutes: 120,
+          fulfilled: ["history"],
+          freeMinutes: 120,
+        }),
       ],
       INTERESTS,
       new Map([
-        ["a", purpose(1, 1)],
-        ["b", purpose(1, 3)],
+        ["near", purpose()],
+        ["weak", purpose({ facilities: 1, types: 1 })],
       ]),
     );
-    expect(selected[0].groupId).toBe("b");
-  });
-
-  it("행정구역 분할·보조 상한 초과 개수는 순위를 바꾸지 않는다", () => {
-    // 두 시나리오: near의 memberRegionIds 개수와 보조 시설 수만 다르다.
-    // 보조 시설 수는 상한 4에서 잘리므로 5·9 모두 4로 동일 취급되어야 한다.
-    const run = (memberCount: number, matched: number) =>
-      selectCandidateRoles(
-        [
-          bareCandidate("far", {
-            oneWayMinutes: 200,
-            fulfilled: ["history"],
-          }),
-          bareCandidate("near", {
-            oneWayMinutes: 40,
-            fulfilled: ["history"],
-            memberRegionIds: Array.from(
-              { length: memberCount },
-              (_, i) => `r${i}`,
-            ),
-          }),
-        ],
-        INTERESTS,
-        new Map([
-          ["far", purpose(2, 4)],
-          ["near", purpose(2, Math.min(matched, 4))],
-        ]),
-      ).map((c) => c.groupId);
-    expect(run(1, 5)).toEqual(run(12, 9));
-    expect(run(1, 5)[0]).toBe("near");
+    expect(selected.map((c) => c.groupId)).toEqual(["near"]);
   });
 
   it("입력 순서를 섞어도 같은 결과다(결정성·총순서)", () => {
-    const base: Array<[string, number, number, number]> = [
-      ["p", 40, 2, 4],
-      ["q", 40, 2, 4],
-      ["r", 120, 2, 1],
-      ["s", 90, 1, 3],
-      ["t", 40, 1, 0],
+    const base: Array<[string, number]> = [
+      ["near-a", 40],
+      ["near-b", 55],
+      ["overnight", 120],
+      ["rich", 180],
+      ["rich-tie", 180],
     ];
-    const map = new Map(base.map(([g, , b, m]) => [g, purpose(b, m)]));
-    const candidates = base.map(([g, rt]) =>
-      bareCandidate(g, { oneWayMinutes: rt, fulfilled: ["history"] }),
+    const map = new Map(base.map(([groupId]) => [groupId, purpose()]));
+    const candidates = base.map(([groupId, oneWayMinutes]) =>
+      bareCandidate(groupId, { oneWayMinutes, fulfilled: ["history"] }),
     );
     const canonical = selectCandidateRoles(candidates, INTERESTS, map).map(
       (c) => c.groupId,
@@ -180,8 +228,33 @@ describe("T7-4 interest 정렬 (D4)", () => {
       );
       expect(got).toEqual(canonical);
     }
-    // 동점(p·q: 같은 rt·구간·보조)은 groupId 사전순.
-    expect(canonical[0]).toBe("p");
+    expect(canonical).toEqual(["near-a", "overnight", "rich"]);
+  });
+
+  it("행정구역 분할·cap 초과 개수는 순위를 바꾸지 않는다", () => {
+    const run = (memberCount: number, facilities: number, types: number) =>
+      selectCandidateRoles(
+        [
+          bareCandidate("near", {
+            oneWayMinutes: 40,
+            fulfilled: ["history"],
+          }),
+          bareCandidate("overnight", {
+            oneWayMinutes: 120,
+            fulfilled: ["history"],
+            memberRegionIds: Array.from(
+              { length: memberCount },
+              (_, i) => `r${i}`,
+            ),
+          }),
+        ],
+        INTERESTS,
+        new Map([
+          ["near", purpose()],
+          ["overnight", purpose({ facilities, types })],
+        ]),
+      ).map((c) => c.groupId);
+    expect(run(1, 4, 3)).toEqual(run(12, 99, 99));
   });
 });
 

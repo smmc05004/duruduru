@@ -1,7 +1,15 @@
 import { expect, test, type Page, type Locator } from "@playwright/test";
 import type { PlanSnapshot } from "../lib/mvp-phase-two-types";
 
-async function setup(page: Page, origin: "서울특별시" | "부산광역시") {
+async function setup(
+  page: Page,
+  origin: "서울특별시" | "부산광역시",
+  options: {
+    selectRole?: NonNullable<
+      PlanSnapshot["destination"]["recommendation"]
+    >["role"];
+  } = {},
+) {
   const calls = { meals: 0, details: 0 };
   let response: { candidates: PlanSnapshot["destination"][] };
   page.on("response", async (result) => {
@@ -70,9 +78,14 @@ async function setup(page: Page, origin: "서울특별시" | "부산광역시") 
     timeout: 20_000,
   });
   expect(calls).toEqual({ meals: 0, details: 0 });
+  const selected = options.selectRole
+    ? response.candidates.find(
+        (candidate) => candidate.recommendation?.role === options.selectRole,
+      )
+    : response.candidates[0];
+  expect(selected).toBeTruthy();
   await results
-    .getByRole("button", { name: /일정 보기$/ })
-    .first()
+    .getByRole("button", { name: `${selected!.displayName} 일정 보기` })
     .click();
   await expect(page.locator(".p2-block--restaurant").first()).toBeVisible();
   const count = await page.locator(".p2-block--attraction").count();
@@ -122,7 +135,7 @@ async function restore(page: Page, expected: PlanSnapshot) {
 test("R6 서울 실제 검색→식당→관광 날짜/시간/순서 편집→저장·복원", async ({
   page,
 }) => {
-  const calls = await setup(page, "서울특별시");
+  const calls = await setup(page, "서울특별시", { selectRole: "overnight" });
   const original = await stored(page);
   const target = original.blocks.find(
     (b) => b.kind === "attraction" && b.day === 1,

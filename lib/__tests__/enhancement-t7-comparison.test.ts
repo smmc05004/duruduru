@@ -74,6 +74,8 @@ function summarize(res: SearchResponse, interests: MvpCategoryId[]) {
       const rec = c.recommendation!;
       return {
         role: rec.role,
+        algorithmVersion: rec.algorithmVersion,
+        itineraryAlgorithmVersion: c.itineraryAlgorithmVersion,
         displayName: c.displayName,
         province: c.province,
         memberRegionCount: c.memberRegionIds.length,
@@ -122,35 +124,30 @@ describe("T7-5 48개 입력 재실행", () => {
           });
           if (s.kind !== "success") return;
 
-          const [interestCard, ...rest] = s.candidates;
-          expect(interestCard.role).toBe("interest");
+          expect(s.candidates.map((c) => c.role)).toEqual(
+            ["nearby", "overnight", "interestRich"].slice(
+              0,
+              s.candidates.length,
+            ),
+          );
           for (const c of s.candidates) {
             if (c.fitBand !== null) expect([0, 1, 2]).toContain(c.fitBand);
+            expect(c.algorithmVersion).toBe("e1-v4");
+            expect(c.itineraryAlgorithmVersion).toBe("e2-v3");
+            expect(c.placedTitles.length).toBeGreaterThanOrEqual(3);
           }
-          // D4 interest 정렬: 다른 후보가 (더 많은 충족) 또는
-          // (같은 충족 · 더 높은 구간 · 왕복시간이 더 짧거나 같음)이면 안 된다.
-          for (const other of rest) {
-            const better =
-              other.fulfilledInterestCount >
-                interestCard.fulfilledInterestCount ||
-              (other.fulfilledInterestCount ===
-                interestCard.fulfilledInterestCount &&
-                (other.fitBand ?? 0) > (interestCard.fitBand ?? 0) &&
-                other.roundTripMinutes <= interestCard.roundTripMinutes);
-            expect(better).toBe(false);
+          const nearby = s.candidates.find((c) => c.role === "nearby");
+          if (nearby) expect(nearby.roundTripMinutes).toBeLessThanOrEqual(120);
+          const overnight = s.candidates.find((c) => c.role === "overnight");
+          if (overnight) {
+            expect(overnight.roundTripMinutes).toBeGreaterThan(120);
+            expect(overnight.roundTripMinutes).toBeLessThanOrEqual(360);
           }
-          // 같은 구간이면 interest 왕복시간이 easy(가장 가까운 후보)보다
-          // 크게 벗어나지 않는다 — 유사 적합성에서 짧은 이동 우선.
-          const easyCard = s.candidates.find((c) => c.role === "easy");
-          if (
-            easyCard &&
-            (interestCard.fitBand ?? 0) <= (easyCard.fitBand ?? 0) &&
-            interestCard.fulfilledInterestCount ===
-              easyCard.fulfilledInterestCount
-          )
-            expect(interestCard.roundTripMinutes).toBeLessThanOrEqual(
-              easyCard.roundTripMinutes,
-            );
+          const rich = s.candidates.find((c) => c.role === "interestRich");
+          if (rich) {
+            expect(rich.roundTripMinutes).toBeGreaterThanOrEqual(240);
+            expect(rich.roundTripMinutes).toBeLessThanOrEqual(480);
+          }
         });
       }
     }

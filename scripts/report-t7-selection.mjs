@@ -4,8 +4,9 @@
  * 입력: `enhancement-t7-comparison.test.ts`가 `T7_OUT`으로 덤프한 JSON.
  *   T7_OUT=/tmp/t7.json npx jest enhancement-t7-comparison --runInBand
  *   node scripts/report-t7-selection.mjs /tmp/t7.json [--md]
- * 출력: 48개 입력별 interest/easy/relaxed 후보의 구간·관심사별 시설/유형/보조 근거·
- *   왕복/현지시간·실제 배치 장소. 외부 호출 0. 결정적.
+ * 출력: 48개 입력별 후보의 구간·관심사별 시설/유형/보조 근거·왕복/현지시간·
+ *   실제 배치 장소. 구 T7 덤프(interest/easy/relaxed)와 현행 R4 덤프
+ *   (nearby/overnight/interestRich)를 감지해 요약을 분리한다. 외부 호출 0. 결정적.
  */
 import { readFileSync } from "node:fs";
 
@@ -35,7 +36,9 @@ const cell = (c) => {
 
 const rt = [];
 const bandCount = [0, 0, 0];
+const roleCounts = new Map();
 let far = 0;
+let legacyInterestCells = 0;
 
 for (const r of rows) {
   console.log(`\n## ${r.origin} · ${r.interests} · ${r.time}\n`);
@@ -43,10 +46,15 @@ for (const r of rows) {
     console.log(`- ${r.kind}: ${r.message ?? ""}`);
     continue;
   }
+  for (const c of r.candidates)
+    roleCounts.set(c.role, (roleCounts.get(c.role) ?? 0) + 1);
   const interest = r.candidates.find((c) => c.role === "interest");
-  rt.push(interest.roundTripMinutes);
-  bandCount[interest.fitBand ?? 0]++;
-  if (interest.roundTripMinutes > 240) far++;
+  if (interest) {
+    legacyInterestCells++;
+    rt.push(interest.roundTripMinutes);
+    bandCount[interest.fitBand ?? 0]++;
+    if (interest.roundTripMinutes > 240) far++;
+  }
   if (md) {
     console.log("| 역할 | 후보 |");
     console.log("| --- | --- |");
@@ -61,9 +69,20 @@ rt.sort((a, b) => a - b);
 console.log(`\n---\n## 요약`);
 console.log(`- 성공 셀: ${rows.filter((r) => r.kind === "success").length}`);
 console.log(
-  `- \`interest\` 왕복시간 min/중앙/max: ${rt[0]} / ${rt[Math.floor(rt.length / 2)]} / ${rt[rt.length - 1]}분`,
+  `- 역할 분포: ${[...roleCounts.entries()]
+    .map(([role, count]) => `${role} ${count}`)
+    .join(" · ")}`,
 );
-console.log(`- \`interest\` 왕복 > 240분 셀: ${far}`);
-console.log(
-  `- \`interest\` 구간 분포: 보통 ${bandCount[0]} · 충실 ${bandCount[1]} · 매우 충실 ${bandCount[2]}`,
-);
+if (legacyInterestCells) {
+  console.log(
+    `- 구 T7 \`interest\` 왕복시간 min/중앙/max: ${rt[0]} / ${rt[Math.floor(rt.length / 2)]} / ${rt[rt.length - 1]}분`,
+  );
+  console.log(`- 구 T7 \`interest\` 왕복 > 240분 셀: ${far}`);
+  console.log(
+    `- 구 T7 \`interest\` 구간 분포: 보통 ${bandCount[0]} · 충실 ${bandCount[1]} · 매우 충실 ${bandCount[2]}`,
+  );
+} else {
+  console.log(
+    "- 현행 R4 덤프에는 구 T7 `interest` 역할이 없어 interest 전용 요약을 생략한다.",
+  );
+}

@@ -126,7 +126,7 @@ test("실제 검색 엔진의 역할 후보를 선택한 뒤에만 음식점 API
 
   const results = page.getByRole("region", { name: "목적지 추천" });
   await expect(results.locator(".dd-candidate").first()).toBeVisible();
-  await expect(results).toContainText("이동 부담을 줄인 여행");
+  await expect(results).toContainText("가까운 여행");
   expect(restaurantCalls).toBe(0);
 
   await results

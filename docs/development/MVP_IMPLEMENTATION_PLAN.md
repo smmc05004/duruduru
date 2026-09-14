@@ -1,5 +1,7 @@
 # MVP 구현 계획
 
+> **현재 작업(2026-09-14): R1/R2 검토·R3 확정·R4 구현·R5 검증 완료, 단일 PR 인계.** GPT-5.5 employee가 가까운 여행·1박 2일 여행·관심사 중심 여행 역할을 구현했고 총괄이 검토했다. 고도화 Jest 290개·E2E 12개·통합 검증을 통과했다. 실제 48개 전후 결과와 한계는 [R5 보고서](RECOMMENDATION_QUALITY_R5_REPORT.md), 정책은 [재작업 제품 기준](../product/RECOMMENDATION_QUALITY_RECOVERY.md)이다. 다음 단계는 사용자 결과 확인과 PR 검토다. 품질 수용 전 추천 문제 해결 완료로 표현하지 않는다. 아래 시점별 인계는 과거 기록이다.
+
 > **최우선 인계(2026-09-10):** 관광 데이터 고도화의 마지막 추가 작업은 [작업 계획 T7](TOURISM_RECOMMENDATION_WORK_PLAN.md)의 목적 적합성 보완이다. 사용자 승인·문서 반영 완료, 코드 구현은 미착수다. [제품 D4](../product/TOURISM_RECOMMENDATION_UPGRADE.md)에 따라 관심사 우선과 기존 입력을 유지하고 실제 일정 적합성 구간 안에서 이동 부담을 비교한다. 같은 작업 브랜치/기존 PR에서 T7만 마무리한다. 아래 PM 판단 대기·별도 후속 결정 문구는 과거 이력이다.
 
 > **최신 인계(2026-09-10):** [관광 데이터·목적 적합성 기획서](../product/TOURISM_RECOMMENDATION_UPGRADE.md)의 D1~D4를 **T1~T6으로 구현 완료**(브랜치 `docs/tourism-recommendation-upgrade`, PR 병합 대기). 새 공식 분류(`lclsSystm*`) 해석기·전국 재수집(schemaVersion 2)·중심 관광지 수집(202608)·보수적 원천 연결·목적 근거 점수·`interest` 우선 역할 순서가 반영됐다. 결과·검증·미해소 항목은 [T6 보고서](TOURISM_RECOMMENDATION_T6_REPORT.md). 아래 2장의 관심사 코드 규칙(`A01`·`A0201` 등)은 새 분류가 없는 레코드의 하위 호환 경로로만 유효하다. **PM 판단 대기: `interest` 역할의 원거리 대도시 쏠림(D4 정렬 산출물).** 아래 과거의 ‘다음 작업’ 문구보다 이 항목이 우선한다.

@@ -11,6 +11,7 @@ import { groupForMapping } from "@/lib/mvp-phase-two-regions";
 import {
   distinctAttractions,
   E2_ITINERARY_ALGORITHM_VERSION,
+  facilityGroups,
   scheduleTrip,
   validateSearchInput,
   type SchedulingCache,
@@ -166,7 +167,7 @@ function recommendationFor(
   const distance = actualDistanceMetrics(candidate);
   return {
     role,
-    algorithmVersion: "e1-v3",
+    algorithmVersion: "e1-v4",
     ...(purpose ? { purpose } : {}),
     roundTripMinutes: candidate.oneWayMinutes * 2,
     fulfilledInterestCount: fulfilled.length,
@@ -181,10 +182,6 @@ function recommendationFor(
   };
 }
 
-/**
- * `interest` 정렬의 2번째 키(D4). 저장본에 근거가 없으면(`unavailable`) 0으로 둔다.
- * 중심 자료가 없어도(`no-central-data`) 구간은 실제 일정 지표로 정상 계산된다.
- */
 function purposeFitBandOf(recommendation: CandidateRecommendation): number {
   const purpose = recommendation.purpose;
   if (!purpose || purpose.status === "unavailable" || purpose.fitBand == null)
@@ -192,10 +189,6 @@ function purposeFitBandOf(recommendation: CandidateRecommendation): number {
   return purpose.fitBand;
 }
 
-/**
- * `interest` 정렬의 보조 동점 키(D4). 확정 연결된 초안 배치 시설 수(상한 적용).
- * 하위 구 개수·구별 순위 숫자에 불변이다.
- */
 function matchedFacilityCountOf(
   recommendation: CandidateRecommendation,
 ): number {
@@ -203,6 +196,95 @@ function matchedFacilityCountOf(
   if (!purpose || purpose.status === "unavailable") return 0;
   return purpose.matchedFacilityCount ?? 0;
 }
+
+function purposeFitAverageOf(recommendation: CandidateRecommendation): number {
+  const value = recommendation.purpose?.fitAverage;
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function purposeInterestStats(
+  recommendation: CandidateRecommendation,
+  requestedInterests: MvpCategoryId[],
+) {
+  const byInterest = recommendation.purpose?.fitByInterest ?? {};
+  const facilities = requestedInterests.map(
+    (interest) => byInterest[interest]?.facilities ?? 0,
+  );
+  const types = requestedInterests.map(
+    (interest) => byInterest[interest]?.types ?? 0,
+  );
+  return {
+    minFacilities: facilities.length ? Math.min(...facilities) : 0,
+    minTypes: types.length ? Math.min(...types) : 0,
+  };
+}
+
+function attractionGroupCount(
+  blocks: Omit<Candidate, "recommendation" | "reasons">["preview"]["blocks"],
+  day?: 1 | 2,
+) {
+  const attractions = blocks.flatMap((block) =>
+    block.kind === "attraction" &&
+    (!day || block.day === day) &&
+    block.attraction
+      ? [block.attraction]
+      : [],
+  );
+  return new Set(facilityGroups(attractions).values()).size;
+}
+
+function attractionMinutesOnDay(
+  blocks: Omit<Candidate, "recommendation" | "reasons">["preview"]["blocks"],
+  day: 1 | 2,
+) {
+  return blocks
+    .filter((block) => block.kind === "attraction" && block.day === day)
+    .reduce((sum, block) => sum + block.durationMinutes, 0);
+}
+
+function qualifiesForRole(
+  candidate: RecommendedCandidate,
+  role: RecommendationRole,
+) {
+  const { recommendation } = candidate;
+  const requestedInterests = recommendation.requestedInterests;
+  if (recommendation.fulfilledInterestCount < requestedInterests.length)
+    return false;
+  if (attractionGroupCount(candidate.preview.blocks) < 3) return false;
+  if (role === "nearby") return candidate.oneWayMinutes <= 60;
+  if (role === "overnight") {
+    if (
+      candidate.oneWayMinutes <= 60 ||
+      candidate.oneWayMinutes > 180 ||
+      recommendation.localFreeMinutes < 240
+    )
+      return false;
+    const day1AttractionMinutes = attractionMinutesOnDay(
+      candidate.preview.blocks,
+      1,
+    );
+    if (day1AttractionMinutes >= 120)
+      return (
+        attractionGroupCount(candidate.preview.blocks, 1) >= 1 &&
+        attractionGroupCount(candidate.preview.blocks, 2) >= 1
+      );
+    return attractionGroupCount(candidate.preview.blocks, 2) >= 3;
+  }
+  if (role === "interestRich") {
+    const stats = purposeInterestStats(recommendation, requestedInterests);
+    return (
+      candidate.oneWayMinutes >= 120 &&
+      candidate.oneWayMinutes <= 240 &&
+      recommendation.localFreeMinutes >= 240 &&
+      purposeFitAverageOf(recommendation) >= 6 &&
+      stats.minFacilities >= 3 &&
+      stats.minTypes >= 3
+    );
+  }
+  return true;
+}
+
+const capped = (value: number, max: number) => Math.min(value, max);
 
 function compareByRole(
   role: RecommendationRole,
@@ -212,6 +294,61 @@ function compareByRole(
   const a = left.recommendation;
   const b = right.recommendation;
   let result = 0;
+  if (role === "nearby") {
+    const aStats = purposeInterestStats(a, a.requestedInterests);
+    const bStats = purposeInterestStats(b, b.requestedInterests);
+    result =
+      compareNumber(left.oneWayMinutes, right.oneWayMinutes) ||
+      compareNumber(
+        capped(purposeFitAverageOf(b), 7),
+        capped(purposeFitAverageOf(a), 7),
+      ) ||
+      compareNumber(
+        capped(bStats.minFacilities, 4),
+        capped(aStats.minFacilities, 4),
+      ) ||
+      compareNumber(capped(bStats.minTypes, 3), capped(aStats.minTypes, 3));
+  }
+  if (role === "overnight") {
+    const aStats = purposeInterestStats(a, a.requestedInterests);
+    const bStats = purposeInterestStats(b, b.requestedInterests);
+    result =
+      compareNumber(
+        Math.abs(left.oneWayMinutes - 120),
+        Math.abs(right.oneWayMinutes - 120),
+      ) ||
+      compareNumber(
+        capped(purposeFitAverageOf(b), 7),
+        capped(purposeFitAverageOf(a), 7),
+      ) ||
+      compareNumber(
+        capped(bStats.minFacilities, 4),
+        capped(aStats.minFacilities, 4),
+      ) ||
+      compareNumber(capped(bStats.minTypes, 3), capped(aStats.minTypes, 3)) ||
+      compareNumber(b.localFreeMinutes, a.localFreeMinutes) ||
+      compareNumber(left.oneWayMinutes, right.oneWayMinutes);
+  }
+  if (role === "interestRich") {
+    const aStats = purposeInterestStats(a, a.requestedInterests);
+    const bStats = purposeInterestStats(b, b.requestedInterests);
+    result =
+      compareNumber(
+        capped(purposeFitAverageOf(b), 7),
+        capped(purposeFitAverageOf(a), 7),
+      ) ||
+      compareNumber(capped(bStats.minTypes, 3), capped(aStats.minTypes, 3)) ||
+      compareNumber(
+        capped(bStats.minFacilities, 4),
+        capped(aStats.minFacilities, 4),
+      ) ||
+      compareNumber(
+        Math.abs(left.oneWayMinutes - 180),
+        Math.abs(right.oneWayMinutes - 180),
+      ) ||
+      compareNumber(b.localFreeMinutes, a.localFreeMinutes) ||
+      compareNumber(left.oneWayMinutes, right.oneWayMinutes);
+  }
   if (role === "easy")
     result =
       compareNumber(a.roundTripMinutes, b.roundTripMinutes) ||
@@ -296,6 +433,9 @@ function reasonsFor(recommendation: CandidateRecommendation): string[] {
     easy: "이동 부담을 줄인 여행",
     interest: "관심사를 깊게 즐기는 여행",
     relaxed: "여유롭게 머무는 여행",
+    nearby: "가까운 여행",
+    overnight: "1박 2일 여행",
+    interestRich: "관심사 중심 여행",
   };
   const fulfilled = recommendation.requestedInterests.filter(
     (interest) => !recommendation.missingInterests.includes(interest),
@@ -306,9 +446,19 @@ function reasonsFor(recommendation: CandidateRecommendation): string[] {
   const missing = recommendation.missingInterests
     .map((interest) => categoryLabels.get(interest))
     .join(" · ");
+  const roleReason: Partial<Record<RecommendationRole, string>> = {
+    nearby:
+      "가까운 이동 범위에서 실제 방문할 관광 시설 그룹을 3곳 이상 배치했어요.",
+    overnight:
+      "1박 2일로 다녀올 이동 범위에서 실제 방문할 관광 일정을 구성했어요.",
+    interestRich:
+      "관심사 시설과 세부 유형이 충분한 후보 중 이동 부담도 함께 비교했어요.",
+  };
+  const selectedRoleReason = roleReason[recommendation.role];
   return [
     `${roleTitle[recommendation.role]} · 왕복 자동차 일반 예상시간 ${recommendation.roundTripMinutes}분`,
     `${included || "선택 관심사 없음"} 포함 · 관광 ${recommendation.attractionCount}곳 · 현지 낮 자유시간 ${recommendation.localFreeMinutes}분${missing ? ` · ${missing} 미포함` : ""}`,
+    ...(selectedRoleReason ? [selectedRoleReason] : []),
     ...purposeReasons(
       recommendation.purpose,
       recommendation.requestedInterests,
@@ -342,11 +492,12 @@ export function selectCandidateRoles(
     };
   });
   const selected: RecommendedCandidate[] = [];
-  for (const role of ["interest", "easy", "relaxed"] as const) {
+  for (const role of ["nearby", "overnight", "interestRich"] as const) {
     const winner = prepared
       .filter(
         (candidate) =>
-          !selected.some((item) => item.groupId === candidate.groupId),
+          !selected.some((item) => item.groupId === candidate.groupId) &&
+          qualifiesForRole(candidate, role),
       )
       .map((candidate) => {
         const recommendation = { ...candidate.recommendation, role };
@@ -487,14 +638,21 @@ export function searchPhaseTwo(
           ? "왕복 이동·여행 중 식사·낮 관광과 여유시간을 함께 확보할 수 있는 지역이 없어요. 출발을 앞당기거나 복귀를 늦춰 주세요."
           : "선택 관심사의 서로 다른 관광지를 3곳 이상 확인할 수 있는 지역이 없어요. 관심사를 바꿔 주세요.",
     };
+  const selected = selectCandidateRoles(
+    candidates,
+    input.interests,
+    purposeByGroupId,
+  );
+  if (!selected.length)
+    return {
+      kind: "no-results",
+      message:
+        "이번 조건으로 추천할 여행지를 찾지 못했어요. 출발·복귀 시간이나 관심사를 바꿔 주세요.",
+    };
   return {
     kind: "success",
     searchId,
-    candidates: selectCandidateRoles(
-      candidates,
-      input.interests,
-      purposeByGroupId,
-    ),
+    candidates: selected,
     profileGeneratedAt: profiles.generatedAt,
   };
 }
