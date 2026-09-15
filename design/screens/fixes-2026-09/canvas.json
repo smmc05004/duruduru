@@ -1,0 +1,24 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 390, "h": 700, "title": "1 · 현지 이동 — BEFORE (스크린샷 재현)" },
+    { "file": "TravelVsVisitAfter.dc.html", "x": 470, "y": 0, "w": 390, "h": 660, "title": "2 · 현지 이동 — AFTER (점선 한 줄)" },
+    { "file": "OriginFormDeprecated.dc.html", "x": 940, "y": 0, "w": 390, "h": 260, "title": "폐기 · 출발지 폼 (다시 그리지 않음)" }
+  ],
+  "annotations": [
+    {
+      "id": "fix-brief-v2",
+      "x": 0,
+      "y": -280,
+      "w": 860,
+      "text": "2026-09-15 재작업. 사용자가 1차 결과를 반려해 두 가지를 바로잡았다.\n\n1) 출발지 폼 작업은 폐기했다 — 서울/부산 세그먼티드와 OriginSearch 검색 자체를 제품에서 곧 제거할 예정이라 이번엔 손대지 않는다. 오른쪽 작은 아트보드에만 폐기 메모를 남겼다.\n\n2) 실제로 깨진 대상은 '현지 이동'(장소↔장소, SERVICE_ENHANCEMENT_PHASE_2_PLAN.md의 straight-line-v1 직선거리 추정) 블록이었다. 1차 수정(배경만 --track으로 교체)은 카드의 테두리·섀도·패딩을 그대로 둬서 사용자 눈에는 그대로였다.\n\n코드 확인 결과: '현지 이동'과 '출발/복귀 이동'(KTDB, 지역 간)은 TripPlanner.tsx에서 둘 다 block.kind === \"travel\"이라 완전히 같은 클래스(p2-block p2-block--travel → p2-block-main dd-timeline-row__card)를 쓴다. '배치 근거' 아코디언은 이동 전용이 아니라 모든 블록 종류(방문·식사·이동·휴식)에 공통으로 붙는 요소다(block.reason).\n\ndocs/design/DESIGN_TOKENS.md에는 이번 세션 이전, 2차 고도화 코드가 들어오기 전에 이미 '장소 사이 이동: 카드가 아닌 한 줄 — --paper 바탕, 2px dashed --line-dashed, 높이 44px 미만 허용' 규정이 있었다(당시엔 '여행지 내부 이동을 계산하지 않는다'는 이유로 삭제됨). straight-line-v1이 이 기능을 실제로 구현했는데 문서가 그 변화를 반영하지 못했다. 이번에 이 규정을 복원하고 현재 코드에 맞게 갱신했다."
+    },
+    {
+      "id": "fix-scope-note-v2",
+      "x": 940,
+      "y": -280,
+      "w": 400,
+      "text": "이번에 하지 않은 것:\n\n· '현지 이동'과 '출발·복귀 이동'을 CSS로 서로 다르게 그리는 것 — 둘이 같은 클래스를 쓰므로 구분하려면 JSX에 block.localTravel 기준 modifier 클래스 추가가 먼저 필요하다. 이번엔 최우선 기준(둘 다 방문·식사 카드처럼 보이면 안 된다)만 충족하도록 하나의 형태를 공유시켰다.\n\n· app/globals.css의 죽은 .dd-tl-* 블록 정리 — 별도 과제로 남긴다.\n\n· 출발지 폼 재설계 — 기능 자체가 곧 제거될 예정이라 하지 않는다."
+    }
+  ],
+  "launch": { "view": "canvas" }
+}
