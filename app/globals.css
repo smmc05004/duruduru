@@ -175,6 +175,31 @@ button {
 .p2-block--restaurant .p2-block-main {
   border-left: 6px solid var(--olive-bar);
 }
+/* 이동 · 복귀 이동 · 현지 이동: 카드가 아닌 점선 한 줄.
+   docs/design/DESIGN_TOKENS.md 「일정 타임라인 항목 · 2026-09 복원·현행화」 참고.
+   `p2-block-main dd-timeline-row__card`가 주는 카드 배경·실선·하드섀도를
+   같은 특이도(클래스 2개)의 규칙으로 덮어써 방문·식사 카드와 구분한다. */
+.p2-block--travel .p2-block-main {
+  background: var(--paper);
+  border: 2px dashed var(--line-dashed);
+  box-shadow: none;
+  padding: 8px 14px;
+}
+.p2-block--travel .p2-block-label {
+  margin-bottom: 2px;
+}
+.p2-block--travel .p2-block-main > strong {
+  display: block;
+  margin: 2px 0 0;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-faint);
+}
+.p2-block--travel .p2-block-basis {
+  margin-top: 6px;
+  padding-top: 6px;
+  font-size: 10px;
+}
 .p2-block-time {
   font-weight: 800;
   font-size: 12px;
